@@ -23,6 +23,8 @@ func _ready() -> void:
 	_language.focus_neighbor_bottom = _start.get_path()
 	_start.focus_neighbor_top = _language.get_path()
 
+	for button: Button in [_start, _quit, _language]:
+		button.focus_entered.connect(Sfx.play_ui.bind("ui_move"))
 	_start.grab_focus()
 	_update_info()
 
@@ -53,6 +55,7 @@ func _update_info() -> void:
 
 
 func _on_start_pressed() -> void:
+	Sfx.play_ui("ui_confirm")
 	get_tree().change_scene_to_file(GAME_SCENE)
 
 
@@ -61,4 +64,5 @@ func _on_quit_pressed() -> void:
 
 
 func _on_language_pressed() -> void:
+	Sfx.play_ui("ui_confirm")
 	Settings.toggle_language()

@@ -1,0 +1,146 @@
+# Pagina itch.io di Gobelino
+
+Testi e immagini della pagina https://fdamore1984.itch.io/gobelino, allineati
+all'ultima versione del gioco. Vanno aggiornati a ogni modifica che cambia ciò
+che il gioco fa o mostra (vedi `CLAUDE.md`).
+
+itch.io non ha un'API per modificare la pagina: `butler` carica solo le build.
+Testi e immagini si inseriscono a mano da **Dashboard → Gobelino → Edit game**.
+
+Le immagini si rigenerano con lo strumento di cattura (serve una finestra):
+
+```bash
+godot --path . --resolution 1280x720 res://tools/store_capture.tscn -- screenshots
+godot --path . --resolution 1260x1000 res://tools/store_capture.tscn -- cover
+```
+
+---
+
+## Campi della pagina
+
+| Campo su itch.io | Valore |
+|---|---|
+| Kind of project | Downloadable |
+| Release status | Prototype |
+| Pricing | No payments (oppure "Donate" se vuoi accettare offerte) |
+| Uploads | Caricati dalla CI con butler: canali `windows`, `linux`, `android`. In *Edit game → Uploads* spunta per ciascuno la piattaforma (Windows / Linux / Android) |
+| Genre | Role Playing |
+| Tags | vedi sotto |
+| AI generation disclosure | Sì: codice, testi e grafica provvisoria sono stati prodotti con l'aiuto di un'IA (Claude) |
+| Languages | English, Italian |
+| Inputs | Keyboard, Xbox controller, Playstation controller, Touchscreen |
+| Cover image | `cover_en.png` (630×500) |
+| Screenshots | `en_1_combat.png`, `en_2_parry.png`, `en_3_level_up.png`, `en_4_menu.png` (le versioni `it_` sono le stesse in italiano) |
+
+### Tags
+
+Su itch.io se ne possono mettere al massimo 10:
+
+```
+action-rpg, fantasy, medieval, goblins, isometric, 2d, controller, singleplayer, godot, prototype
+```
+
+---
+
+## Short description or tagline
+
+```
+A feral goblin, a world to explore, real-time combat. · Un goblin selvatico, un mondo da esplorare, combattimenti in tempo reale.
+```
+
+---
+
+## Description
+
+Da incollare così com'è nel campo *Description* (l'editor accetta il testo
+formattato; i titoli si possono rendere in grassetto).
+
+```
+🇬🇧 ENGLISH
+
+Gobelino is a 2D medieval fantasy action RPG with an isometric view.
+
+You are a lone goblin with no past, living in a den like a wild animal. Starting from the woods around your den, you will explore the world beyond, grow stronger and meet those who will open new paths for you.
+
+⚠️ This is a prototype build: characters and enemies are placeholder geometric shapes and the sounds are synthesized placeholders. It's here to test the combat.
+
+IN THIS PROTOTYPE
+- A boundless test level with enemies scattered everywhere
+- Real-time combat: chain up to 3 attacks in a combo, each hit stronger than the last
+- Parry, and time it right before the hit for a perfect parry: the enemy is stunned and your attacks are empowered for a few seconds (double damage, faster swings)
+- Dodge, and press again mid-dodge to chain another one in a new direction
+- Four kinds of enemies: quick scouts, warriors, heavy brutes and summoners that call in reinforcements (hit them while they summon to interrupt them)
+- Enemies circle around you with quick sidesteps; their attacks are slow but unpredictable: watch the red area on the ground, beware of feints and follow-up strikes
+- Earn experience to level up: every level raises your base damage and lets you choose an upgrade: one more combo hit, one more chained dodge or one more health point
+
+CONTROLS
+- Move: left stick / WASD / on-screen stick
+- Attack (combo): R1 / J
+- Parry (hold): L1 / K
+- Dodge (press again to chain): B / Space
+- Menu: Start / Esc
+
+Play with a controller, keyboard, or touch on Android. Available in English and Italian.
+
+PLATFORMS
+Windows, Linux (Steam Deck included) and Android.
+
+--------------------------------------------------------------
+
+🇮🇹 ITALIANO
+
+Gobelino è un RPG d'azione 2D fantasy medievale con visuale isometrica.
+
+Sei un goblin solitario e senza passato, che vive in una tana come un animale selvatico. Partendo dai dintorni della tana esplorerai il mondo che ti circonda, diventerai più forte e incontrerai chi ti aprirà nuove strade.
+
+⚠️ Questa è una build di prototipo: personaggi e nemici sono forme geometriche provvisorie e i suoni sono provvisori, sintetizzati. Serve a provare il combattimento.
+
+IN QUESTO PROTOTIPO
+- Un livello di test senza confini, con nemici sparsi ovunque
+- Combattimento in tempo reale: concatena fino a 3 attacchi in combo, ogni colpo più forte del precedente
+- Para, e fallo appena prima del colpo per una parata perfetta: il nemico resta stordito e i tuoi attacchi sono potenziati per qualche secondo (doppio danno, colpi più rapidi)
+- Schiva, e premi di nuovo durante la schivata per concatenarne un'altra in una nuova direzione
+- Quattro tipi di nemici: esploratori rapidi, guerrieri, bruti corazzati ed evocatori che chiamano rinforzi (colpiscili mentre evocano per interromperli)
+- I nemici ti girano attorno con scatti laterali; i loro attacchi sono lenti ma imprevedibili: guarda la zona rossa a terra, attento alle finte e ai secondi colpi
+- Guadagna esperienza per salire di livello: ogni livello aumenta i danni base e ti fa scegliere un potenziamento: un colpo in più nella combo, una schivata concatenata in più o un punto vita in più
+
+COMANDI
+- Movimento: levetta sinistra / WASD / levetta a schermo
+- Attacco (combo): R1 / J
+- Parata (tieni premuto): L1 / K
+- Schivata (premi di nuovo per concatenare): B / Spazio
+- Menù: Start / Esc
+
+Gioca con il controller, con la tastiera o col touch su Android. Disponibile in italiano e in inglese.
+
+PIATTAFORME
+Windows, Linux (anche Steam Deck) e Android.
+```
+
+---
+
+## Download instructions
+
+Campo *Download & install instructions* (sotto la sezione Uploads).
+
+```
+🇬🇧 HOW TO INSTALL
+
+Windows: download the Windows file, extract the archive and run Gobelino.exe. Windows may warn that the app is from an unknown publisher: click "More info" → "Run anyway".
+
+Linux / Steam Deck: download the Linux file, extract it and run Gobelino.x86_64 (if needed, make it executable first: right click → Properties → Allow executing, or chmod +x Gobelino.x86_64). On Steam Deck do this in Desktop Mode; you can then add it to Steam as a non-Steam game to play it in Game Mode with the controller.
+
+Android: download the .apk file on your phone and open it. Android will ask you to allow installing apps from this source: allow it, then install. To update, download and install the new .apk over the old one.
+
+Tip: with the itch.io app (https://itch.io/app) the game on Windows and Linux updates automatically to the latest build.
+
+🇮🇹 COME INSTALLARE
+
+Windows: scarica il file per Windows, estrai l'archivio e avvia Gobelino.exe. Windows potrebbe avvisare che l'app è di un autore sconosciuto: clicca "Ulteriori informazioni" → "Esegui comunque".
+
+Linux / Steam Deck: scarica il file per Linux, estrailo e avvia Gobelino.x86_64 (se serve, rendilo prima eseguibile: tasto destro → Proprietà → Consenti l'esecuzione, oppure chmod +x Gobelino.x86_64). Su Steam Deck fallo in modalità Desktop; poi puoi aggiungerlo a Steam come gioco non Steam per giocarlo in modalità Gioco con il controller.
+
+Android: scarica il file .apk sul telefono e aprilo. Android chiederà di consentire l'installazione di app da questa fonte: consentila e installa. Per aggiornare, scarica e installa il nuovo .apk sopra quello vecchio.
+
+Consiglio: con l'app di itch.io (https://itch.io/app) il gioco su Windows e Linux si aggiorna da solo all'ultima build.
+```

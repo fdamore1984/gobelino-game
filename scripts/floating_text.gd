@@ -18,6 +18,8 @@ static func spawn(parent: Node, at: Vector2, text: String, color: Color, height_
 	label._text = text
 	label._color = color
 	label.z_index = 100
+	# Si muove in _process: l'interpolazione fisica non serve.
+	label.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	parent.add_child(label)
 	label.global_position = at + Vector2(0, -50.0 - height_offset)
 
