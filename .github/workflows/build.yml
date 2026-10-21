@@ -36,6 +36,15 @@ jobs:
         with:
           lfs: true
 
+      # L'immagine installa template ed editor settings (SDK Android, Java,
+      # keystore di debug) sotto /root, ma nei container di GitHub Actions
+      # HOME è /github/home: li spostiamo dove Godot li cerca.
+      - name: Prepara template ed editor settings
+        run: |
+          mkdir -v -p ~/.local/share/godot/export_templates ~/.config
+          mv /root/.local/share/godot/export_templates/* ~/.local/share/godot/export_templates/
+          mv /root/.config/godot ~/.config/godot
+
       - name: Importa le risorse
         run: godot --headless --verbose --import || true
 
