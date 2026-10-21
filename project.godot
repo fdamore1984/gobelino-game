@@ -21,6 +21,7 @@ config/icon="res://icon.svg"
 
 Platform="*res://scripts/platform.gd"
 Settings="*res://scripts/settings.gd"
+Sfx="*res://scripts/sfx.gd"
 
 [display]
 
@@ -34,6 +35,10 @@ window/handheld/orientation=0
 
 locale/translations=PackedStringArray("res://data/translations.it.translation", "res://data/translations.en.translation")
 locale/fallback="en"
+
+[physics]
+
+common/physics_interpolation=true
 
 [rendering]
 

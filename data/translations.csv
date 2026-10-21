@@ -6,7 +6,7 @@ MENU_VERSION,Versione %s,Version %s
 HUD_HEALTH,Vita  %d / %d,Health  %d / %d
 HUD_KILLS,Nemici sconfitti  %d,Enemies defeated  %d
 HUD_DEFEAT,Sconfitto!,Defeated!
-HUD_HINT,Muovi: WASD / frecce / levetta    Attacco: J / R1    Parata: K / L1 (tieni premuto)    Schivata: Spazio / B (due volte: più lunga)    Menu: Esc / Start,Move: WASD / arrows / stick    Attack: J / R1    Parry: K / L1 (hold)    Dodge: Space / B (twice: longer)    Menu: Esc / Start
+HUD_HINT,Muovi: WASD / levetta    Attacco (combo): J / R1    Parata: K / L1 tenuto    Schivata (ripeti per concatenare): Spazio / B    Menu: Esc / Start,Move: WASD / stick    Attack (combo): J / R1    Parry: K / L1 hold    Dodge (repeat to chain): Space / B    Menu: Esc / Start
 FX_DODGED,Schivato!,Dodged!
 FX_BLOCKED,Parato,Blocked
 FX_PERFECT_PARRY,Parata perfetta!,Perfect parry!
@@ -15,3 +15,14 @@ TOUCH_ATTACK,Attacco,Attack
 TOUCH_PARRY,Parata,Parry
 TOUCH_DODGE,Schivata,Dodge
 TOUCH_MENU,Menu,Menu
+HUD_LEVEL,Livello %d,Level %d
+HUD_XP,EXP %d / %d,XP %d / %d
+FX_XP,+%d EXP,+%d XP
+FX_COMBO,Combo x%d,Combo x%d
+FX_LEVEL_UP,Livello superiore!,Level up!
+LEVELUP_TITLE,Livello %d!,Level %d!
+LEVELUP_DAMAGE,Danni base: %d → %d,Base damage: %d → %d
+LEVELUP_CHOOSE,Scegli un potenziamento,Choose an upgrade
+UPGRADE_COMBO,Colpi in combo +1   (%d → %d),Combo hits +1   (%d → %d)
+UPGRADE_DODGE,Schivate consecutive +1   (%d → %d),Chained dodges +1   (%d → %d)
+UPGRADE_HEALTH,Punti vita +1   (%d → %d),Health +1   (%d → %d)

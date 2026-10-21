@@ -29,8 +29,8 @@ Documento vivo: da compilare e aggiornare. Le sezioni vuote sono da definire.
 Cosa fa il giocatore minuto per minuto, ora per ora:
 
 - **Esplorazione**: partire dai dintorni della tana, poi scoprire il mondo e le città
-- **Combattimento**: in tempo reale. Nel prototipo: attacco frontale ad arco, parata tenendo premuto, schivata con invulnerabilità (doppia pressione: schivata più lunga). La parata perfetta stordisce il nemico e potenzia per qualche secondo gli attacchi (più forti e più rapidi). I nemici si muovono lateralmente con scatti rapidi e hanno attacchi lenti e annunciati, con tempi variabili, finte e secondi attacchi. Stamina e armi _da definire_
-- **Progressione**: diventare più forte, trovare nuove armi e nuovo equipaggiamento. Sistema _da definire (livelli, abilità)_
+- **Combattimento**: in tempo reale. Nel prototipo: combo di attacchi sempre più forti (3 colpi all'inizio), parata tenendo premuto, schivate concatenate con cambio di direzione. La parata perfetta stordisce il nemico e potenzia per qualche secondo gli attacchi (più forti e più rapidi). Nemici di quattro tipi (esploratore, guerriero, bruto, evocatore che chiama rinforzi) con scatti laterali e attacchi lenti e annunciati, con tempi variabili, finte e secondi attacchi. Stamina e armi _da definire_
+- **Progressione**: diventare più forte, trovare nuove armi e nuovo equipaggiamento. Nel prototipo: esperienza dai nemici, livelli a 100 / 200 / 300... punti; ogni livello aumenta i danni base e fa scegliere un potenziamento (combo, schivate concatenate o vita)
 - **Quest**: assegnate da personaggi incontrati lungo il cammino
 - **Looting**: sia drop dai nemici sia forzieri e oggetti fissi nel mondo. Tabelle di drop e rarità _da definire_
 - **Economia**: _da definire_
@@ -42,7 +42,8 @@ Priorità di design indicata: il cuore del gioco sono sistema di gioco, inventar
 | Sistema | Descrizione | Stato |
 |---|---|---|
 | Movimento | Isometrico, 8 direzioni; tastiera, gamepad e touch. Nel prototipo il movimento segue le direzioni dello schermo, con accelerazione e frenata | prototipo |
-| Combattimento | Tempo reale: attacco (R1), parata (L1), schivata (B); nemici con attacchi lenti da schivare | prototipo |
+| Combattimento | Tempo reale: combo (R1), parata (L1), schivate concatenate (B); quattro tipi di nemici | prototipo |
+| Progressione | Esperienza, livelli e potenziamenti a scelta | prototipo |
 | Inventario | A slot con limite di peso. Dettagli (numero slot, pesi, deposito nella tana) _da definire_ | da fare |
 | Dialoghi | _da definire_ | da fare |
 | Quest | _da definire_ | da fare |
@@ -57,7 +58,7 @@ Priorità di design indicata: il cuore del gioco sono sistema di gioco, inventar
 
 - **Stile grafico**: 2D isometrico (pixel art, disegnato a mano...): _da definire_
 - **Risoluzione base**: 1280x720 (impostata nel progetto, modificabile)
-- **Musica e suoni**: _da definire_
+- **Musica e suoni**: _da definire_. Nel prototipo effetti sintetizzati in codice, da sostituire
 
 ## 8. Scope e roadmap
 

@@ -26,7 +26,9 @@ Poi apri la cartella da Godot (Importa progetto → `project.godot`) e premi F5.
 | `scenes/` | Scene Godot (`.tscn`) |
 | `scripts/` | Script GDScript (`.gd`) |
 | `assets/` | Sprite, audio, font (gestiti con LFS) |
-| `data/` | Dati di gioco in JSON/risorse: oggetti, nemici, quest |
+| `data/` | Dati di gioco: nemici (`enemies.json`), traduzioni (`translations.csv`) |
+| `store/itch/` | Testi e immagini della pagina itch.io |
+| `tools/` | Strumenti di sviluppo esclusi dalle build (cattura screenshot per lo store) |
 | `docs/` | Documentazione, incluso il [GDD](docs/GDD.md) |
 | `.github/workflows/` | Build automatiche |
 
@@ -54,21 +56,22 @@ Regole di progetto per restare multipiattaforma:
 
 ## Livello di test
 
-All'avvio c'è un menù (Inizia / Esci). Il livello di test è un piano senza limiti con nemici sparsi a caso; per ora personaggi e nemici sono forme geometriche, in attesa degli asset grafici.
+All'avvio c'è un menù (Inizia / Esci / lingua). Il livello di test è un piano senza limiti con nemici di vari tipi sparsi a caso; per ora personaggi e nemici sono forme geometriche e i suoni sono sintetizzati in `scripts/sfx.gd`, in attesa degli asset definitivi.
 
 | Azione | Tastiera | Gamepad | Touch |
 |---|---|---|---|
 | Movimento | WASD / frecce | levetta sinistra / croce | levetta virtuale a sinistra |
-| Attacco | J | R1 | pulsante "Attacco" |
+| Attacco (combo) | J | R1 | pulsante "Attacco" |
 | Parata (tieni premuto) | K | L1 | pulsante "Parata" |
-| Schivata (due volte di seguito: più lunga) | Spazio | B | pulsante "Schivata" |
+| Schivata (ripeti per concatenare) | Spazio | B | pulsante "Schivata" |
 | Torna al menù | Esc | Start | pulsante "Menu" |
 
-Il movimento ha accelerazione e frenata: si parte piano, si accelera rapidamente e ci si ferma dopo un breve scivolamento.
-
-I nemici girano attorno al giocatore con spostamenti laterali e scatti rapidi. Il loro attacco è lento: a terra compare la zona che verrà colpita, poi scattano in avanti. Per essere meno prevedibili la carica ha durata variabile, a volte è una finta e a volte segue subito un secondo attacco.
-
-La schivata rende invulnerabili per un istante; premuta due volte di seguito è più lunga. Una parata iniziata appena prima del colpo (parata perfetta) lascia il nemico stordito e potenzia gli attacchi per 4 secondi: fanno il doppio dei danni e sono più rapidi.
+- **Movimento**: accelerazione e frenata, con interpolazione fisica per restare fluido anche su schermi a 90/120 Hz.
+- **Combo**: attacchi ravvicinati formano una combo (3 colpi all'inizio); ogni colpo fa il 50% in più del precedente.
+- **Parata**: blocca i colpi frontali; una parata perfetta, iniziata appena prima del colpo, stordisce il nemico e per 4 secondi raddoppia i danni e velocizza gli attacchi.
+- **Schivata**: invulnerabilità per un istante; premendo di nuovo durante la schivata se ne concatena un'altra, anche in un'altra direzione (2 all'inizio).
+- **Esperienza e livelli**: ogni nemico sconfitto dà esperienza; servono 100 punti per il livello 2, 200 per il 3 e così via. Ogni livello aumenta i danni base e fa scegliere un potenziamento: +1 colpo nella combo, +1 schivata concatenata o +1 punto vita.
+- **Nemici** (`data/enemies.json`): esploratori rapidi, guerrieri, bruti lenti e resistenti che fanno 2 danni, evocatori che restano a distanza ed evocano esploratori (colpirli mentre evocano li interrompe). Girano attorno al giocatore con scatti laterali; l'attacco è annunciato dalla zona rossa a terra, con durata variabile, finte e secondi attacchi. Salendo di livello compaiono più spesso i nemici forti.
 
 ## Lingue
 
