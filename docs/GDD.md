@@ -6,7 +6,7 @@ Documento vivo: da compilare e aggiornare. Le sezioni vuote sono da definire.
 
 - **Titolo provvisorio**: Gobelino
 - **Genere**: RPG fantasy medievale 2D
-- **Piattaforma target**: PC (Steam), Windows e Linux
+- **Piattaforme target**: Windows, Linux, SteamOS (Steam Deck) e Android. Steam per desktop e Deck, Google Play per Android
 - **Pitch in una frase**: _da definire_
 - **Pubblico**: _da definire_
 - **Durata stimata**: _da definire (consigliato 5-10 ore per il primo titolo)_
@@ -65,6 +65,7 @@ Cosa fa il giocatore minuto per minuto, ora per ora:
 
 ## 9. Decisioni tecniche
 
-- **Motore**: Godot 4.4, GDScript
+- **Motore**: Godot 4.4, GDScript, renderer Compatibility
+- **Input**: tastiera, gamepad e touch tramite Input Map; UI utilizzabile anche solo con controller
 - **Dati**: contenuti di gioco in `data/` (JSON o risorse), separati dal codice
 - **Repository**: ramo unico `main`, CI su GitHub Actions

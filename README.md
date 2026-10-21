@@ -30,11 +30,27 @@ Poi apri la cartella da Godot (Importa progetto → `project.godot`) e premi F5.
 | `docs/` | Documentazione, incluso il [GDD](docs/GDD.md) |
 | `.github/workflows/` | Build automatiche |
 
+## Piattaforme
+
+| Piattaforma | Come | Note |
+|---|---|---|
+| Windows | export "Windows Desktop" | Distribuzione su Steam |
+| Linux / SteamOS | export "Linux" | La build Linux gira nativa sullo Steam Deck (16:10, controller) |
+| Android | export "Android" | Distribuzione su Google Play, non su Steam |
+
+Regole di progetto per restare multipiattaforma:
+
+- **Renderer**: Compatibility (OpenGL), il più compatibile per 2D su mobile e PC datati
+- **Input**: solo azioni dell'Input Map (`move_*`, `interact`, `attack`, `menu`), mai tasti scritti nel codice. Tastiera e gamepad sono già mappati; i controlli touch vanno aggiunti nella UI
+- **UI**: ancoraggi e container, stretch "expand", orientamento landscape
+- **Piattaforma**: il codice chiede a `Platform` (`scripts/platform.gd`) cosa è disponibile (touch, Steam, Deck) invece di controllare il sistema operativo
+- **Salvataggi**: sempre in `user://`
+
 ## Flusso di lavoro
 
 - `main`: ramo unico, sempre in stato funzionante
 - Lavoro in branch di feature (`feature/nome`) con Pull Request verso `main`
-- Ogni push su `main` genera le build Windows e Linux come artifact di GitHub Actions
+- Ogni push su `main` genera le build Windows, Linux e Android (APK di debug) come artifact di GitHub Actions
 
 ## Build
 

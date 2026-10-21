@@ -7,9 +7,6 @@ on:
     branches: [main]
   workflow_dispatch:
 
-env:
-  GODOT_VERSION: "4.4.1"
-
 jobs:
   export:
     name: Export (${{ matrix.preset }})
@@ -23,9 +20,17 @@ jobs:
           - preset: "Windows Desktop"
             dir: windows
             artifact: gobelino-windows
+            mode: --export-release
           - preset: "Linux"
             dir: linux
             artifact: gobelino-linux
+            mode: --export-release
+          # Build di test firmata con la chiave di debug. Per Google Play
+          # servirà un job release con keystore nei secrets di GitHub.
+          - preset: "Android"
+            dir: android
+            artifact: gobelino-android-debug
+            mode: --export-debug
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,7 +42,7 @@ jobs:
       - name: Esporta
         run: |
           mkdir -p build/${{ matrix.dir }}
-          godot --headless --verbose --export-release "${{ matrix.preset }}"
+          godot --headless --verbose ${{ matrix.mode }} "${{ matrix.preset }}"
 
       - name: Carica artifact
         uses: actions/upload-artifact@v4
