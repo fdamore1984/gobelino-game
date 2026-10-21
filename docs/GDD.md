@@ -7,33 +7,37 @@ Documento vivo: da compilare e aggiornare. Le sezioni vuote sono da definire.
 - **Titolo provvisorio**: Gobelino
 - **Genere**: RPG fantasy medievale 2D
 - **Piattaforme target**: Windows, Linux, SteamOS (Steam Deck) e Android. Steam per desktop e Deck, Google Play per Android
-- **Pitch in una frase**: _da definire_
+- **Pitch in una frase**: Un goblin solitario, muto e senza passato, che vive in una tana come un animale selvatico, esplora il mondo attorno a sé, diventa più forte e incontra chi gli apre nuove strade.
 - **Pubblico**: _da definire_
 - **Durata stimata**: _da definire (consigliato 5-10 ore per il primo titolo)_
 
 ## 2. Ambientazione e tono
 
-- **Mondo**: _da definire_
+- **Mondo**: si parte dai dintorni della tana del goblin e ci si allarga al mondo circostante, fino alle città. Dettagli da definire
 - **Epoca e atmosfera**: medievale fantasy
 - **Tono** (serio, ironico, cupo...): _da definire_
 - **Riferimenti e ispirazioni**: _da definire_
 
 ## 3. Protagonista e personaggi
 
-- **Protagonista**: _da definire_
-- **Personaggi chiave**: _da definire_
+- **Protagonista**: un goblin che vive in una tana tutta sua. Non parla, non ha un passato, è completamente solo e si comporta come un animale selvatico. Nome: _da definire_
+- **Personaggi chiave**: personaggi incontrati nel mondo che introducono nuove quest. Elenco _da definire_
 - **Fazioni**: _da definire_
 
 ## 4. Loop di gioco
 
 Cosa fa il giocatore minuto per minuto, ora per ora:
 
-- **Esplorazione**: _da definire_
+- **Esplorazione**: partire dai dintorni della tana, poi scoprire il mondo e le città
 - **Combattimento**: _da definire (a turni, in tempo reale, ibrido)_
-- **Progressione**: _da definire (livelli, equipaggiamento, abilità)_
+- **Progressione**: diventare più forte, trovare nuove armi e nuovo equipaggiamento. Sistema _da definire (livelli, abilità)_
+- **Quest**: assegnate da personaggi incontrati lungo il cammino
+- **Looting**: _da definire_
 - **Economia**: _da definire_
 
 ## 5. Sistemi principali
+
+Priorità di design indicata: il cuore del gioco sono sistema di gioco, inventario e looting. Vanno definiti prima dei contenuti.
 
 | Sistema | Descrizione | Stato |
 |---|---|---|
