@@ -45,6 +45,10 @@ jobs:
           mv /root/.local/share/godot/export_templates/* ~/.local/share/godot/export_templates/
           mv /root/.config/godot ~/.config/godot
 
+      # La versione mostrata nel gioco coincide con quella caricata su itch.io.
+      - name: Imposta la versione
+        run: sed -i 's|^config/version=.*|config/version="0.1.${{ github.run_number }}"|' project.godot
+
       - name: Importa le risorse
         run: godot --headless --verbose --import || true
 
