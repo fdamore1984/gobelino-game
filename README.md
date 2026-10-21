@@ -41,7 +41,7 @@ Poi apri la cartella da Godot (Importa progetto → `project.godot`) e premi F5.
 Regole di progetto per restare multipiattaforma:
 
 - **Renderer**: Compatibility (OpenGL), il più compatibile per 2D su mobile e PC datati
-- **Input**: solo azioni dell'Input Map (`move_*`, `interact`, `attack`, `menu`), mai tasti scritti nel codice. Tastiera e gamepad sono già mappati; i controlli touch vanno aggiunti nella UI
+- **Input**: solo azioni dell'Input Map (`move_*`, `interact`, `attack`, `parry`, `dodge`, `menu`), mai tasti scritti nel codice. Tastiera e gamepad sono mappati nel progetto; i controlli touch (`scripts/touch_controls.gd`) premono le stesse azioni
 - **UI**: ancoraggi e container, stretch "expand", orientamento landscape
 - **Piattaforma**: il codice chiede a `Platform` (`scripts/platform.gd`) cosa è disponibile (touch, Steam, Deck) invece di controllare il sistema operativo
 - **Salvataggi**: sempre in `user://`
@@ -50,7 +50,21 @@ Regole di progetto per restare multipiattaforma:
 
 - `main`: ramo unico, sempre in stato funzionante
 - Lavoro in branch di feature (`feature/nome`) con Pull Request verso `main`
-- Ogni push su `main` genera le build Windows, Linux e Android (APK di debug) come artifact di GitHub Actions
+- Ogni push su `main` genera le build Windows, Linux e Android (APK di debug) e le carica su itch.io; sulle Pull Request la CI verifica solo che l'export riesca
+
+## Livello di test
+
+All'avvio c'è un menù (Inizia / Esci). Il livello di test è un piano senza limiti con nemici sparsi a caso; per ora personaggi e nemici sono forme geometriche, in attesa degli asset grafici.
+
+| Azione | Tastiera | Gamepad | Touch |
+|---|---|---|---|
+| Movimento | WASD / frecce | levetta sinistra / croce | levetta virtuale a sinistra |
+| Attacco | J | R1 | pulsante "Attacco" |
+| Parata (tieni premuto) | K | L1 | pulsante "Parata" |
+| Schivata | Spazio | B | pulsante "Schivata" |
+| Torna al menù | Esc | Start | pulsante "Menu" |
+
+I nemici caricano un attacco lento: a terra compare la zona che verrà colpita, poi scattano in avanti. La schivata rende invulnerabili per un istante; una parata iniziata appena prima del colpo (parata perfetta) lascia il nemico stordito.
 
 ## Build
 

@@ -29,7 +29,7 @@ Documento vivo: da compilare e aggiornare. Le sezioni vuote sono da definire.
 Cosa fa il giocatore minuto per minuto, ora per ora:
 
 - **Esplorazione**: partire dai dintorni della tana, poi scoprire il mondo e le città
-- **Combattimento**: in tempo reale. Dettagli (attacco, schivata, stamina, armi) _da definire_
+- **Combattimento**: in tempo reale. Nel prototipo: attacco frontale ad arco, parata tenendo premuto (con parata perfetta che stordisce il nemico), schivata con invulnerabilità. I nemici hanno attacchi lenti e annunciati da schivare. Stamina e armi _da definire_
 - **Progressione**: diventare più forte, trovare nuove armi e nuovo equipaggiamento. Sistema _da definire (livelli, abilità)_
 - **Quest**: assegnate da personaggi incontrati lungo il cammino
 - **Looting**: sia drop dai nemici sia forzieri e oggetti fissi nel mondo. Tabelle di drop e rarità _da definire_
@@ -41,8 +41,8 @@ Priorità di design indicata: il cuore del gioco sono sistema di gioco, inventar
 
 | Sistema | Descrizione | Stato |
 |---|---|---|
-| Movimento | Isometrico, 8 direzioni; tastiera, gamepad e touch | da fare |
-| Combattimento | Tempo reale | da fare |
+| Movimento | Isometrico, 8 direzioni; tastiera, gamepad e touch. Nel prototipo il movimento segue le direzioni dello schermo | prototipo |
+| Combattimento | Tempo reale: attacco (R1), parata (L1), schivata (B); nemici con attacchi lenti da schivare | prototipo |
 | Inventario | A slot con limite di peso. Dettagli (numero slot, pesi, deposito nella tana) _da definire_ | da fare |
 | Dialoghi | _da definire_ | da fare |
 | Quest | _da definire_ | da fare |
