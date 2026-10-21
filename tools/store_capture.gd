@@ -37,26 +37,35 @@ func _ready() -> void:
 func _capture_menu(language: String) -> void:
 	var menu := (load("res://scenes/menu.tscn") as PackedScene).instantiate()
 	add_child(menu)
+	# Nella pagina dello store non serve la riga diagnostica sul controller.
+	var info: Label = menu.get_node("%Info")
+	info.text = "\n".join(info.text.split("\n").slice(0, 2))
 	await _save("%s_4_menu.png" % language)
 	menu.queue_free()
 	await _frames(2)
 
 
-## Combo in corso, un bruto che carica, un evocatore che evoca, nemici attorno.
+## Colpo potente in fondo alla combo, un bruto che carica, un evocatore
+## che evoca, nemici attorno; scudo attivo.
 func _capture_combat(language: String) -> void:
 	_start_game(Vector2(0, 20), 1.15)
 	_player.level = 3
 	_player.experience = 170
 	_player.facing = Vector2(1, -0.2).normalized()
 	_player._combo_step = 3
+	_player._heavy_step = 1
+	_player._attack_heavy = true
 	_player._state = Player.State.ATTACK
-	_player._state_time = Player.ATTACK_WINDUP + 0.02
+	_player._state_time = Player.HEAVY_WINDUP + 0.03
+	_player.shield_active = true
+	_player.shield_cooldown = 21.0
+	_player.potions = 1
 	_hud_stats()
-	var warrior := _enemy("warrior", Vector2(85, -25), Enemy.State.CHASE, 0.0)
+	var warrior := _enemy("warrior", Vector2(95, -25), Enemy.State.CHASE, 0.0)
 	warrior.health = 15
 	warrior._hit_flash = 0.1
-	FloatingText.spawn(_entities(), warrior.global_position + Vector2(0, 4), "20", Color.WHITE)
-	FloatingText.spawn(_entities(), _player.global_position, tr("FX_COMBO") % 3, Player.COLOR_SLASH, 12.0)
+	FloatingText.spawn(_entities(), warrior.global_position + Vector2(0, 4), str(_player._attack_damage()), Color.WHITE)
+	FloatingText.spawn(_entities(), _player.global_position, tr("FX_HEAVY"), Player.COLOR_HEAVY, 12.0)
 	_enemy("brute", Vector2(-170, 90), Enemy.State.WINDUP, 0.6)
 	var summoner := _enemy("summoner", Vector2(330, 150), Enemy.State.SUMMON, 0.8)
 	summoner._summon_positions = [Vector2(-70, 0), Vector2(70, 0)]
@@ -95,7 +104,7 @@ func _capture_level_up(language: String) -> void:
 	_enemy("scout", Vector2(-220, -90), Enemy.State.CHASE, 0.0)
 	_enemy("brute", Vector2(-300, 160), Enemy.State.CHASE, 0.0)
 	var hud: Hud = _game.get_node("HUD")
-	hud.show_level_up(3, Player.BASE_DAMAGE + Player.DAMAGE_PER_LEVEL, Player.BASE_DAMAGE + 2 * Player.DAMAGE_PER_LEVEL, _player)
+	hud.show_level_up(3, Player.BASE_DAMAGE + Player.DAMAGE_PER_LEVEL, Player.BASE_DAMAGE + 2 * Player.DAMAGE_PER_LEVEL)
 	await get_tree().create_timer(Hud.LEVEL_UP_INPUT_DELAY + 0.1).timeout
 	await _save("%s_3_level_up.png" % language)
 	_end_game()

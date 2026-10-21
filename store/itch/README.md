@@ -66,18 +66,22 @@ You are a lone goblin with no past, living in a den like a wild animal. Starting
 
 IN THIS PROTOTYPE
 - A boundless test level with enemies scattered everywhere
-- Real-time combat: chain up to 3 attacks in a combo, each hit stronger than the last
+- Real-time combat: chain up to 3 attacks in a combo, each hit stronger than the last, and finish it with a power strike for a big bonus
 - Parry, and time it right before the hit for a perfect parry: the enemy is stunned and your attacks are empowered for a few seconds (double damage, faster swings)
 - Dodge, and press again mid-dodge to chain another one in a new direction
+- Healing potions (you start with 2) and a magic shield that absorbs one hit, recharging in 30 seconds
 - Four kinds of enemies: quick scouts, warriors, heavy brutes and summoners that call in reinforcements (hit them while they summon to interrupt them)
 - Enemies circle around you with quick sidesteps; their attacks are slow but unpredictable: watch the red area on the ground, beware of feints and follow-up strikes
-- Earn experience to level up: every level raises your base damage and lets you choose an upgrade: one more combo hit, one more chained dodge or one more health point
+- Earn experience to level up: every level raises your base damage and lets you choose an upgrade: one more combo hit, one more chained power strike, one more chained dodge, one more health point, one more potion or a faster shield recharge
 
 CONTROLS
 - Move: left stick / WASD / on-screen stick
 - Attack (combo): R1 / J
+- Power strike (ends the combo): Y / L
 - Parry (hold): L1 / K
 - Dodge (press again to chain): B / Space
+- Potion: D-pad left / Q
+- Shield: D-pad right / R
 - Menu: Start / Esc
 
 Play with a controller, keyboard, or touch on Android. Available in English and Italian.
@@ -97,18 +101,22 @@ Sei un goblin solitario e senza passato, che vive in una tana come un animale se
 
 IN QUESTO PROTOTIPO
 - Un livello di test senza confini, con nemici sparsi ovunque
-- Combattimento in tempo reale: concatena fino a 3 attacchi in combo, ogni colpo più forte del precedente
+- Combattimento in tempo reale: concatena fino a 3 attacchi in combo, ogni colpo più forte del precedente, e chiudila con un colpo potente per un grosso bonus
 - Para, e fallo appena prima del colpo per una parata perfetta: il nemico resta stordito e i tuoi attacchi sono potenziati per qualche secondo (doppio danno, colpi più rapidi)
 - Schiva, e premi di nuovo durante la schivata per concatenarne un'altra in una nuova direzione
+- Pozioni curative (ne hai 2 all'inizio) e uno scudo magico che assorbe un colpo e si ricarica in 30 secondi
 - Quattro tipi di nemici: esploratori rapidi, guerrieri, bruti corazzati ed evocatori che chiamano rinforzi (colpiscili mentre evocano per interromperli)
 - I nemici ti girano attorno con scatti laterali; i loro attacchi sono lenti ma imprevedibili: guarda la zona rossa a terra, attento alle finte e ai secondi colpi
-- Guadagna esperienza per salire di livello: ogni livello aumenta i danni base e ti fa scegliere un potenziamento: un colpo in più nella combo, una schivata concatenata in più o un punto vita in più
+- Guadagna esperienza per salire di livello: ogni livello aumenta i danni base e ti fa scegliere un potenziamento: un colpo in più nella combo, un colpo potente concatenato in più, una schivata concatenata in più, un punto vita in più, una pozione in più o una ricarica più rapida dello scudo
 
 COMANDI
 - Movimento: levetta sinistra / WASD / levetta a schermo
 - Attacco (combo): R1 / J
+- Colpo potente (chiude la combo): Y / L
 - Parata (tieni premuto): L1 / K
 - Schivata (premi di nuovo per concatenare): B / Spazio
+- Pozione: croce sinistra / Q
+- Scudo: croce destra / R
 - Menù: Start / Esc
 
 Gioca con il controller, con la tastiera o col touch su Android. Disponibile in italiano e in inglese.
@@ -128,7 +136,7 @@ Campo *Download & install instructions* (sotto la sezione Uploads).
 
 Windows: download the Windows file, extract the archive and run Gobelino.exe. Windows may warn that the app is from an unknown publisher: click "More info" → "Run anyway".
 
-Linux / Steam Deck: download the Linux file, extract it and run Gobelino.x86_64 (if needed, make it executable first: right click → Properties → Allow executing, or chmod +x Gobelino.x86_64). On Steam Deck do this in Desktop Mode; you can then add it to Steam as a non-Steam game to play it in Game Mode with the controller.
+Linux / Steam Deck: download the Linux file, extract it and run Gobelino.x86_64 (if needed, make it executable first: right click → Properties → Allow executing, or chmod +x Gobelino.x86_64). On Steam Deck do this in Desktop Mode, then add it to Steam as a non-Steam game (Steam → Games → Add a Non-Steam Game) and always launch it from Steam: this way the built-in controller works as a gamepad, both in Game Mode and in Desktop Mode.
 
 Android: download the .apk file on your phone and open it. Android will ask you to allow installing apps from this source: allow it, then install. To update, download and install the new .apk over the old one.
 
@@ -138,7 +146,7 @@ Tip: with the itch.io app (https://itch.io/app) the game on Windows and Linux up
 
 Windows: scarica il file per Windows, estrai l'archivio e avvia Gobelino.exe. Windows potrebbe avvisare che l'app è di un autore sconosciuto: clicca "Ulteriori informazioni" → "Esegui comunque".
 
-Linux / Steam Deck: scarica il file per Linux, estrailo e avvia Gobelino.x86_64 (se serve, rendilo prima eseguibile: tasto destro → Proprietà → Consenti l'esecuzione, oppure chmod +x Gobelino.x86_64). Su Steam Deck fallo in modalità Desktop; poi puoi aggiungerlo a Steam come gioco non Steam per giocarlo in modalità Gioco con il controller.
+Linux / Steam Deck: scarica il file per Linux, estrailo e avvia Gobelino.x86_64 (se serve, rendilo prima eseguibile: tasto destro → Proprietà → Consenti l'esecuzione, oppure chmod +x Gobelino.x86_64). Su Steam Deck fallo in modalità Desktop, poi aggiungilo a Steam come gioco non Steam (Steam → Giochi → Aggiungi un gioco non Steam) e avvialo sempre da Steam: così i comandi integrati funzionano come un controller, sia in modalità Gioco sia in modalità Desktop.
 
 Android: scarica il file .apk sul telefono e aprilo. Android chiederà di consentire l'installazione di app da questa fonte: consentila e installa. Per aggiornare, scarica e installa il nuovo .apk sopra quello vecchio.
 

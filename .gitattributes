@@ -15,4 +15,4 @@
 *.otf filter=lfs diff=lfs merge=lfs -text
 
 # Immagini per la pagina store: piccole e rigenerate spesso, fuori da LFS
-store/** -filter -diff -merge binary
+store/**/*.png -filter -diff -merge -text

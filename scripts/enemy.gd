@@ -328,7 +328,14 @@ func _begin_windup(min_time: float, max_time: float, can_feint: bool) -> void:
 func _can_summon(distance: float) -> bool:
 	if not _type.has("summon") or _summon_cooldown > 0.0 or distance > LEASH_RANGE:
 		return false
-	_minions = _minions.filter(func(minion: Enemy) -> bool: return is_instance_valid(minion) and not minion.is_dead())
+	# I servitori sconfitti possono essere già stati liberati: si controlla
+	# con is_instance_valid prima di usarli (niente filter con parametri
+	# tipizzati, che fallisce sugli oggetti liberati).
+	var alive: Array[Enemy] = []
+	for minion in _minions:
+		if is_instance_valid(minion) and not minion.is_dead():
+			alive.append(minion)
+	_minions = alive
 	return _minions.size() < int(_type["summon"]["max_minions"])
 
 

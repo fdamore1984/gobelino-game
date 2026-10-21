@@ -23,6 +23,7 @@ script = ExtResource("3_player")
 process_callback = 0
 
 [node name="HUD" type="CanvasLayer" parent="."]
+process_mode = 3
 script = ExtResource("4_hud")
 
 [node name="Health" type="Label" parent="HUD"]
@@ -68,14 +69,32 @@ offset_bottom = 124.0
 theme_override_colors/font_color = Color(1, 1, 1, 0.75)
 theme_override_font_sizes/font_size = 20
 
+[node name="Potions" type="Label" parent="HUD"]
+unique_name_in_owner = true
+offset_left = 24.0
+offset_top = 124.0
+offset_right = 324.0
+offset_bottom = 154.0
+theme_override_colors/font_color = Color(0.5, 1, 0.5, 1)
+theme_override_font_sizes/font_size = 20
+
+[node name="Shield" type="Label" parent="HUD"]
+unique_name_in_owner = true
+offset_left = 24.0
+offset_top = 152.0
+offset_right = 324.0
+offset_bottom = 182.0
+theme_override_colors/font_color = Color(0.55, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 20
+
 [node name="Hint" type="Label" parent="HUD"]
 unique_name_in_owner = true
 anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = -44.0
-offset_bottom = -12.0
+offset_top = -60.0
+offset_bottom = -8.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_colors/font_color = Color(1, 1, 1, 0.6)
@@ -134,13 +153,13 @@ grow_vertical = 2
 
 [node name="VBox" type="VBoxContainer" parent="HUD/LevelUp/Center"]
 layout_mode = 2
-theme_override_constants/separation = 14
+theme_override_constants/separation = 8
 
 [node name="LevelUpTitle" type="Label" parent="HUD/LevelUp/Center/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.8, 0.25, 1)
-theme_override_font_sizes/font_size = 64
+theme_override_font_sizes/font_size = 56
 horizontal_alignment = 1
 
 [node name="LevelUpDamage" type="Label" parent="HUD/LevelUp/Center/VBox"]
@@ -158,21 +177,42 @@ horizontal_alignment = 1
 
 [node name="UpgradeCombo" type="Button" parent="HUD/LevelUp/Center/VBox"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(520, 64)
+custom_minimum_size = Vector2(560, 54)
 layout_mode = 2
 size_flags_horizontal = 4
-theme_override_font_sizes/font_size = 26
+theme_override_font_sizes/font_size = 24
+
+[node name="UpgradeHeavy" type="Button" parent="HUD/LevelUp/Center/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(560, 54)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 24
 
 [node name="UpgradeDodge" type="Button" parent="HUD/LevelUp/Center/VBox"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(520, 64)
+custom_minimum_size = Vector2(560, 54)
 layout_mode = 2
 size_flags_horizontal = 4
-theme_override_font_sizes/font_size = 26
+theme_override_font_sizes/font_size = 24
 
 [node name="UpgradeHealth" type="Button" parent="HUD/LevelUp/Center/VBox"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(520, 64)
+custom_minimum_size = Vector2(560, 54)
 layout_mode = 2
 size_flags_horizontal = 4
-theme_override_font_sizes/font_size = 26
+theme_override_font_sizes/font_size = 24
+
+[node name="UpgradePotion" type="Button" parent="HUD/LevelUp/Center/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(560, 54)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 24
+
+[node name="UpgradeShield" type="Button" parent="HUD/LevelUp/Center/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(560, 54)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 24

@@ -77,6 +77,20 @@ func _build_sounds() -> void:
 		var index := mini(int(t / 0.09), notes.size() - 1)
 		var local := t - index * 0.09
 		return _triangle(notes[index] * t) * 0.4 * exp(-local * (4.0 if index == 3 else 12.0)))
+	_streams["heavy_swing"] = _render_filtered(0.3, Vector2(0.35, 0.06), func(t: float, d: float) -> float:
+		var rumble := sin(TAU * lerpf(90.0, 50.0, t / d) * t) * 0.5
+		return (_noise() * 0.7 + rumble) * _env(t, d, 0.04))
+	_streams["potion"] = _render(0.45, func(t: float, _d: float) -> float:
+		# Bollicine: brevi toni ascendenti in sequenza.
+		var local := fmod(t, 0.09)
+		var base := 500.0 + int(t / 0.09) * 120.0
+		return sin(TAU * (base + local * 2500.0) * t) * 0.22 * exp(-local * 30.0))
+	_streams["shield_up"] = _render(0.4, func(t: float, d: float) -> float:
+		var shimmer := sin(TAU * lerpf(400.0, 900.0, t / d) * t) + sin(TAU * lerpf(600.0, 1350.0, t / d) * t) * 0.5
+		return shimmer * 0.2 * sin(PI * t / d))
+	_streams["shield_break"] = _render(0.35, func(t: float, d: float) -> float:
+		var glass := sin(TAU * 1800.0 * t) * 0.3 + sin(TAU * 2700.0 * t) * 0.2
+		return (glass + _noise() * 0.35) * _env(t, d, 0.002) * exp(-t * 6.0))
 	_streams["xp"] = _render(0.08, func(t: float, d: float) -> float:
 		return sin(TAU * lerpf(1200.0, 1600.0, t / d) * t) * 0.25 * _env(t, d, 0.005))
 	# Nemici
