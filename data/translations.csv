@@ -6,7 +6,7 @@ MENU_VERSION,Versione %s,Version %s
 HUD_HEALTH,Vita  %d / %d,Health  %d / %d
 HUD_KILLS,Nemici sconfitti  %d,Enemies defeated  %d
 HUD_DEFEAT,Sconfitto!,Defeated!
-HUD_HINT,Muovi: WASD / levetta    Attacco (combo): J / R1    Parata: K / L1 tenuto    Schivata (ripeti per concatenare): Spazio / B    Menu: Esc / Start,Move: WASD / stick    Attack (combo): J / R1    Parry: K / L1 hold    Dodge (repeat to chain): Space / B    Menu: Esc / Start
+HUD_HINT,Muovi: WASD / levetta    Attacco (combo): J / R1    Attacco potente: L / Y    Parata: K / L1 tenuto    Schivata (ripeti per concatenare): Spazio / B,Move: WASD / stick    Attack (combo): J / R1    Power strike: L / Y    Parry: K / L1 hold    Dodge (repeat to chain): Space / B
 FX_DODGED,Schivato!,Dodged!
 FX_BLOCKED,Parato,Blocked
 FX_PERFECT_PARRY,Parata perfetta!,Perfect parry!
@@ -26,3 +26,20 @@ LEVELUP_CHOOSE,Scegli un potenziamento,Choose an upgrade
 UPGRADE_COMBO,Colpi in combo +1   (%d → %d),Combo hits +1   (%d → %d)
 UPGRADE_DODGE,Schivate consecutive +1   (%d → %d),Chained dodges +1   (%d → %d)
 UPGRADE_HEALTH,Punti vita +1   (%d → %d),Health +1   (%d → %d)
+HUD_HINT_2,Pozione: Q / croce sinistra    Scudo: R / croce destra    Menu: Esc / Start,Potion: Q / D-pad left    Shield: R / D-pad right    Menu: Esc / Start
+HUD_POTIONS,Pozioni  %d / %d,Potions  %d / %d
+HUD_SHIELD_READY,Scudo: pronto,Shield: ready
+HUD_SHIELD_ACTIVE,Scudo: attivo,Shield: active
+HUD_SHIELD_COOLDOWN,Scudo: %d s,Shield: %d s
+FX_HEAVY,Colpo potente!,Power strike!
+FX_POTION,+%d vita,+%d HP
+FX_SHIELD_UP,Scudo!,Shield!
+FX_SHIELD_BLOCK,Assorbito!,Absorbed!
+UPGRADE_HEAVY,Colpi potenti concatenati +1   (%d → %d),Chained power strikes +1   (%d → %d)
+UPGRADE_POTION,Pozioni +1   (%d → %d),Potions +1   (%d → %d)
+UPGRADE_SHIELD,Ricarica scudo -2%%   (%.1f s → %.1f s),Shield recharge -2%%   (%.1f s → %.1f s)
+TOUCH_HEAVY,Potente,Power
+TOUCH_POTION,Pozione,Potion
+TOUCH_SHIELD,Scudo,Shield
+MENU_CONTROLLER,Controller: %s,Controller: %s
+MENU_NO_CONTROLLER,Nessun controller rilevato,No controller detected

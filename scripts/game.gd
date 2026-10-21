@@ -32,6 +32,7 @@ func _ready() -> void:
 	_player.leveled_up.connect(_on_player_leveled_up)
 	_player.died.connect(_on_player_died)
 	_hud.upgrade_chosen.connect(_on_upgrade_chosen)
+	_hud.player = _player
 	_hud.set_health(_player.health, _player.max_health)
 	_hud.set_experience(_player.experience, _player.experience_needed(), _player.level)
 	_hud.set_kills(_kills)
@@ -112,7 +113,7 @@ func _show_level_up() -> void:
 	var damage_after := damage_before + Player.DAMAGE_PER_LEVEL
 	FloatingText.spawn(_entities, _player.global_position, tr("FX_LEVEL_UP"), Player.COLOR_EMPOWERED, 56.0)
 	get_tree().paused = true
-	_hud.show_level_up(reached, damage_before, damage_after, _player)
+	_hud.show_level_up(reached, damage_before, damage_after)
 
 
 func _on_upgrade_chosen(upgrade: String) -> void:

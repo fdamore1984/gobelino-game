@@ -4,11 +4,13 @@ extends Node2D
 ## verrà sostituito dagli sprite definitivi.
 ##
 ## Azioni: movimento in tutte le direzioni con accelerazione e frenata,
-## attacchi consecutivi in combo sempre più potenti (R1), parata tenendo
-## premuto (L1), schivate concatenate con cambio di direzione (B).
+## attacchi consecutivi in combo sempre più potenti (R1), attacco potente
+## che chiude la combo con un bonus (Y), parata tenendo premuto (L1),
+## schivate concatenate con cambio di direzione (B), pozioni che curano
+## (croce sinistra) e scudo che assorbe un colpo (croce destra).
 ## Una parata perfetta potenzia gli attacchi per qualche secondo.
 ## Sconfiggere nemici dà esperienza; a ogni livello aumentano i danni
-## base e si sceglie un potenziamento (combo, schivate o vita).
+## base e si sceglie un potenziamento.
 
 signal health_changed(current: int, maximum: int)
 signal experience_changed(current: int, needed: int, level: int)
@@ -47,6 +49,20 @@ const ATTACK_RANGE_PER_STEP := 10.0
 const ATTACK_ARC := deg_to_rad(110.0)
 const ATTACK_LUNGE_SPEED := 140.0
 
+## Attacco potente: più lento, più ampio e molto più forte. In fondo a una
+## combo prende anche il bonus dei colpi già fatti; chiude la combo, a
+## meno che non si possano concatenare altri colpi potenti.
+const HEAVY_WINDUP := 0.22
+const HEAVY_ACTIVE := 0.12
+const HEAVY_RECOVERY := 0.35
+const HEAVY_DAMAGE_FACTOR := 2.5
+## Ogni colpo potente concatenato fa questo in più del precedente.
+const HEAVY_CHAIN_DAMAGE_STEP := 0.5
+const HEAVY_RANGE := 110.0
+const HEAVY_ARC := deg_to_rad(150.0)
+const HEAVY_LUNGE_SPEED := 220.0
+const START_HEAVY_CHAIN := 1
+
 ## Mentre si para ci si muove più lentamente.
 const PARRY_SPEED_FACTOR := 0.35
 ## La parata copre i colpi che arrivano entro questo angolo dal davanti.
@@ -63,11 +79,25 @@ const EMPOWER_ATTACK_SPEED := 1.7
 const DODGE_SPEED := 760.0
 const DODGE_TIME := 0.28
 const DODGE_INVULNERABLE_TIME := 0.24
-## Premendo di nuovo durante una schivata se ne concatena un'altra,
-## anche in un'altra direzione, fino al numero massimo di schivate.
+## Premendo di nuovo durante una schivata (o subito dopo) se ne concatena
+## un'altra, fino al numero massimo di schivate.
 const START_CHAINED_DODGES := 2
-const DODGE_CHAIN_MIN_TIME := 0.06
+const DODGE_CHAIN_MIN_TIME := 0.04
+const DODGE_CHAIN_GRACE := 0.15
+## All'inizio di ogni schivata la direzione segue ancora la levetta, così
+## cambiare direzione è facile anche premendo un attimo prima di girarla.
+const DODGE_STEER_TIME := 0.1
+## Per la direzione delle schivate basta inclinare poco la levetta.
+const DODGE_STICK_DEADZONE := 0.2
 const DODGE_COOLDOWN := 0.4
+
+## Ogni pozione cura questi punti vita.
+const POTION_HEAL := 3
+const START_POTIONS := 2
+## Lo scudo assorbe un colpo; poi va ricaricato. Ogni potenziamento
+## riduce la ricarica del 2%.
+const SHIELD_COOLDOWN := 30.0
+const SHIELD_COOLDOWN_UPGRADE := 0.98
 
 const HURT_TIME := 0.25
 const HURT_KNOCKBACK := 420.0
@@ -78,14 +108,24 @@ const COLOR_HURT := Color(0.95, 0.35, 0.3)
 const COLOR_DEAD := Color(0.4, 0.4, 0.4)
 const COLOR_SHIELD := Color(0.45, 0.7, 1.0)
 const COLOR_SLASH := Color(1.0, 1.0, 0.85)
+const COLOR_HEAVY := Color(1.0, 0.5, 0.2)
 const COLOR_EMPOWERED := Color(1.0, 0.8, 0.25)
+const COLOR_HEAL := Color(0.5, 1.0, 0.5)
+const COLOR_BUBBLE := Color(0.55, 0.85, 1.0)
 
 var max_health := START_HEALTH
 var health := START_HEALTH
 var level := 1
 var experience := 0
 var max_combo_hits := START_COMBO_HITS
+var max_heavy_chain := START_HEAVY_CHAIN
 var max_chained_dodges := START_CHAINED_DODGES
+var max_potions := START_POTIONS
+var potions := START_POTIONS
+var shield_cooldown_max := SHIELD_COOLDOWN
+## Ricarica dello scudo rimasta, e se lo scudo è attivo in questo momento.
+var shield_cooldown := 0.0
+var shield_active := false
 var facing := Vector2.RIGHT
 
 var _state := State.NORMAL
@@ -95,11 +135,17 @@ var _target_facing := Vector2.RIGHT
 var _dodge_direction := Vector2.RIGHT
 var _dodges_used := 0
 var _dodge_cooldown := 0.0
+## Dopo una schivata resta un attimo per concatenarne un'altra.
+var _dodge_chain_grace := 0.0
 var _invulnerable_time := 0.0
-## Colpo della combo in corso (1 = primo) e tempo rimasto per continuarla.
+## Colpi normali e colpi potenti della combo in corso, e tempo rimasto per continuarla.
 var _combo_step := 0
+var _heavy_step := 0
 var _combo_timer := 0.0
-var _attack_queued := false
+## Attacco in corso: normale o potente.
+var _attack_heavy := false
+## Attacco premuto durante quello in corso: "", "attack" o "heavy".
+var _queued_attack := ""
 var _attack_resolved := false
 ## Velocità dell'attacco in corso: resta quella con cui è iniziato.
 var _attack_speed := 1.0
@@ -110,77 +156,95 @@ var _block_flash := 0.0
 func _physics_process(delta: float) -> void:
 	_state_time += delta
 	_dodge_cooldown = maxf(_dodge_cooldown - delta, 0.0)
+	_dodge_chain_grace = maxf(_dodge_chain_grace - delta, 0.0)
 	_invulnerable_time = maxf(_invulnerable_time - delta, 0.0)
 	_empowered_time = maxf(_empowered_time - delta, 0.0)
 	_block_flash = maxf(_block_flash - delta, 0.0)
 	_combo_timer = maxf(_combo_timer - delta, 0.0)
+	shield_cooldown = maxf(shield_cooldown - delta, 0.0)
 
 	var input := Input.get_vector("move_left", "move_right", "move_up", "move_down")
+	var dodge_input := Input.get_vector("move_left", "move_right", "move_up", "move_down", DODGE_STICK_DEADZONE)
+
+	if _state not in [State.DEAD, State.HURT]:
+		if Input.is_action_just_pressed("potion"):
+			_drink_potion()
+		if Input.is_action_just_pressed("shield"):
+			_raise_shield()
 
 	match _state:
 		State.NORMAL:
 			if input != Vector2.ZERO:
 				_target_facing = input.normalized()
 			_velocity = _accelerate(_velocity, input * SPEED, delta)
-			if Input.is_action_just_pressed("dodge") and _dodge_cooldown == 0.0:
-				_start_dodge(input)
+			if Input.is_action_just_pressed("dodge"):
+				if _dodge_chain_grace > 0.0 and _dodges_used < max_chained_dodges:
+					_chain_dodge(dodge_input)
+				elif _dodge_cooldown == 0.0:
+					_start_dodge(dodge_input)
+			elif Input.is_action_just_pressed("heavy_attack"):
+				_start_heavy(input)
 			elif Input.is_action_just_pressed("attack"):
-				var next_step := _combo_step + 1 if _combo_timer > 0.0 else 1
-				_start_attack(next_step, input)
+				# Dopo un colpo potente o dopo l'ultimo colpo la combo è finita: si ricomincia.
+				var continues := _combo_timer > 0.0 and _heavy_step == 0 and _combo_step < max_combo_hits
+				_start_attack(_combo_step + 1 if continues else 1, input)
 			elif Input.is_action_pressed("parry"):
 				_change_state(State.PARRY)
 
 		State.ATTACK:
-			var windup := ATTACK_WINDUP / _attack_speed
-			var active := ATTACK_ACTIVE / _attack_speed
-			var is_finisher := _combo_step >= max_combo_hits
-			var recovery := (FINISHER_RECOVERY if is_finisher else ATTACK_RECOVERY) / _attack_speed
+			var windup := (HEAVY_WINDUP if _attack_heavy else ATTACK_WINDUP) / _attack_speed
+			var active := (HEAVY_ACTIVE if _attack_heavy else ATTACK_ACTIVE) / _attack_speed
+			var recovery := _attack_recovery() / _attack_speed
 			if _state_time < windup + active:
-				_velocity = facing * ATTACK_LUNGE_SPEED * (1.0 + 0.2 * (_combo_step - 1))
+				var lunge := HEAVY_LUNGE_SPEED if _attack_heavy else ATTACK_LUNGE_SPEED * (1.0 + 0.2 * (_combo_step - 1))
+				_velocity = facing * lunge if _state_time >= windup * 0.5 else _velocity * 0.8
 			else:
 				_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * delta)
-			if Input.is_action_just_pressed("attack"):
-				_attack_queued = true
+			# Si memorizza la pressione solo se può davvero continuare la combo:
+			# alla fine della combo le pressioni in più vengono ignorate.
+			if Input.is_action_just_pressed("heavy_attack") and _can_chain_heavy():
+				_queued_attack = "heavy"
+			elif Input.is_action_just_pressed("attack") and _can_chain_attack():
+				_queued_attack = "attack"
 			if not _attack_resolved and _state_time >= windup:
 				_attack_resolved = true
 				_resolve_attack()
-			if _attack_queued and not is_finisher and _state_time >= windup + active:
-				# Colpo successivo della combo, appena finito quello attivo.
-				_start_attack(_combo_step + 1, input)
-			elif _state_time >= windup + active + recovery:
-				_combo_timer = 0.0 if is_finisher else COMBO_WINDOW
-				if is_finisher:
-					_combo_step = 0
-				if is_finisher and _attack_queued:
-					# Premuto durante il recupero del colpo finale: nuova combo.
-					_start_attack(1, input)
+			if _queued_attack != "" and _state_time >= windup + active:
+				if _queued_attack == "heavy":
+					_start_heavy(input)
 				else:
-					_change_state(State.NORMAL)
+					_start_attack(_combo_step + 1, input)
+			elif _state_time >= windup + active + recovery:
+				if _combo_finished():
+					_combo_step = 0
+					_heavy_step = 0
+					_combo_timer = 0.0
+				else:
+					_combo_timer = COMBO_WINDOW
+				_change_state(State.NORMAL)
 
 		State.PARRY:
 			if input != Vector2.ZERO:
 				_target_facing = input.normalized()
 			_velocity = _accelerate(_velocity, input * SPEED * PARRY_SPEED_FACTOR, delta)
 			if Input.is_action_just_pressed("dodge") and _dodge_cooldown == 0.0:
-				_start_dodge(input)
+				_start_dodge(dodge_input)
 			elif not Input.is_action_pressed("parry"):
 				_change_state(State.NORMAL)
 
 		State.DODGE:
 			if Input.is_action_just_pressed("dodge") and _dodges_used < max_chained_dodges \
 					and _state_time >= DODGE_CHAIN_MIN_TIME:
-				# Schivata concatenata: riparte a piena velocità e si può cambiare direzione.
-				_dodges_used += 1
-				if input != Vector2.ZERO:
-					_dodge_direction = input.normalized()
-					_target_facing = _dodge_direction
-				_state_time = 0.0
-				Sfx.play("dodge", global_position, 1.0 + 0.1 * _dodges_used)
+				_chain_dodge(dodge_input)
+			elif _state_time <= DODGE_STEER_TIME and dodge_input != Vector2.ZERO:
+				_dodge_direction = dodge_input.normalized()
+				_target_facing = _dodge_direction
 			# Scatto rapido che rallenta verso la fine.
 			var t := _state_time / DODGE_TIME
 			_velocity = _dodge_direction * DODGE_SPEED * (1.0 - t * t)
 			if _state_time >= DODGE_TIME:
 				_dodge_cooldown = DODGE_COOLDOWN
+				_dodge_chain_grace = DODGE_CHAIN_GRACE
 				_change_state(State.NORMAL)
 
 		State.HURT:
@@ -223,6 +287,14 @@ func receive_hit(from: Vector2, damage: int) -> String:
 		FloatingText.spawn(get_parent(), global_position, tr("FX_BLOCKED"), COLOR_SHIELD)
 		Sfx.play("block", global_position)
 		return "blocked"
+
+	if shield_active:
+		# Lo scudo assorbe un colpo da qualsiasi direzione e poi si rompe.
+		shield_active = false
+		_invulnerable_time = 0.3
+		FloatingText.spawn(get_parent(), global_position, tr("FX_SHIELD_BLOCK"), COLOR_BUBBLE)
+		Sfx.play("shield_break", global_position)
+		return "shielded"
 
 	health = maxi(health - damage, 0)
 	health_changed.emit(health, max_health)
@@ -269,17 +341,25 @@ func add_experience(amount: int) -> void:
 	experience_changed.emit(experience, experience_needed(), level)
 
 
-## Potenziamento scelto salendo di livello: "combo", "dodge" o "health".
+## Potenziamento scelto salendo di livello.
 func apply_upgrade(upgrade: String) -> void:
 	match upgrade:
 		"combo":
 			max_combo_hits += 1
+		"heavy":
+			max_heavy_chain += 1
 		"dodge":
 			max_chained_dodges += 1
 		"health":
 			max_health += 1
 			health += 1
 			health_changed.emit(health, max_health)
+		"potion":
+			max_potions += 1
+			potions += 1
+		"shield":
+			shield_cooldown_max *= SHIELD_COOLDOWN_UPGRADE
+			shield_cooldown = minf(shield_cooldown, shield_cooldown_max)
 
 
 func _change_state(new_state: State) -> void:
@@ -297,18 +377,64 @@ func _accelerate(current: Vector2, target: Vector2, delta: float) -> Vector2:
 	return current.move_toward(target, acceleration * delta)
 
 
+## Un colpo normale può seguire solo colpi normali, fino al massimo della combo.
+func _can_chain_attack() -> bool:
+	return not _attack_heavy and _combo_step < max_combo_hits
+
+
+## Un colpo potente può chiudere la combo o seguire altri colpi potenti,
+## finché non si raggiunge il massimo di colpi potenti concatenati.
+func _can_chain_heavy() -> bool:
+	return _heavy_step < max_heavy_chain
+
+
+func _combo_finished() -> bool:
+	if _attack_heavy:
+		return _heavy_step >= max_heavy_chain
+	return _combo_step >= max_combo_hits and max_heavy_chain == 0
+
+
+func _attack_recovery() -> float:
+	if _attack_heavy:
+		return HEAVY_RECOVERY
+	return FINISHER_RECOVERY if _combo_step >= max_combo_hits else ATTACK_RECOVERY
+
+
 func _start_attack(step: int, input: Vector2) -> void:
 	_combo_step = clampi(step, 1, max_combo_hits)
+	_heavy_step = 0
+	_attack_heavy = false
+	_begin_attack(input)
+	Sfx.play("swing", global_position, 1.0 + 0.12 * (_combo_step - 1))
+	if _combo_step > 1:
+		FloatingText.spawn(get_parent(), global_position, tr("FX_COMBO") % _combo_step, COLOR_SLASH, 12.0)
+
+
+func _start_heavy(input: Vector2) -> void:
+	# Fuori dalla combo il colpo potente parte da solo, senza bonus.
+	if _combo_timer == 0.0 and _state != State.ATTACK:
+		_combo_step = 0
+		_heavy_step = 0
+	if _heavy_step >= max_heavy_chain:
+		_heavy_step = 0
+		_combo_step = 0
+	_heavy_step += 1
+	_attack_heavy = true
+	_begin_attack(input)
+	Sfx.play("heavy_swing", global_position, 1.0 + 0.08 * (_heavy_step - 1))
+	if _combo_step > 0 or _heavy_step > 1:
+		FloatingText.spawn(get_parent(), global_position, tr("FX_HEAVY"), COLOR_HEAVY, 12.0)
+
+
+func _begin_attack(input: Vector2) -> void:
 	_attack_speed = EMPOWER_ATTACK_SPEED if is_empowered() else 1.0
-	_attack_queued = false
+	_queued_attack = ""
 	_attack_resolved = false
+	_combo_timer = 0.0
 	# Si attacca subito nella direzione indicata, senza aspettare la rotazione.
 	if input != Vector2.ZERO:
 		_target_facing = input.normalized()
 		facing = _target_facing
-	Sfx.play("swing", global_position, 1.0 + 0.12 * (_combo_step - 1))
-	if _combo_step > 1:
-		FloatingText.spawn(get_parent(), global_position, tr("FX_COMBO") % _combo_step, COLOR_SLASH, 12.0)
 	_change_state(State.ATTACK)
 
 
@@ -317,20 +443,70 @@ func _start_dodge(input: Vector2) -> void:
 	_dodge_direction = input.normalized() if input != Vector2.ZERO else -facing
 	_dodges_used = 1
 	_combo_step = 0
+	_heavy_step = 0
 	Sfx.play("dodge", global_position)
 	_change_state(State.DODGE)
 
 
+## Schivata concatenata: riparte a piena velocità, nella nuova direzione.
+func _chain_dodge(input: Vector2) -> void:
+	_dodges_used += 1
+	if input != Vector2.ZERO:
+		_dodge_direction = input.normalized()
+		_target_facing = _dodge_direction
+	Sfx.play("dodge", global_position, 1.0 + 0.1 * _dodges_used)
+	_change_state(State.DODGE)
+
+
+func _drink_potion() -> void:
+	if potions == 0 or health >= max_health:
+		return
+	var healed := mini(POTION_HEAL, max_health - health)
+	potions -= 1
+	health += healed
+	health_changed.emit(health, max_health)
+	FloatingText.spawn(get_parent(), global_position, tr("FX_POTION") % healed, COLOR_HEAL)
+	Sfx.play("potion", global_position)
+
+
+func _raise_shield() -> void:
+	if shield_active or shield_cooldown > 0.0:
+		return
+	shield_active = true
+	shield_cooldown = shield_cooldown_max
+	FloatingText.spawn(get_parent(), global_position, tr("FX_SHIELD_UP"), COLOR_BUBBLE)
+	Sfx.play("shield_up", global_position)
+
+
 func _attack_range() -> float:
+	if _attack_heavy:
+		return HEAVY_RANGE
 	return ATTACK_RANGE + ATTACK_RANGE_PER_STEP * (_combo_step - 1)
 
 
-func _resolve_attack() -> void:
-	var multiplier := 1.0 + COMBO_DAMAGE_STEP * (_combo_step - 1)
+func _attack_arc() -> float:
+	if _attack_heavy:
+		return HEAVY_ARC
+	return ATTACK_ARC + 0.15 * (_combo_step - 1)
+
+
+func _attack_damage() -> int:
+	var multiplier: float
+	if _attack_heavy:
+		# Il colpo potente prende il bonus dei colpi normali che lo precedono
+		# nella combo e cresce a ogni colpo potente concatenato.
+		multiplier = HEAVY_DAMAGE_FACTOR * (1.0 + COMBO_DAMAGE_STEP * _combo_step) \
+				* (1.0 + HEAVY_CHAIN_DAMAGE_STEP * (_heavy_step - 1))
+	else:
+		multiplier = 1.0 + COMBO_DAMAGE_STEP * (_combo_step - 1)
 	if _attack_speed > 1.0:
 		multiplier *= EMPOWER_DAMAGE_FACTOR
-	var damage := roundi(base_damage() * multiplier)
-	var heavy := _combo_step >= max_combo_hits
+	return roundi(base_damage() * multiplier)
+
+
+func _resolve_attack() -> void:
+	var damage := _attack_damage()
+	var heavy := _attack_heavy or _combo_step >= max_combo_hits
 	var landed := false
 	for node in get_tree().get_nodes_in_group("enemies"):
 		var enemy := node as Enemy
@@ -340,11 +516,11 @@ func _resolve_attack() -> void:
 		if offset.length() > _attack_range() + enemy.radius:
 			continue
 		# A contatto si colpisce sempre, altrimenti serve essere girati verso il nemico.
-		if offset.length() <= RADIUS + enemy.radius or absf(facing.angle_to(offset)) <= ATTACK_ARC / 2.0:
+		if offset.length() <= RADIUS + enemy.radius or absf(facing.angle_to(offset)) <= _attack_arc() / 2.0:
 			enemy.take_damage(damage, offset.normalized(), heavy)
 			landed = true
 	if landed:
-		Sfx.play("hit", global_position, 1.0 + 0.1 * (_combo_step - 1))
+		Sfx.play("hit", global_position, 0.8 if _attack_heavy else 1.0 + 0.1 * (_combo_step - 1))
 
 
 func _draw() -> void:
@@ -370,18 +546,30 @@ func _draw() -> void:
 	var side := facing.orthogonal() * 9.0
 	draw_colored_polygon(PackedVector2Array([tip, facing * RADIUS * 0.6 + side, facing * RADIUS * 0.6 - side]), body.darkened(0.3))
 
-	var windup := ATTACK_WINDUP / _attack_speed
-	if _state == State.ATTACK and _state_time >= windup and _state_time < windup + ATTACK_ACTIVE / _attack_speed:
-		var slash := COLOR_EMPOWERED if _attack_speed > 1.0 else COLOR_SLASH
-		# I colpi successivi della combo hanno un fendente più ampio e più acceso.
-		var alpha := 0.45 + 0.15 * (_combo_step - 1)
-		_draw_arc_band(facing, RADIUS + 6.0, _attack_range() + RADIUS, ATTACK_ARC + 0.15 * (_combo_step - 1), Color(slash, minf(alpha, 0.9)))
+	if _state == State.ATTACK:
+		var windup := (HEAVY_WINDUP if _attack_heavy else ATTACK_WINDUP) / _attack_speed
+		var active := (HEAVY_ACTIVE if _attack_heavy else ATTACK_ACTIVE) / _attack_speed
+		if _attack_heavy and _state_time < windup:
+			# Carica del colpo potente: un arco che si accende.
+			draw_arc(Vector2.ZERO, RADIUS + 6.0, facing.angle() - HEAVY_ARC / 2.0, facing.angle() + HEAVY_ARC / 2.0, 24, Color(COLOR_HEAVY, _state_time / windup), 4.0)
+		elif _state_time >= windup and _state_time < windup + active:
+			var slash := COLOR_HEAVY if _attack_heavy else COLOR_SLASH
+			if _attack_speed > 1.0:
+				slash = COLOR_EMPOWERED
+			# I colpi successivi della combo hanno un fendente più ampio e più acceso.
+			var alpha := 0.8 if _attack_heavy else 0.45 + 0.15 * (_combo_step - 1)
+			_draw_arc_band(facing, RADIUS + 6.0, _attack_range() + RADIUS, _attack_arc(), Color(slash, minf(alpha, 0.9)))
 
 	if _state == State.PARRY:
 		var shield := COLOR_SHIELD
 		if _state_time <= PERFECT_PARRY_WINDOW or _block_flash > 0.0:
 			shield = Color.WHITE
 		draw_arc(Vector2.ZERO, RADIUS + 10.0, facing.angle() - PARRY_ARC / 2.0, facing.angle() + PARRY_ARC / 2.0, 24, shield, 6.0)
+
+	# Scudo attivo: una bolla attorno al personaggio.
+	if shield_active and _state != State.DEAD:
+		draw_circle(Vector2.ZERO, RADIUS + 16.0, Color(COLOR_BUBBLE, 0.15))
+		draw_arc(Vector2.ZERO, RADIUS + 16.0, 0.0, TAU, 40, Color(COLOR_BUBBLE, 0.7), 2.5)
 
 
 ## Disegna un settore circolare "a fascia" orientato verso direction.

@@ -25,6 +25,10 @@ func _ready() -> void:
 
 	for button: Button in [_start, _quit, _language]:
 		button.focus_entered.connect(Sfx.play_ui.bind("ui_move"))
+		# Col mouse o col trackpad il pulsante sotto il puntatore prende il
+		# focus, così chi passa poi al controller riparte da lì.
+		button.mouse_entered.connect(button.grab_focus)
+	Input.joy_connection_changed.connect(_on_joy_connection_changed)
 	_start.grab_focus()
 	_update_info()
 
@@ -35,15 +39,10 @@ func _notification(what: int) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	# Se nessun pulsante ha il focus (per esempio dopo un tocco sullo
-	# schermo), il primo comando del controller lo riporta su "Inizia".
-	if get_viewport().gui_get_focus_owner() != null:
-		return
-	for action in ["ui_up", "ui_down", "ui_left", "ui_right", "ui_accept"]:
-		if event.is_action_pressed(action):
-			_start.grab_focus()
-			get_viewport().set_input_as_handled()
-			return
+	# Il pulsante premuto può aver già cambiato scena: in quel caso questo
+	# nodo non è più nell'albero e non c'è niente da segnare.
+	if UiNav.handle(event, get_viewport(), _start) and is_inside_tree():
+		get_viewport().set_input_as_handled()
 
 
 func _update_info() -> void:
@@ -51,7 +50,15 @@ func _update_info() -> void:
 	var platform := OS.get_name()
 	if Platform.is_steam_deck:
 		platform += " (Steam Deck)"
-	_info.text = (tr("MENU_VERSION") % version) + "\n" + platform
+	# Controller rilevato: aiuta a capire i problemi di input (per esempio
+	# sullo Steam Deck in modalità desktop).
+	var joypads := Input.get_connected_joypads()
+	var controller := tr("MENU_CONTROLLER") % Input.get_joy_name(joypads[0]) if not joypads.is_empty() else tr("MENU_NO_CONTROLLER")
+	_info.text = (tr("MENU_VERSION") % version) + "\n" + platform + "\n" + controller
+
+
+func _on_joy_connection_changed(_device: int, _connected: bool) -> void:
+	_update_info()
 
 
 func _on_start_pressed() -> void:

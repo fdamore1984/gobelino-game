@@ -10,11 +10,17 @@ const COLOR_BASE := Color(1, 1, 1, 0.15)
 const COLOR_ACTIVE := Color(1, 1, 1, 0.4)
 const FONT_SIZE := 18
 
-## Pulsanti: azione, etichetta e posizione rispetto all'angolo in basso a destra.
+const SMALL_BUTTON_RADIUS := 40.0
+
+## Pulsanti: azione, etichetta, posizione rispetto all'angolo in basso a
+## destra e raggio.
 const BUTTONS := [
-	{"action": "attack", "label": "TOUCH_ATTACK", "offset": Vector2(-90, -200)},
-	{"action": "parry", "label": "TOUCH_PARRY", "offset": Vector2(-210, -130)},
-	{"action": "dodge", "label": "TOUCH_DODGE", "offset": Vector2(-90, -80)},
+	{"action": "attack", "label": "TOUCH_ATTACK", "offset": Vector2(-90, -200), "radius": BUTTON_RADIUS},
+	{"action": "heavy_attack", "label": "TOUCH_HEAVY", "offset": Vector2(-210, -250), "radius": BUTTON_RADIUS},
+	{"action": "parry", "label": "TOUCH_PARRY", "offset": Vector2(-210, -130), "radius": BUTTON_RADIUS},
+	{"action": "dodge", "label": "TOUCH_DODGE", "offset": Vector2(-90, -80), "radius": BUTTON_RADIUS},
+	{"action": "potion", "label": "TOUCH_POTION", "offset": Vector2(-330, -60), "radius": SMALL_BUTTON_RADIUS},
+	{"action": "shield", "label": "TOUCH_SHIELD", "offset": Vector2(-335, -180), "radius": SMALL_BUTTON_RADIUS},
 ]
 
 var _stick_touch := -1
@@ -81,7 +87,7 @@ func _action_at(point: Vector2) -> String:
 	if point.distance_to(_menu_button_center()) <= MENU_BUTTON_RADIUS:
 		return "menu"
 	for button: Dictionary in BUTTONS:
-		if point.distance_to(size + button["offset"]) <= BUTTON_RADIUS:
+		if point.distance_to(size + button["offset"]) <= button["radius"]:
 			return button["action"]
 	return ""
 
@@ -102,7 +108,7 @@ func _draw() -> void:
 	for button: Dictionary in BUTTONS:
 		var center: Vector2 = size + button["offset"]
 		var pressed := Input.is_action_pressed(button["action"])
-		draw_circle(center, BUTTON_RADIUS, COLOR_ACTIVE if pressed else COLOR_BASE)
+		draw_circle(center, button["radius"], COLOR_ACTIVE if pressed else COLOR_BASE)
 		_draw_centered_text(font, center, tr(button["label"]))
 
 	draw_circle(_menu_button_center(), MENU_BUTTON_RADIUS, COLOR_BASE)
