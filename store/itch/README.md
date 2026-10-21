@@ -68,7 +68,7 @@ IN THIS PROTOTYPE
 - A boundless test level with enemies scattered everywhere
 - Real-time combat: chain up to 3 attacks in a combo, each hit stronger than the last, and finish it with a power strike for a big bonus
 - Parry, and time it right before the hit for a perfect parry: the enemy is stunned and your attacks are empowered for a few seconds (double damage, faster swings)
-- Dodge, and press again mid-dodge to chain another one in a new direction
+- Dodge, and press again mid-dodge to chain another one in a new direction. Dodge and parry are always available and cancel your combo; attacking cancels a dodge into an immediate strike
 - Healing potions (you start with 2) and a magic shield that absorbs one hit, recharging in 30 seconds
 - Four kinds of enemies: quick scouts, warriors, heavy brutes and summoners that call in reinforcements (hit them while they summon to interrupt them)
 - Enemies circle around you with quick sidesteps; their attacks are slow but unpredictable: watch the red area on the ground, beware of feints and follow-up strikes
@@ -77,7 +77,7 @@ IN THIS PROTOTYPE
 CONTROLS
 - Move: left stick / WASD / on-screen stick
 - Attack (combo): R1 / J
-- Power strike (ends the combo): Y / L
+- Power strike (ends the combo): L2 / L
 - Parry (hold): L1 / K
 - Dodge (press again to chain): B / Space
 - Potion: D-pad left / Q
@@ -103,7 +103,7 @@ IN QUESTO PROTOTIPO
 - Un livello di test senza confini, con nemici sparsi ovunque
 - Combattimento in tempo reale: concatena fino a 3 attacchi in combo, ogni colpo più forte del precedente, e chiudila con un colpo potente per un grosso bonus
 - Para, e fallo appena prima del colpo per una parata perfetta: il nemico resta stordito e i tuoi attacchi sono potenziati per qualche secondo (doppio danno, colpi più rapidi)
-- Schiva, e premi di nuovo durante la schivata per concatenarne un'altra in una nuova direzione
+- Schiva, e premi di nuovo durante la schivata per concatenarne un'altra in una nuova direzione. Schivata e parata sono sempre disponibili e interrompono la combo; attaccare interrompe la schivata con un colpo immediato
 - Pozioni curative (ne hai 2 all'inizio) e uno scudo magico che assorbe un colpo e si ricarica in 30 secondi
 - Quattro tipi di nemici: esploratori rapidi, guerrieri, bruti corazzati ed evocatori che chiamano rinforzi (colpiscili mentre evocano per interromperli)
 - I nemici ti girano attorno con scatti laterali; i loro attacchi sono lenti ma imprevedibili: guarda la zona rossa a terra, attento alle finte e ai secondi colpi
@@ -112,7 +112,7 @@ IN QUESTO PROTOTIPO
 COMANDI
 - Movimento: levetta sinistra / WASD / levetta a schermo
 - Attacco (combo): R1 / J
-- Colpo potente (chiude la combo): Y / L
+- Colpo potente (chiude la combo): L2 / L
 - Parata (tieni premuto): L1 / K
 - Schivata (premi di nuovo per concatenare): B / Spazio
 - Pozione: croce sinistra / Q

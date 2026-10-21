@@ -5,9 +5,11 @@ extends Node2D
 ##
 ## Azioni: movimento in tutte le direzioni con accelerazione e frenata,
 ## attacchi consecutivi in combo sempre più potenti (R1), attacco potente
-## che chiude la combo con un bonus (Y), parata tenendo premuto (L1),
+## che chiude la combo con un bonus (L2), parata tenendo premuto (L1),
 ## schivate concatenate con cambio di direzione (B), pozioni che curano
 ## (croce sinistra) e scudo che assorbe un colpo (croce destra).
+## Schivata e parata interrompono la combo in qualsiasi momento; attaccare
+## durante una schivata la interrompe e attacca subito.
 ## Una parata perfetta potenzia gli attacchi per qualche secondo.
 ## Sconfiggere nemici dà esperienza; a ogni livello aumentano i danni
 ## base e si sceglie un potenziamento.
@@ -192,36 +194,14 @@ func _physics_process(delta: float) -> void:
 				_change_state(State.PARRY)
 
 		State.ATTACK:
-			var windup := (HEAVY_WINDUP if _attack_heavy else ATTACK_WINDUP) / _attack_speed
-			var active := (HEAVY_ACTIVE if _attack_heavy else ATTACK_ACTIVE) / _attack_speed
-			var recovery := _attack_recovery() / _attack_speed
-			if _state_time < windup + active:
-				var lunge := HEAVY_LUNGE_SPEED if _attack_heavy else ATTACK_LUNGE_SPEED * (1.0 + 0.2 * (_combo_step - 1))
-				_velocity = facing * lunge if _state_time >= windup * 0.5 else _velocity * 0.8
+			# Schivata e parata sono sempre possibili e interrompono la combo.
+			if Input.is_action_just_pressed("dodge") and _dodge_cooldown == 0.0:
+				_start_dodge(dodge_input)
+			elif Input.is_action_just_pressed("parry"):
+				_end_combo()
+				_change_state(State.PARRY)
 			else:
-				_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * delta)
-			# Si memorizza la pressione solo se può davvero continuare la combo:
-			# alla fine della combo le pressioni in più vengono ignorate.
-			if Input.is_action_just_pressed("heavy_attack") and _can_chain_heavy():
-				_queued_attack = "heavy"
-			elif Input.is_action_just_pressed("attack") and _can_chain_attack():
-				_queued_attack = "attack"
-			if not _attack_resolved and _state_time >= windup:
-				_attack_resolved = true
-				_resolve_attack()
-			if _queued_attack != "" and _state_time >= windup + active:
-				if _queued_attack == "heavy":
-					_start_heavy(input)
-				else:
-					_start_attack(_combo_step + 1, input)
-			elif _state_time >= windup + active + recovery:
-				if _combo_finished():
-					_combo_step = 0
-					_heavy_step = 0
-					_combo_timer = 0.0
-				else:
-					_combo_timer = COMBO_WINDOW
-				_change_state(State.NORMAL)
+				_update_attack(input, delta)
 
 		State.PARRY:
 			if input != Vector2.ZERO:
@@ -233,19 +213,29 @@ func _physics_process(delta: float) -> void:
 				_change_state(State.NORMAL)
 
 		State.DODGE:
-			if Input.is_action_just_pressed("dodge") and _dodges_used < max_chained_dodges \
+			# Attaccare o parare interrompe subito la schivata.
+			if Input.is_action_just_pressed("attack"):
+				_end_combo()
+				_start_attack(1, input)
+			elif Input.is_action_just_pressed("heavy_attack"):
+				_end_combo()
+				_start_heavy(input)
+			elif Input.is_action_just_pressed("parry"):
+				_change_state(State.PARRY)
+			elif Input.is_action_just_pressed("dodge") and _dodges_used < max_chained_dodges \
 					and _state_time >= DODGE_CHAIN_MIN_TIME:
 				_chain_dodge(dodge_input)
 			elif _state_time <= DODGE_STEER_TIME and dodge_input != Vector2.ZERO:
 				_dodge_direction = dodge_input.normalized()
 				_target_facing = _dodge_direction
-			# Scatto rapido che rallenta verso la fine.
-			var t := _state_time / DODGE_TIME
-			_velocity = _dodge_direction * DODGE_SPEED * (1.0 - t * t)
-			if _state_time >= DODGE_TIME:
-				_dodge_cooldown = DODGE_COOLDOWN
-				_dodge_chain_grace = DODGE_CHAIN_GRACE
-				_change_state(State.NORMAL)
+			if _state == State.DODGE:
+				# Scatto rapido che rallenta verso la fine.
+				var t := _state_time / DODGE_TIME
+				_velocity = _dodge_direction * DODGE_SPEED * (1.0 - t * t)
+				if _state_time >= DODGE_TIME:
+					_dodge_cooldown = DODGE_COOLDOWN
+					_dodge_chain_grace = DODGE_CHAIN_GRACE
+					_change_state(State.NORMAL)
 
 		State.HURT:
 			_velocity = _velocity.move_toward(Vector2.ZERO, HURT_KNOCKBACK * 4.0 * delta)
@@ -263,6 +253,45 @@ func _physics_process(delta: float) -> void:
 
 	position += _velocity * delta
 	queue_redraw()
+
+
+## Avanzamento dell'attacco in corso: affondo, colpo, combo e recupero.
+func _update_attack(input: Vector2, delta: float) -> void:
+	var windup := (HEAVY_WINDUP if _attack_heavy else ATTACK_WINDUP) / _attack_speed
+	var active := (HEAVY_ACTIVE if _attack_heavy else ATTACK_ACTIVE) / _attack_speed
+	var recovery := _attack_recovery() / _attack_speed
+	if _state_time < windup + active:
+		var lunge := HEAVY_LUNGE_SPEED if _attack_heavy else ATTACK_LUNGE_SPEED * (1.0 + 0.2 * (_combo_step - 1))
+		_velocity = facing * lunge if _state_time >= windup * 0.5 else _velocity * 0.8
+	else:
+		_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * delta)
+	# Si memorizza la pressione solo se può davvero continuare la combo:
+	# alla fine della combo le pressioni in più vengono ignorate.
+	if Input.is_action_just_pressed("heavy_attack") and _can_chain_heavy():
+		_queued_attack = "heavy"
+	elif Input.is_action_just_pressed("attack") and _can_chain_attack():
+		_queued_attack = "attack"
+	if not _attack_resolved and _state_time >= windup:
+		_attack_resolved = true
+		_resolve_attack()
+	if _queued_attack != "" and _state_time >= windup + active:
+		if _queued_attack == "heavy":
+			_start_heavy(input)
+		else:
+			_start_attack(_combo_step + 1, input)
+	elif _state_time >= windup + active + recovery:
+		if _combo_finished():
+			_end_combo()
+		else:
+			_combo_timer = COMBO_WINDOW
+		_change_state(State.NORMAL)
+
+
+func _end_combo() -> void:
+	_combo_step = 0
+	_heavy_step = 0
+	_combo_timer = 0.0
+	_queued_attack = ""
 
 
 ## Un nemico colpisce il giocatore. Restituisce l'esito, così il nemico
