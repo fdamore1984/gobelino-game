@@ -1,0 +1,26 @@
+# Godot 4+
+.godot/
+*.translation
+
+# Build / export
+build/
+export/
+*.exe
+*.pck
+*.zip
+
+# Mono / C#
+.mono/
+data_*/
+mono_crash.*.json
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Credenziali e chiavi (non committare mai)
+export_credentials.cfg
+*.key
+.env

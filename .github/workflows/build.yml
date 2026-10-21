@@ -1,0 +1,47 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: "4.4.1"
+
+jobs:
+  export:
+    name: Export (${{ matrix.preset }})
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.4.1
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - preset: "Windows Desktop"
+            dir: windows
+            artifact: gobelino-windows
+          - preset: "Linux"
+            dir: linux
+            artifact: gobelino-linux
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Importa le risorse
+        run: godot --headless --verbose --import || true
+
+      - name: Esporta
+        run: |
+          mkdir -p build/${{ matrix.dir }}
+          godot --headless --verbose --export-release "${{ matrix.preset }}"
+
+      - name: Carica artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: build/${{ matrix.dir }}
+          retention-days: 14
