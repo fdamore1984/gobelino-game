@@ -1,0 +1,17 @@
+keys,it,en
+MENU_START,Inizia,Start
+MENU_QUIT,Esci,Quit
+MENU_LANGUAGE,English,Italiano
+MENU_VERSION,Versione %s,Version %s
+HUD_HEALTH,Vita  %d / %d,Health  %d / %d
+HUD_KILLS,Nemici sconfitti  %d,Enemies defeated  %d
+HUD_DEFEAT,Sconfitto!,Defeated!
+HUD_HINT,Muovi: WASD / frecce / levetta    Attacco: J / R1    Parata: K / L1 (tieni premuto)    Schivata: Spazio / B (due volte: più lunga)    Menu: Esc / Start,Move: WASD / arrows / stick    Attack: J / R1    Parry: K / L1 (hold)    Dodge: Space / B (twice: longer)    Menu: Esc / Start
+FX_DODGED,Schivato!,Dodged!
+FX_BLOCKED,Parato,Blocked
+FX_PERFECT_PARRY,Parata perfetta!,Perfect parry!
+FX_EMPOWERED,Potenziato!,Empowered!
+TOUCH_ATTACK,Attacco,Attack
+TOUCH_PARRY,Parata,Parry
+TOUCH_DODGE,Schivata,Dodge
+TOUCH_MENU,Menu,Menu

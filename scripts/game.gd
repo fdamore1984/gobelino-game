@@ -71,7 +71,7 @@ func _on_enemy_died(_enemy: Enemy) -> void:
 
 
 func _on_player_died() -> void:
-	_hud.show_message("Sconfitto!")
+	_hud.show_message(tr("HUD_DEFEAT"))
 	# Collegato al segnale (e non con await) così, se nel frattempo si torna
 	# al menù, il timer non richiama una scena già distrutta.
 	get_tree().create_timer(GAME_OVER_DELAY).timeout.connect(_back_to_menu)
