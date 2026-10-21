@@ -18,3 +18,7 @@
   sintetizzati in `scripts/sfx.gd`, finché non arrivano gli asset definitivi.
 - **Verifica prima di pubblicare**: import e avvio senza errori né warning
   con Godot 4.4.1, test delle meccaniche toccate, screenshot di controllo.
+- **Merge automatico**: ogni modifica passa da una Pull Request verso `main`;
+  quando la CI della PR è verde (export Windows, Linux e Android) si fa il
+  merge senza chiedere conferma, poi si verifica il caricamento su itch.io
+  del build su `main`. Se la CI è rossa, niente merge: si corregge prima.
