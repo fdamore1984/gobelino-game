@@ -62,7 +62,7 @@ All'avvio c'è un menù (Inizia / Esci / lingua). Il livello di test è un piano
 |---|---|---|---|
 | Movimento | WASD / frecce | levetta sinistra | levetta virtuale a sinistra |
 | Attacco (combo) | J | R1 | pulsante "Attacco" |
-| Colpo potente (chiude la combo) | L | Y | pulsante "Potente" |
+| Colpo potente (chiude la combo) | L | L2 | pulsante "Potente" |
 | Parata (tieni premuto) | K | L1 | pulsante "Parata" |
 | Schivata (ripeti per concatenare) | Spazio | B | pulsante "Schivata" |
 | Pozione | Q | croce sinistra | pulsante "Pozione" |
@@ -75,6 +75,7 @@ All'avvio c'è un menù (Inizia / Esci / lingua). Il livello di test è un piano
 - **Pozioni**: curano 3 punti vita; se ne hanno 2 all'inizio.
 - **Scudo**: assorbe un colpo da qualsiasi direzione; ricarica di 30 secondi dall'attivazione.
 - **Parata**: blocca i colpi frontali; una parata perfetta, iniziata appena prima del colpo, stordisce il nemico e per 4 secondi raddoppia i danni e velocizza gli attacchi.
+- **Interruzioni**: schivata e parata si possono usare in qualsiasi momento, anche durante una combo, che si interrompe; attaccare durante una schivata la interrompe e attacca subito.
 - **Schivata**: invulnerabilità per un istante; premendo di nuovo durante la schivata (o subito dopo) se ne concatena un'altra (2 all'inizio). All'inizio di ogni schivata la direzione segue ancora la levetta, così cambiare direzione è facile.
 - **Esperienza e livelli**: ogni nemico sconfitto dà esperienza; servono 100 punti per il livello 2, 200 per il 3 e così via. Ogni livello aumenta i danni base e fa scegliere un potenziamento: +1 colpo nella combo, +1 colpo potente concatenato, +1 schivata concatenata, +1 punto vita, +1 pozione o ricarica dello scudo -2%.
 - **Nemici** (`data/enemies.json`): esploratori rapidi, guerrieri, bruti lenti e resistenti che fanno 2 danni, evocatori che restano a distanza ed evocano esploratori (colpirli mentre evocano li interrompe). Girano attorno al giocatore con scatti laterali; l'attacco è annunciato dalla zona rossa a terra, con durata variabile, finte e secondi attacchi. Salendo di livello compaiono più spesso i nemici forti.

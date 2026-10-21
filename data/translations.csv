@@ -6,7 +6,7 @@ MENU_VERSION,Versione %s,Version %s
 HUD_HEALTH,Vita  %d / %d,Health  %d / %d
 HUD_KILLS,Nemici sconfitti  %d,Enemies defeated  %d
 HUD_DEFEAT,Sconfitto!,Defeated!
-HUD_HINT,Muovi: WASD / levetta    Attacco (combo): J / R1    Attacco potente: L / Y    Parata: K / L1 tenuto    Schivata (ripeti per concatenare): Spazio / B,Move: WASD / stick    Attack (combo): J / R1    Power strike: L / Y    Parry: K / L1 hold    Dodge (repeat to chain): Space / B
+HUD_HINT,Muovi: WASD / levetta    Attacco (combo): J / R1    Attacco potente: L / L2    Parata: K / L1 tenuto    Schivata (ripeti per concatenare): Spazio / B,Move: WASD / stick    Attack (combo): J / R1    Power strike: L / L2    Parry: K / L1 hold    Dodge (repeat to chain): Space / B
 FX_DODGED,Schivato!,Dodged!
 FX_BLOCKED,Parato,Blocked
 FX_PERFECT_PARRY,Parata perfetta!,Perfect parry!
