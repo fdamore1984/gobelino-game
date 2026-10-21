@@ -45,7 +45,7 @@ custom_minimum_size = Vector2(320, 72)
 layout_mode = 2
 size_flags_horizontal = 4
 theme_override_font_sizes/font_size = 36
-text = "Inizia"
+text = "MENU_START"
 
 [node name="Quit" type="Button" parent="Center/VBox"]
 unique_name_in_owner = true
@@ -53,7 +53,25 @@ custom_minimum_size = Vector2(320, 72)
 layout_mode = 2
 size_flags_horizontal = 4
 theme_override_font_sizes/font_size = 36
-text = "Esci"
+text = "MENU_QUIT"
+
+[node name="Language" type="Button" parent="."]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(180, 52)
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -196.0
+offset_top = -68.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_font_sizes/font_size = 24
+text = "MENU_LANGUAGE"
 
 [node name="Info" type="Label" parent="."]
 unique_name_in_owner = true

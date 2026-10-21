@@ -12,9 +12,9 @@ const FONT_SIZE := 18
 
 ## Pulsanti: azione, etichetta e posizione rispetto all'angolo in basso a destra.
 const BUTTONS := [
-	{"action": "attack", "label": "Attacco", "offset": Vector2(-90, -200)},
-	{"action": "parry", "label": "Parata", "offset": Vector2(-210, -130)},
-	{"action": "dodge", "label": "Schivata", "offset": Vector2(-90, -80)},
+	{"action": "attack", "label": "TOUCH_ATTACK", "offset": Vector2(-90, -200)},
+	{"action": "parry", "label": "TOUCH_PARRY", "offset": Vector2(-210, -130)},
+	{"action": "dodge", "label": "TOUCH_DODGE", "offset": Vector2(-90, -80)},
 ]
 
 var _stick_touch := -1
@@ -103,10 +103,10 @@ func _draw() -> void:
 		var center: Vector2 = size + button["offset"]
 		var pressed := Input.is_action_pressed(button["action"])
 		draw_circle(center, BUTTON_RADIUS, COLOR_ACTIVE if pressed else COLOR_BASE)
-		_draw_centered_text(font, center, button["label"])
+		_draw_centered_text(font, center, tr(button["label"]))
 
 	draw_circle(_menu_button_center(), MENU_BUTTON_RADIUS, COLOR_BASE)
-	_draw_centered_text(font, _menu_button_center(), "Menu")
+	_draw_centered_text(font, _menu_button_center(), tr("TOUCH_MENU"))
 
 
 func _draw_centered_text(font: Font, center: Vector2, text: String) -> void:

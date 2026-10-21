@@ -12,13 +12,14 @@ var _color := Color.WHITE
 var _age := 0.0
 
 
-static func spawn(parent: Node, at: Vector2, text: String, color: Color) -> void:
+## height_offset alza la scritta, per impilarne più di una sullo stesso punto.
+static func spawn(parent: Node, at: Vector2, text: String, color: Color, height_offset := 0.0) -> void:
 	var label := FloatingText.new()
 	label._text = text
 	label._color = color
 	label.z_index = 100
 	parent.add_child(label)
-	label.global_position = at + Vector2(0, -50)
+	label.global_position = at + Vector2(0, -50.0 - height_offset)
 
 
 func _process(delta: float) -> void:
