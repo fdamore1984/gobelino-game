@@ -1,6 +1,6 @@
 extends Node2D
 ## Livello di test del gameplay: un mondo senza limiti generato a caso
-## (dislivelli, dirupi e ostacoli naturali, vedi World) con nemici di vari
+## (blocchi a gradini su più altezze e ostacoli naturali, vedi World) con nemici di vari
 ## tipi sparsi a caso attorno al giocatore. I nemici troppo lontani vengono
 ## rimossi e ne compaiono di nuovi fuori dallo schermo, così ce ne sono
 ## sempre. Gestisce anche esperienza, livelli e scelta dei potenziamenti.
