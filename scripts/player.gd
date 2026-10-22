@@ -33,9 +33,9 @@ const SPEED := 310.0
 
 ## Da fermo si parte piano; più si va veloci, più si accelera.
 const ACCELERATION_START := 600.0
-const ACCELERATION_FULL := 3200.0
+const ACCELERATION_FULL := 2800.0
 ## Quando si lascia la direzione ci si ferma dopo un breve scivolamento.
-const DECELERATION := 1300.0
+const DECELERATION := 1100.0
 ## La direzione in cui si guarda ruota in modo continuo invece che a scatti.
 const TURN_SPEED := 18.0
 
@@ -125,8 +125,17 @@ const JUMP_EVADE_HEIGHT := 18.0
 ## Colpi dati e ricevuti arrivano solo tra chi sta più o meno alla stessa
 ## altezza (per esempio non a un nemico sul gradino di sotto).
 const HIT_HEIGHT_REACH := 40.0
-## La telecamera segue con dolcezza l'altezza del terreno.
+## La telecamera segue con dolcezza l'altezza del terreno e anticipa un
+## poco la direzione di movimento.
 const CAMERA_HEIGHT_FOLLOW := 6.0
+const CAMERA_SMOOTHING := 7.0
+const CAMERA_LOOK_AHEAD := 0.18
+const CAMERA_LOOK_AHEAD_MAX := 70.0
+const CAMERA_LOOK_AHEAD_FOLLOW := 2.5
+## Il corpo si inclina nella direzione di corsa e si schiaccia atterrando.
+const LEAN_ANGLE := 0.12
+const SQUASH_AMOUNT := 0.22
+const SQUASH_RECOVERY := 5.0
 const START_JUMPS := 1
 
 ## Mana: serve per le magie e si ricarica piano da solo.
@@ -258,6 +267,10 @@ var _walk_velocity := Vector2.ZERO
 var _swing_sign := 1.0
 ## Fase del passo per l'animazione delle gambe.
 var _walk_phase := 0.0
+## Schiacciamento dopo un atterraggio (0-1) e anticipo della telecamera.
+var _squash := 0.0
+var _look_ahead := Vector2.ZERO
+var _camera_height := 0.0
 var _spell_cooldown := 0.0
 ## Carica del colpo potente (0-1) e se il tasto è ancora tenuto premuto.
 var _charge := 0.0
@@ -282,7 +295,11 @@ func _ready() -> void:
 	if World.current:
 		ground_elevation = World.current.elevation_at(position)
 	if _camera:
-		_camera.position.y = -ground_elevation
+		_camera_height = -ground_elevation
+		_camera.position = Vector2(0, _camera_height)
+		_camera.position_smoothing_enabled = true
+		_camera.position_smoothing_speed = CAMERA_SMOOTHING
+		_camera.reset_smoothing()
 
 
 func _physics_process(delta: float) -> void:
@@ -433,8 +450,12 @@ func _physics_process(delta: float) -> void:
 		# La fiamma tremola.
 		_torch.position = Vector2(0, -altitude() - LEG_LENGTH)
 		_torch.energy = TORCH_ENERGY * randf_range(0.92, 1.05)
+	_squash = move_toward(_squash, 0.0, SQUASH_RECOVERY * delta)
 	if _camera:
-		_camera.position.y = lerpf(_camera.position.y, -ground_elevation, minf(CAMERA_HEIGHT_FOLLOW * delta, 1.0))
+		_camera_height = lerpf(_camera_height, -ground_elevation, minf(CAMERA_HEIGHT_FOLLOW * delta, 1.0))
+		var ahead := (_velocity * CAMERA_LOOK_AHEAD).limit_length(CAMERA_LOOK_AHEAD_MAX)
+		_look_ahead = _look_ahead.lerp(ahead, minf(CAMERA_LOOK_AHEAD_FOLLOW * delta, 1.0))
+		_camera.position = Vector2(0, _camera_height) + _look_ahead
 	queue_redraw()
 
 
@@ -501,6 +522,8 @@ func _update_height(delta: float) -> void:
 	_height_velocity -= gravity * delta
 	_height += _height_velocity * delta
 	if _height <= 0.0:
+		# Più forte la caduta, più il corpo si schiaccia atterrando.
+		_squash = clampf(-_height_velocity / 900.0, 0.0, 1.0)
 		_height = 0.0
 		_land()
 
@@ -1031,12 +1054,19 @@ func _draw() -> void:
 	var lift := -altitude() + (RADIUS * 0.4 if _state == State.SLIDE else 0.0)
 	draw_set_transform(Vector2(0, lift), 0.0, body_scale)
 	# Gambe: camminano quando ci si muove, raccolte in aria e in scivolata.
+	var walking := _velocity.length() > 20.0 and not is_airborne() and _state != State.DEAD
 	if _state != State.SLIDE:
-		var walking := _velocity.length() > 20.0 and not is_airborne() and _state != State.DEAD
 		var foot_y := RADIUS * 0.85 - (6.0 if is_airborne() else 0.0)
 		BodyParts.draw_legs(self, -LEG_LENGTH + RADIUS * 0.55, foot_y, 8.0, 6.0, _walk_phase,
 				_velocity.normalized(), STRIDE if walking else 0.0, body.darkened(0.35))
-	draw_set_transform(Vector2(0, lift - LEG_LENGTH), 0.0, body_scale)
+	# Il corpo ondeggia camminando, si inclina nella direzione di corsa, si
+	# allunga salendo e si schiaccia atterrando.
+	var bob := absf(sin(_walk_phase)) * 2.5 if walking else 0.0
+	var lean := clampf(_velocity.x / run_speed(), -1.0, 1.0) * LEAN_ANGLE if _state != State.DEAD else 0.0
+	var squash := Vector2(1.0 + SQUASH_AMOUNT * _squash, 1.0 - SQUASH_AMOUNT * _squash)
+	if _height_velocity > 200.0:
+		squash = Vector2(0.92, 1.08)
+	draw_set_transform(Vector2(0, lift - LEG_LENGTH - bob), lean, body_scale * squash)
 
 	# Aura del potenziamento, corpo e "naso" che indica la direzione.
 	if is_empowered() and _state != State.DEAD:

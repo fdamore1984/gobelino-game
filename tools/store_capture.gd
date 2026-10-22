@@ -75,9 +75,10 @@ func _capture_combat(language: String) -> void:
 	_enemy("brute", Vector2(-170, 90), Enemy.State.WINDUP, 0.6)
 	var summoner := _enemy("summoner", Vector2(330, 150), Enemy.State.SUMMON, 0.8)
 	summoner._summon_positions = [Vector2(-70, 0), Vector2(70, 0)]
-	_enemy("scout", Vector2(-330, -140), Enemy.State.CHASE, 0.0)
-	_enemy("scout", Vector2(250, -190), Enemy.State.DASH, 0.0)
-	_enemy("warrior", Vector2(-420, 200), Enemy.State.CHASE, 0.0)
+	_enemy("caster", Vector2(-330, -140), Enemy.State.WINDUP, 0.6)
+	_enemy("lancer", Vector2(250, -190), Enemy.State.CHASE, 0.0)
+	_enemy("whirler", Vector2(-420, 200), Enemy.State.WINDUP, 0.7)
+	_enemy("golem", Vector2(470, -40), Enemy.State.CHASE, 0.0)
 	await _save("%s_1_combat.png" % language)
 	_end_game()
 
@@ -164,7 +165,9 @@ func _capture_challenge(language: String) -> void:
 	# Il mondo attorno alla nuova posizione va generato prima della foto.
 	var camera: Camera2D = _player.get_node("Camera")
 	camera.reset_physics_interpolation()
+	camera.reset_smoothing()
 	await _frames(2)
+	camera.reset_smoothing()
 	camera.force_update_scroll()
 	world._update_chunks()
 	await _frames(20)

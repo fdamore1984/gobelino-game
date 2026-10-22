@@ -30,5 +30,34 @@
 			"type": "scout", "count": 2, "max_minions": 4,
 			"cooldown": [3.5, 6.0], "channel_time": 1.2, "minion_xp": 5
 		}
+	},
+	"lancer": {
+		"health": 35, "xp": 35, "damage": 1,
+		"radius": 21, "speed": 105, "mass": 0.9, "aggro_range": 440, "orbit_distance": 210,
+		"windup": [0.9, 1.4], "lunge_speed": 520, "strike_reach": 70, "strike_arc": 50,
+		"color": [0.85, 0.65, 0.25], "shape": "pentagon",
+		"spawn_weight": [8, 3]
+	},
+	"whirler": {
+		"health": 45, "xp": 40, "damage": 1,
+		"radius": 23, "speed": 88, "mass": 1.2, "aggro_range": 380, "orbit_distance": 140,
+		"windup": [1.0, 1.5], "lunge_speed": 60, "strike_reach": 60, "strike_arc": 360,
+		"color": [0.35, 0.75, 0.4], "shape": "star",
+		"spawn_weight": [3, 3]
+	},
+	"golem": {
+		"health": 200, "xp": 110, "damage": 2,
+		"radius": 40, "speed": 50, "mass": 4.0, "aggro_range": 340, "orbit_distance": 180,
+		"windup": [1.8, 2.6], "lunge_speed": 200, "strike_reach": 100, "strike_arc": 200,
+		"color": [0.5, 0.48, 0.55], "shape": "octagon",
+		"spawn_weight": [0, 2]
+	},
+	"caster": {
+		"health": 30, "xp": 40, "damage": 1,
+		"radius": 20, "speed": 85, "mass": 0.8, "aggro_range": 520, "orbit_distance": 320,
+		"windup": [1.0, 1.6], "lunge_speed": 0, "strike_reach": 40, "strike_arc": 60,
+		"color": [0.6, 0.35, 0.85], "shape": "cross",
+		"spawn_weight": [4, 3],
+		"ranged": {"range": 400, "bolt_speed": 250}
 	}
 }
