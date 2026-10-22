@@ -72,7 +72,7 @@ IN THIS PROTOTYPE
 - Jump over enemy attacks (unlock multiple jumps in mid-air) and combine jumps with dodges
 - Hold R2 to run; dodge while running to slide, and attack, dodge, jump or parry out of the slide
 - Healing potions (you start with 2) and a magic shield that absorbs one hit, recharging in 30 seconds
-- Four kinds of enemies: quick scouts, warriors, heavy brutes and summoners that call in reinforcements (hit them while they summon to interrupt them)
+- Eight kinds of enemies: quick scouts, warriors, heavy brutes, summoners that call in reinforcements (hit them while they summon to interrupt them), lancers with long thrusts, whirlers that strike all around, huge golems and casters that hurl magic bolts from afar
 - Enemies circle around you with quick sidesteps; their sword slashes are slow and wide but unpredictable: watch the red area on the ground, beware of feints and follow-up strikes
 - Hold the power strike to charge it up to double damage; every hit you land shakes the controller and freezes the action for an instant
 - Cast fireballs that seek out and chase the nearest enemy (they cost mana: drink mana potions to refill)
@@ -120,7 +120,7 @@ IN QUESTO PROTOTIPO
 - Salta per evitare gli attacchi dei nemici (sblocca più salti in aria) e combina salti e schivate
 - Tieni premuto R2 per correre; schiva mentre corri per una scivolata, da cui puoi attaccare, schivare, saltare o parare
 - Pozioni curative (ne hai 2 all'inizio) e uno scudo magico che assorbe un colpo e si ricarica in 30 secondi
-- Quattro tipi di nemici: esploratori rapidi, guerrieri, bruti corazzati ed evocatori che chiamano rinforzi (colpiscili mentre evocano per interromperli)
+- Otto tipi di nemici: esploratori rapidi, guerrieri, bruti corazzati, evocatori che chiamano rinforzi (colpiscili mentre evocano per interromperli), lancieri con affondi lunghi, rotanti che colpiscono tutto attorno, golem enormi e lanciatori che scagliano dardi magici da lontano
 - I nemici ti girano attorno con scatti laterali; i loro fendenti di spada sono lenti e ampi ma imprevedibili: guarda la zona rossa a terra, attento alle finte e ai secondi colpi
 - Tieni premuto il colpo potente per caricarlo fino al doppio del danno; ogni colpo a segno fa vibrare il controller e ferma l'azione per un istante
 - Lancia palle di fuoco che cercano e inseguono il nemico più vicino (costano mana: bevi le pozioni di mana per ricaricarlo)

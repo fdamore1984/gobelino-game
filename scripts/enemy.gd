@@ -10,7 +10,8 @@ extends Node2D
 ## prevedibile la carica ha durata variabile, a volte è una finta e a
 ## volte segue subito un secondo attacco più rapido.
 ## Gli evocatori restano a distanza ed evocano altri nemici: colpirli
-## mentre evocano interrompe l'evocazione.
+## mentre evocano interrompe l'evocazione. I tipi con "ranged" (lanciatori)
+## restano a distanza e scagliano dardi magici (vedi EnemyBolt).
 
 signal died(enemy: Enemy)
 ## Chiede alla scena di gioco di creare i nemici evocati.
@@ -18,7 +19,10 @@ signal summon_requested(summoner: Enemy, type_id: String, positions: Array[Vecto
 
 enum State { WANDER, CHASE, DASH, WINDUP, STRIKE, RECOVER, STUNNED, SUMMON, DEAD }
 
-const ACCELERATION := 900.0
+const ACCELERATION := 750.0
+## Lo sguardo ruota con continuità invece che a scatti.
+const TURN_RATE := 9.0
+const SHARD_COUNT := 7
 const LEASH_RANGE := 700.0
 const SEPARATION_RANGE := 60.0
 const KNOCKBACK := 260.0
@@ -189,12 +193,17 @@ func _physics_process(delta: float) -> void:
 		State.STRIKE:
 			_velocity = _attack_direction * float(_type["lunge_speed"])
 			target_velocity = _velocity
-			if not _strike_resolved and player_active and _player_in_strike_zone():
+			if not _is_ranged() and not _strike_resolved and player_active and _player_in_strike_zone():
 				_strike_resolved = true
 				if player.receive_hit(global_position, _type["damage"]) == "parried":
 					_is_combo = false
 					Sfx.play("stun", global_position)
 					_change_state(State.STUNNED)
+			if _state == State.STRIKE and _is_ranged():
+				_velocity = Vector2.ZERO
+				if not _strike_resolved:
+					_strike_resolved = true
+					_shoot_bolt()
 			if _state == State.STRIKE and _state_time >= STRIKE_TIME:
 				_velocity = _velocity * 0.2
 				if not _is_combo and player_active and randf() < COMBO_CHANCE:
@@ -236,12 +245,14 @@ func _physics_process(delta: float) -> void:
 	elif _state in [State.WINDUP, State.RECOVER, State.STUNNED, State.SUMMON]:
 		_velocity = _velocity.move_toward(Vector2.ZERO, ACCELERATION * delta)
 
-	if _state in [State.WINDUP, State.STRIKE]:
+	if _state == State.STRIKE:
 		_facing = _attack_direction
+	elif _state == State.WINDUP:
+		_turn_toward(_attack_direction, delta)
 	elif _state in [State.CHASE, State.DASH, State.SUMMON] and player_active:
-		_facing = to_player.normalized()
+		_turn_toward(to_player, delta)
 	elif _velocity.length() > 5.0:
-		_facing = _velocity.normalized()
+		_turn_toward(_velocity, delta)
 
 	_knockback = _knockback.move_toward(Vector2.ZERO, 1200.0 * delta)
 	# I nemici non saltano: restano sul loro livello del terreno (le rampe
@@ -304,11 +315,36 @@ func _change_state(new_state: State) -> void:
 	_state_time = 0.0
 
 
+func _turn_toward(direction: Vector2, delta: float) -> void:
+	if direction != Vector2.ZERO:
+		_facing = Vector2.from_angle(rotate_toward(_facing.angle(), direction.angle(), TURN_RATE * delta))
+
+
+func _is_ranged() -> bool:
+	return _type.has("ranged")
+
+
+## Dardo magico verso la direzione dell'attacco.
+func _shoot_bolt() -> void:
+	var ranged: Dictionary = _type["ranged"]
+	var bolt := EnemyBolt.new()
+	bolt.direction = _attack_direction
+	bolt.speed = ranged["bolt_speed"]
+	bolt.damage = _type["damage"]
+	bolt.max_distance = ranged["range"] * 1.3
+	bolt.altitude = ground_elevation
+	bolt.color = _color.lightened(0.3)
+	bolt.position = position + _attack_direction * radius
+	get_parent().add_child(bolt)
+
+
 func _orbit_distance() -> float:
 	return _type["orbit_distance"]
 
 
 func _attack_trigger_range() -> float:
+	if _is_ranged():
+		return _type["ranged"]["range"]
 	return radius + Player.RADIUS + ATTACK_TRIGGER_GAP
 
 
@@ -327,7 +363,7 @@ func _chase_direction(to_player: Vector2) -> Vector2:
 	var radial := to_player.normalized()
 	var tangent := radial.orthogonal() * _orbit_sign
 	var distance := to_player.length()
-	if _attack_cooldown == 0.0 and not _type.has("summon"):
+	if _attack_cooldown == 0.0 and not _type.has("summon") and not _is_ranged():
 		return (radial * 0.85 + tangent * 0.35).normalized()
 	if distance > _orbit_distance() + 30.0:
 		return (radial * 0.8 + tangent * 0.5).normalized()
@@ -410,7 +446,15 @@ func _separation() -> Vector2:
 ## Zona di pericolo dell'attacco, che si riempie durante la carica, e
 ## cerchi dove compariranno i nemici evocati.
 func _draw_telegraph() -> void:
-	if _state == State.WINDUP:
+	if _state == State.WINDUP and _is_ranged():
+		# Linea di mira che si accende durante la carica.
+		var progress := _state_time / _windup_time
+		var length: float = _type["ranged"]["range"]
+		var side := _attack_direction.orthogonal() * 5.0
+		var tip := _attack_direction * length
+		_telegraph.draw_colored_polygon(PackedVector2Array([side, tip + side, tip - side, -side]), Color(COLOR_DANGER, 0.12))
+		_telegraph.draw_line(Vector2.ZERO, tip * progress, Color(COLOR_DANGER, 0.45), 4.0)
+	elif _state == State.WINDUP:
 		var progress := _state_time / _windup_time
 		_draw_sector(_attack_direction, _strike_reach(), Color(COLOR_DANGER, 0.15))
 		_draw_sector(_attack_direction, _strike_reach() * progress, Color(COLOR_DANGER, 0.3))
@@ -443,10 +487,18 @@ func _draw() -> void:
 	var walking := _velocity.length() > 15.0 and _state != State.DEAD
 	BodyParts.draw_legs(self, -leg + radius * 0.55, radius * 0.85, radius * 0.35, maxf(4.0, radius * 0.22),
 			_walk_phase, _velocity.normalized(), radius * 0.3 if walking else 0.0, _color.darkened(0.4))
-	draw_set_transform(Vector2(0, -ground_elevation - leg))
+	# Camminando il corpo ondeggia un poco su e giù.
+	var bob := absf(sin(_walk_phase)) * radius * 0.1 if walking else 0.0
+	draw_set_transform(Vector2(0, -ground_elevation - leg - bob))
+	if _state == State.DEAD:
+		_draw_shards(body)
+		return
 	draw_colored_polygon(_shape_points(), body)
+	draw_polyline(_closed(_shape_points()), body.darkened(0.35), 2.0)
 	draw_circle(_facing * radius * 0.5, maxf(radius * 0.2, 4.0), Color(0.1, 0.05, 0.1))
-	if _state != State.DEAD:
+	if _is_ranged():
+		_draw_staff()
+	else:
 		_draw_sword()
 
 	if _state == State.STUNNED:
@@ -486,8 +538,61 @@ func _draw_sword() -> void:
 	BodyParts.draw_sword(self, hand, angle, length, width, Color(1.0, 0.9, 0.9) if _state == State.STRIKE else Color.WHITE)
 
 
+## Alla morte il corpo si rompe in frammenti che volano via.
+func _draw_shards(color: Color) -> void:
+	var t := _state_time / DEATH_FADE_TIME
+	for i in SHARD_COUNT:
+		var direction := Vector2.from_angle(TAU * i / SHARD_COUNT + float(get_instance_id() % 7))
+		var center := direction * radius * (0.3 + 1.6 * t) + Vector2(0, 30.0 * t * t)
+		var size := radius * 0.35 * (1.0 - 0.5 * t)
+		var spin := t * 6.0 + i
+		draw_colored_polygon(PackedVector2Array([
+			center + Vector2.from_angle(spin) * size, center + Vector2.from_angle(spin + 2.2) * size,
+			center + Vector2.from_angle(spin + 4.1) * size * 0.7,
+		]), color)
+
+
+## Bastone del lanciatore con la sfera che si accende caricando il dardo.
+func _draw_staff() -> void:
+	var hand := _facing.orthogonal() * radius * 0.8
+	var top := hand + Vector2(0, -radius * 1.4)
+	draw_line(hand + Vector2(0, radius * 0.5), top, Color(0.45, 0.3, 0.18), maxf(3.0, radius * 0.15))
+	var glow := 0.4
+	if _state == State.WINDUP:
+		glow = 0.4 + 0.6 * _state_time / _windup_time
+	draw_circle(top, radius * 0.35 * (1.0 + glow * 0.4), Color(_color.lightened(0.4), 0.35 * glow))
+	draw_circle(top, radius * 0.22, _color.lightened(0.3 + 0.4 * glow))
+
+
+static func _closed(points: PackedVector2Array) -> PackedVector2Array:
+	var result := points.duplicate()
+	result.append(points[0])
+	return result
+
+
+## Poligono regolare (o stella con inner < 1) centrato, a punta in su.
+func _polygon(sides: int, scale: float, inner := 1.0) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	var count := sides * (2 if inner < 1.0 else 1)
+	for i in count:
+		var length := radius * scale * (inner if inner < 1.0 and i % 2 == 1 else 1.0)
+		points.append(Vector2.from_angle(TAU * i / count - PI / 2.0) * length)
+	return points
+
+
 func _shape_points() -> PackedVector2Array:
 	match _type["shape"]:
+		"pentagon":
+			return _polygon(5, 1.15)
+		"octagon":
+			return _polygon(8, 1.08)
+		"star":
+			return _polygon(5, 1.3, 0.5)
+		"cross":
+			var a := radius * 0.4
+			var b := radius * 1.1
+			return PackedVector2Array([Vector2(-a, -b), Vector2(a, -b), Vector2(a, -a), Vector2(b, -a), Vector2(b, a), Vector2(a, a),
+					Vector2(a, b), Vector2(-a, b), Vector2(-a, a), Vector2(-b, a), Vector2(-b, -a), Vector2(-a, -a)])
 		"triangle":
 			return PackedVector2Array([Vector2(0, -radius * 1.3), Vector2(radius, radius * 0.8), Vector2(-radius, radius * 0.8)])
 		"square":
@@ -501,6 +606,10 @@ func _shape_points() -> PackedVector2Array:
 
 
 func _draw_sector(direction: Vector2, sector_radius: float, color: Color) -> void:
+	if _strike_arc() >= TAU - 0.01:
+		# Attacco tutto attorno (nemico rotante): la zona è un cerchio.
+		_telegraph.draw_circle(Vector2.ZERO, sector_radius, color)
+		return
 	var points := PackedVector2Array([Vector2.ZERO])
 	var steps := 16
 	var start := direction.angle() - _strike_arc() / 2.0
