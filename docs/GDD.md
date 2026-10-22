@@ -6,7 +6,7 @@ Documento vivo: da compilare e aggiornare. Le sezioni vuote sono da definire.
 
 - **Titolo provvisorio**: Gobelino
 - **Genere**: RPG fantasy medievale 2D, visuale isometrica, combattimento in tempo reale
-- **Piattaforme target**: Windows, Linux, SteamOS (Steam Deck) e Android. Steam per desktop e Deck, Google Play per Android
+- **Piattaforme target**: Windows, Linux, SteamOS (Steam Deck) e Android. Steam per desktop e Deck, Google Play per Android. Per ora il prototipo viene pubblicato solo per Linux / SteamOS
 - **Pitch in una frase**: Un goblin solitario, muto e senza passato, che vive in una tana come un animale selvatico, esplora il mondo attorno a sé, diventa più forte e incontra chi gli apre nuove strade.
 - **Pubblico**: _da definire_
 - **Durata stimata**: _da definire (consigliato 5-10 ore per il primo titolo)_

@@ -52,7 +52,7 @@ Regole di progetto per restare multipiattaforma:
 
 - `main`: ramo unico, sempre in stato funzionante
 - Lavoro in branch di feature (`feature/nome`) con Pull Request verso `main`
-- Ogni push su `main` genera le build Windows, Linux e Android (APK di debug) e le carica su itch.io; sulle Pull Request la CI verifica solo che l'export riesca
+- Ogni push su `main` genera la build Linux (SteamOS / Steam Deck) e la carica su itch.io (per ora Windows e Android non vengono pubblicati: i preset restano in `export_presets.cfg` per quando si riattiveranno); sulle Pull Request la CI verifica solo che l'export riesca
 
 ## Livello di test
 
