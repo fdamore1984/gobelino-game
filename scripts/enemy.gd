@@ -232,7 +232,13 @@ func _physics_process(delta: float) -> void:
 		_facing = _velocity.normalized()
 
 	_knockback = _knockback.move_toward(Vector2.ZERO, 1200.0 * delta)
-	position += (_velocity + _knockback) * delta
+	# Dirupi e ostacoli solidi fermano anche i nemici; cespugli e rovi li rallentano.
+	var motion := (_velocity + _knockback) * delta
+	var world := World.current
+	if world:
+		position = world.move(position, motion * world.slow_at(position, radius), radius * 0.8)
+	else:
+		position += motion
 	queue_redraw()
 	_telegraph.queue_redraw()
 

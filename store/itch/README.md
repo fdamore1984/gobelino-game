@@ -37,7 +37,7 @@ godot --path . --resolution 1260x1000 res://tools/store_capture.tscn -- cover
 Su itch.io se ne possono mettere al massimo 10:
 
 ```
-action-rpg, fantasy, medieval, goblins, isometric, 2d, controller, singleplayer, godot, prototype
+action-rpg, fantasy, medieval, goblins, isometric, 2d, controller, singleplayer, procedural-generation, prototype
 ```
 
 ---
@@ -65,7 +65,7 @@ You are a lone goblin with no past, living in a den like a wild animal. Starting
 ⚠️ This is a prototype build: characters and enemies are placeholder geometric shapes and the sounds are synthesized placeholders. It's here to test the combat.
 
 IN THIS PROTOTYPE
-- A boundless test level with enemies scattered everywhere
+- A boundless, randomly generated wild world: plains, hills and plateaus, rocky cliffs you can only jump down from, and woods full of trees, rocks, bushes and thorny brambles (bushes and brambles slow you down, brambles prick)
 - Real-time combat: chain up to 3 attacks in a combo, each hit stronger than the last, and finish it with a power strike for a big bonus
 - Parry, and time it right before the hit for a perfect parry: the enemy is stunned and your attacks are empowered for a few seconds (double damage, faster swings)
 - Dodge, and press again mid-dodge to chain another one in a new direction. Dodge and parry are always available and cancel your combo; attacking cancels a dodge into an immediate strike
@@ -74,7 +74,7 @@ IN THIS PROTOTYPE
 - Healing potions (you start with 2) and a magic shield that absorbs one hit, recharging in 30 seconds
 - Four kinds of enemies: quick scouts, warriors, heavy brutes and summoners that call in reinforcements (hit them while they summon to interrupt them)
 - Enemies circle around you with quick sidesteps; their attacks are slow but unpredictable: watch the red area on the ground, beware of feints and follow-up strikes
-- Earn experience to level up: every level raises your base damage and lets you choose an upgrade: one more combo hit, one more chained power strike, one more chained dodge, one more jump, one more health point, one more potion, a faster shield recharge or a faster run. Your skill levels are always shown on screen
+- Earn experience to level up: every level raises your base damage and lets you choose an upgrade: one more combo hit, one more chained power strike, one more chained dodge, one more jump, one more health point, one more potion, a faster shield recharge or a faster run, picked from a grid of cards with icons. Your skill levels are always shown on screen, and the active power-ups are listed on the right
 
 CONTROLS
 - Move: left stick / WASD / on-screen stick
@@ -82,7 +82,7 @@ CONTROLS
 - Power strike (ends the combo): L2 / L
 - Parry (hold): L1 / K
 - Dodge (press again to chain): B / Space
-- Jump: Y / F
+- Jump: A / F
 - Run (hold; dodge while running = slide): R2 / Shift
 - Potion: D-pad left / Q
 - Shield: D-pad right / R
@@ -104,7 +104,7 @@ Sei un goblin solitario e senza passato, che vive in una tana come un animale se
 ⚠️ Questa è una build di prototipo: personaggi e nemici sono forme geometriche provvisorie e i suoni sono provvisori, sintetizzati. Serve a provare il combattimento.
 
 IN QUESTO PROTOTIPO
-- Un livello di test senza confini, con nemici sparsi ovunque
+- Un mondo selvaggio senza confini, generato a caso: pianure, colline e altopiani, dirupi rocciosi da cui si può solo saltare giù, e boschi pieni di alberi, sassi, cespugli e rovi spinosi (cespugli e rovi rallentano, i rovi pungono)
 - Combattimento in tempo reale: concatena fino a 3 attacchi in combo, ogni colpo più forte del precedente, e chiudila con un colpo potente per un grosso bonus
 - Para, e fallo appena prima del colpo per una parata perfetta: il nemico resta stordito e i tuoi attacchi sono potenziati per qualche secondo (doppio danno, colpi più rapidi)
 - Schiva, e premi di nuovo durante la schivata per concatenarne un'altra in una nuova direzione. Schivata e parata sono sempre disponibili e interrompono la combo; attaccare interrompe la schivata con un colpo immediato
@@ -113,7 +113,7 @@ IN QUESTO PROTOTIPO
 - Pozioni curative (ne hai 2 all'inizio) e uno scudo magico che assorbe un colpo e si ricarica in 30 secondi
 - Quattro tipi di nemici: esploratori rapidi, guerrieri, bruti corazzati ed evocatori che chiamano rinforzi (colpiscili mentre evocano per interromperli)
 - I nemici ti girano attorno con scatti laterali; i loro attacchi sono lenti ma imprevedibili: guarda la zona rossa a terra, attento alle finte e ai secondi colpi
-- Guadagna esperienza per salire di livello: ogni livello aumenta i danni base e ti fa scegliere un potenziamento: un colpo in più nella combo, un colpo potente concatenato in più, una schivata concatenata in più, un salto in più, un punto vita in più, una pozione in più, una ricarica più rapida dello scudo o una corsa più veloce. I livelli delle abilità sono sempre visibili a schermo
+- Guadagna esperienza per salire di livello: ogni livello aumenta i danni base e ti fa scegliere un potenziamento: un colpo in più nella combo, un colpo potente concatenato in più, una schivata concatenata in più, un salto in più, un punto vita in più, una pozione in più, una ricarica più rapida dello scudo o una corsa più veloce, scelti da una griglia di schede con icone. I livelli delle abilità sono sempre visibili a schermo e i potenziamenti attivi sono elencati a destra
 
 COMANDI
 - Movimento: levetta sinistra / WASD / levetta a schermo
@@ -121,7 +121,7 @@ COMANDI
 - Colpo potente (chiude la combo): L2 / L
 - Parata (tieni premuto): L1 / K
 - Schivata (premi di nuovo per concatenare): B / Spazio
-- Salto: Y / F
+- Salto: A / F
 - Corsa (tieni premuto; schivata mentre corri = scivolata): R2 / Maiusc
 - Pozione: croce sinistra / Q
 - Scudo: croce destra / R

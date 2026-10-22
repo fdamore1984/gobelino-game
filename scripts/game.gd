@@ -1,5 +1,6 @@
 extends Node2D
-## Livello di test del gameplay: un piano senza limiti con nemici di vari
+## Livello di test del gameplay: un mondo senza limiti generato a caso
+## (dislivelli, dirupi e ostacoli naturali, vedi World) con nemici di vari
 ## tipi sparsi a caso attorno al giocatore. I nemici troppo lontani vengono
 ## rimossi e ne compaiono di nuovi fuori dallo schermo, così ce ne sono
 ## sempre. Gestisce anche esperienza, livelli e scelta dei potenziamenti.
@@ -16,6 +17,7 @@ const MAINTAIN_INTERVAL := 1.0
 const GAME_OVER_DELAY := 2.5
 const COLOR_XP := Color(0.6, 0.9, 1.0)
 
+@onready var _world: World = $World
 @onready var _entities: Node2D = $Entities
 @onready var _player: Player = $Entities/Player
 @onready var _hud: Hud = $HUD
@@ -27,6 +29,8 @@ var _pending_level_ups := 0
 
 
 func _ready() -> void:
+	_world.entities = _entities
+	_world.player = _player
 	_player.health_changed.connect(_hud.set_health)
 	_player.experience_changed.connect(_hud.set_experience)
 	_player.leveled_up.connect(_on_player_leveled_up)
@@ -74,7 +78,7 @@ func _spawn_enemy(type_id: String, at: Vector2) -> Enemy:
 	var enemy := Enemy.new()
 	enemy.setup(type_id)
 	enemy.player = _player
-	enemy.position = at
+	enemy.position = _world.free_position_near(at, enemy.radius)
 	enemy.died.connect(_on_enemy_died)
 	enemy.summon_requested.connect(_on_summon_requested)
 	_entities.add_child(enemy)

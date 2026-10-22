@@ -6,7 +6,7 @@ extends Node2D
 ## Azioni: movimento in tutte le direzioni con accelerazione e frenata,
 ## attacchi consecutivi in combo sempre più potenti (R1), attacco potente
 ## che chiude la combo con un bonus (L2), parata tenendo premuto (L1),
-## schivate concatenate con cambio di direzione (B), salti anche multipli (Y),
+## schivate concatenate con cambio di direzione (B), salti anche multipli (A),
 ## corsa tenendo premuto R2, pozioni che curano (croce sinistra) e scudo
 ## che assorbe un colpo (croce destra).
 ## Schivata e parata interrompono la combo in qualsiasi momento; attaccare
@@ -125,6 +125,11 @@ const START_POTIONS := 2
 const SHIELD_COOLDOWN := 30.0
 const SHIELD_COOLDOWN_UPGRADE := 0.98
 
+## I rovi pungono a intervalli (data/world.json); la prima volta poco dopo
+## esserci entrati.
+const THORNS_FIRST_DELAY := 1.0
+const THORNS_INVULNERABLE_TIME := 0.4
+
 const HURT_TIME := 0.25
 const HURT_KNOCKBACK := 420.0
 const HURT_INVULNERABLE_TIME := 0.8
@@ -188,6 +193,10 @@ var _slide_direction := Vector2.RIGHT
 var _slide_speed := 0.0
 ## Slancio che resta quando si attacca durante una scivolata.
 var _carry_velocity := Vector2.ZERO
+## Tempo passato nei rovi dall'ultima puntura.
+var _thorns_time := 0.0
+## Potenziamento -> quante volte è stato scelto, nell'ordine di scelta.
+var upgrades_taken := {}
 
 
 func _physics_process(delta: float) -> void:
@@ -315,8 +324,59 @@ func _physics_process(delta: float) -> void:
 		facing = Vector2.from_angle(angle + clampf(angle_difference(angle, target), -TURN_SPEED * delta, TURN_SPEED * delta))
 
 	_update_height(delta)
-	position += _velocity * delta
+	_move(delta)
 	queue_redraw()
+
+
+## Spostamento nel mondo: dirupi e ostacoli solidi fermano il personaggio,
+## cespugli e rovi lo rallentano (ma non durante schivate e scivolate) e i
+## rovi pungono. In aria si può saltare giù da un dirupo.
+func _move(delta: float) -> void:
+	var world := World.current
+	if world == null:
+		position += _velocity * delta
+		return
+	var motion := _velocity * delta
+	var grounded := not is_airborne()
+	if grounded and _state != State.DODGE and _state != State.SLIDE:
+		motion *= world.slow_at(position, RADIUS)
+	var from := position
+	position = world.move(position, motion, RADIUS * 0.8, _height > JUMP_EVADE_HEIGHT)
+	if not grounded:
+		var drop := world.cliff_drop(from, position)
+		if drop > 0:
+			# Saltando giù dal dirupo si cade da più in alto.
+			_height += world.face_height(drop)
+	var thorns := world.ground_obstacle_at(position, RADIUS) if grounded else {}
+	if not thorns.is_empty() and thorns["damage"] > 0:
+		_thorns_time += delta
+		if _thorns_time >= thorns["damage_interval"]:
+			_thorns_time -= thorns["damage_interval"]
+			_scratch(thorns["damage"])
+	else:
+		# Appena entrati nei rovi la prima puntura arriva dopo un attimo.
+		_thorns_time = THORNS_FIRST_DELAY
+
+
+## Spinta senza passare attraverso dirupi e ostacoli.
+func _push(offset: Vector2) -> void:
+	position = World.current.move(position, offset, RADIUS * 0.8) if World.current else position + offset
+
+
+## Puntura dei rovi: toglie vita senza spinta né interruzioni.
+func _scratch(damage: int) -> void:
+	if _state == State.DEAD or _invulnerable_time > 0.0:
+		return
+	health = maxi(health - damage, 0)
+	health_changed.emit(health, max_health)
+	FloatingText.spawn(get_parent(), global_position, tr("FX_THORNS"), COLOR_HURT)
+	if health == 0:
+		_change_state(State.DEAD)
+		Sfx.play("death", global_position)
+		died.emit()
+	else:
+		_invulnerable_time = THORNS_INVULNERABLE_TIME
+		Sfx.play("hurt", global_position, 1.3, -6.0)
 
 
 ## Salto e caduta: con più salti disponibili si può saltare di nuovo in aria.
@@ -396,7 +456,7 @@ func receive_hit(from: Vector2, damage: int) -> String:
 			FloatingText.spawn(get_parent(), global_position, tr("FX_EMPOWERED"), COLOR_EMPOWERED, 28.0)
 			Sfx.play("perfect", global_position)
 			return "parried"
-		position -= to_attacker * 12.0
+		_push(-to_attacker * 12.0)
 		FloatingText.spawn(get_parent(), global_position, tr("FX_BLOCKED"), COLOR_SHIELD)
 		Sfx.play("block", global_position)
 		return "blocked"
@@ -429,6 +489,11 @@ func is_dead() -> bool:
 
 func is_empowered() -> bool:
 	return _empowered_time > 0.0
+
+
+## Secondi rimasti del potenziamento della parata perfetta.
+func empowered_time() -> float:
+	return _empowered_time
 
 
 func is_airborne() -> bool:
@@ -464,6 +529,7 @@ func add_experience(amount: int) -> void:
 
 ## Potenziamento scelto salendo di livello.
 func apply_upgrade(upgrade: String) -> void:
+	upgrades_taken[upgrade] = upgrades_taken.get(upgrade, 0) + 1
 	match upgrade:
 		"combo":
 			max_combo_hits += 1
