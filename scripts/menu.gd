@@ -42,6 +42,8 @@ func _notification(what: int) -> void:
 func _input(event: InputEvent) -> void:
 	if event.is_pressed() and not event.is_echo() and not event is InputEventMouseMotion:
 		_last_input = event.as_text()
+		if event is InputEventJoypadButton or event is InputEventJoypadMotion:
+			_last_input += " · " + tr("MENU_DEVICE") % event.device
 		_update_info()
 
 
@@ -59,9 +61,18 @@ func _update_info() -> void:
 		platform += " (Steam Deck)"
 	# Controller rilevato: aiuta a capire i problemi di input (per esempio
 	# sullo Steam Deck in modalità desktop).
+	var lines: Array[String] = [tr("MENU_VERSION") % version, platform]
 	var joypads := Input.get_connected_joypads()
-	var controller := tr("MENU_CONTROLLER") % Input.get_joy_name(joypads[0]) if not joypads.is_empty() else tr("MENU_NO_CONTROLLER")
-	_info.text = (tr("MENU_VERSION") % version) + "\n" + platform + "\n" + controller
+	if joypads.is_empty():
+		lines.append(tr("MENU_NO_CONTROLLER"))
+	for device in joypads:
+		# Il GUID e se Godot conosce la disposizione dei pulsanti servono a
+		# capire perché un controller ha i comandi scambiati.
+		var mapping := tr("MENU_JOY_MAPPED") if Input.is_joy_known(device) else tr("MENU_JOY_UNMAPPED")
+		lines.append(tr("MENU_CONTROLLER") % [device, Input.get_joy_name(device), Input.get_joy_guid(device), mapping])
+	if Platform.ignores_desktop_input():
+		lines.append(tr("MENU_DESKTOP_INPUT_OFF"))
+	_info.text = "\n".join(lines)
 	_deck_hint.text = tr("DECK_HINT")
 	_deck_hint.visible = Platform.needs_deck_controller_hint()
 	if _last_input != "":

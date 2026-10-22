@@ -9,6 +9,20 @@ var is_desktop: bool = false
 var is_steam_deck: bool = false
 var steam_available: bool = false
 
+## Controller virtuale creato da Steam Input (anche sullo Steam Deck).
+const VALVE_VENDOR := 0x28de
+const STEAM_VIRTUAL_GAMEPAD := 0x11ff
+const STEAM_DECK_CONTROLLER := 0x1205
+## Disposizione dei pulsanti del controller virtuale di Steam su Linux
+## (come un controller Xbox 360), dal database dei controller di SDL.
+const STEAM_VIRTUAL_GAMEPAD_LAYOUT := "a:b0,b:b1,x:b2,y:b3,leftshoulder:b4,rightshoulder:b5,back:b6,start:b7,guide:b8,leftstick:b9,rightstick:b10,leftx:a0,lefty:a1,lefttrigger:a2,rightx:a3,righty:a4,righttrigger:a5,dpup:h0.1,dpright:h0.2,dpdown:h0.4,dpleft:h0.8,platform:Linux"
+## Comandi integrati dello Steam Deck letti direttamente (senza Steam).
+const STEAM_DECK_LAYOUT := "a:b3,b:b4,x:b5,y:b6,leftshoulder:b7,rightshoulder:b8,back:b11,start:b12,guide:b13,leftstick:b14,rightstick:b15,leftx:a0,lefty:a1,rightx:a2,righty:a3,lefttrigger:a9,righttrigger:a8,dpup:b16,dpdown:b17,dpleft:b18,dpright:b19,platform:Linux"
+
+## Tasti e clic tolti dalle azioni mentre sullo Steam Deck c'è un
+## controller, da rimettere quando il controller sparisce.
+var _removed_desktop_events := {}
+
 
 func _ready() -> void:
 	is_mobile = OS.has_feature("android") or OS.has_feature("ios")
@@ -19,6 +33,66 @@ func _ready() -> void:
 	is_steam_deck = OS.get_environment("SteamDeck") == "1" or _is_steam_deck_hardware()
 	# Verrà aggiornato quando integreremo GodotSteam (solo desktop).
 	steam_available = false
+	Input.joy_connection_changed.connect(_on_joy_connection_changed)
+	for device in Input.get_connected_joypads():
+		_fix_joypad_mapping(device)
+	_update_desktop_events()
+
+
+func _on_joy_connection_changed(device: int, connected: bool) -> void:
+	if connected:
+		_fix_joypad_mapping(device)
+	_update_desktop_events()
+
+
+## Se Godot non conosce la disposizione dei pulsanti di un controller
+## Valve (succede quando Steam gli dà un numero di versione diverso da
+## quello del database), legge i pulsanti nell'ordine grezzo e B, dorsali
+## e grilletti finiscono su altri comandi: qui gli si dà quella giusta.
+func _fix_joypad_mapping(device: int) -> void:
+	if Input.is_joy_known(device):
+		return
+	var info := Input.get_joy_info(device)
+	var vendor: int = info.get("vendor_id", 0)
+	var product: int = info.get("product_id", 0)
+	var name := Input.get_joy_name(device)
+	var layout := ""
+	if vendor == VALVE_VENDOR and product == STEAM_DECK_CONTROLLER:
+		layout = STEAM_DECK_LAYOUT
+	elif (vendor == VALVE_VENDOR and product == STEAM_VIRTUAL_GAMEPAD) or "Steam Virtual Gamepad" in name:
+		layout = STEAM_VIRTUAL_GAMEPAD_LAYOUT
+	if layout == "" or not OS.has_feature("linuxbsd"):
+		return
+	Input.add_joy_mapping("%s,%s,%s" % [Input.get_joy_guid(device), name, layout], true)
+
+
+## Sullo Steam Deck in modalità desktop Steam può continuare a mandare i
+## tasti del layout desktop (per esempio Esc sul tasto B, le frecce sulla
+## croce) anche dopo il passaggio alla modalità controller: finché c'è un
+## controller, le azioni ignorano tastiera e mouse.
+func _update_desktop_events() -> void:
+	if not is_steam_deck:
+		return
+	var has_joypad := not Input.get_connected_joypads().is_empty()
+	if has_joypad and _removed_desktop_events.is_empty():
+		for action in InputMap.get_actions():
+			var removed: Array[InputEvent] = []
+			for event in InputMap.action_get_events(action):
+				if event is InputEventKey or event is InputEventMouseButton:
+					removed.append(event)
+					InputMap.action_erase_event(action, event)
+			if not removed.is_empty():
+				_removed_desktop_events[action] = removed
+	elif not has_joypad and not _removed_desktop_events.is_empty():
+		for action: StringName in _removed_desktop_events:
+			for event: InputEvent in _removed_desktop_events[action]:
+				InputMap.action_add_event(action, event)
+		_removed_desktop_events.clear()
+
+
+## True se gli eventi di tastiera e mouse vanno ignorati (vedi sopra).
+func ignores_desktop_input() -> bool:
+	return not _removed_desktop_events.is_empty()
 
 
 ## Sullo Steam Deck in modalità desktop, se il gioco non è avviato da
