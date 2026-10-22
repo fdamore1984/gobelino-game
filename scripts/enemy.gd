@@ -27,7 +27,7 @@ const HEAVY_KNOCKBACK_FACTOR := 1.6
 ## Ogni tanto cambia verso di rotazione o fa uno scatto laterale.
 const DECISION_INTERVAL := Vector2(0.5, 1.6)
 const DASH_CHANCE := 0.4
-const DASH_SPEED_FACTOR := 3.8
+const DASH_SPEED_FACTOR := 3.0
 const DASH_TIME := 0.18
 
 ## Distanza dal bordo del giocatore a cui il nemico inizia a caricare l'attacco.
@@ -40,7 +40,7 @@ const FEINT_CHANCE := 0.2
 ## Probabilità di un secondo attacco subito dopo il primo, con carica più breve.
 const COMBO_CHANCE := 0.3
 const COMBO_WINDUP_FACTOR := 0.6
-const STRIKE_TIME := 0.16
+const STRIKE_TIME := 0.3
 const RECOVER_TIME := 0.9
 ## Dopo un attacco aspetta un tempo a caso prima di riprovare.
 const ATTACK_COOLDOWN := Vector2(0.6, 2.0)
@@ -48,6 +48,10 @@ const STUN_TIME := 1.6
 const DEATH_FADE_TIME := 0.4
 ## I nemici evocati compaiono a questa distanza dall'evocatore.
 const SUMMON_DISTANCE := 70.0
+
+## Gambe: altezza rispetto al raggio del corpo e passo.
+const LEG_FACTOR := 0.5
+const WALK_CYCLE := 0.08
 
 const COLOR_WINDUP := Color(1.0, 0.45, 0.2)
 const COLOR_STUNNED := Color(0.55, 0.55, 0.8)
@@ -89,6 +93,9 @@ var _hit_flash := 0.0
 var _summon_cooldown := 0.0
 var _summon_positions: Array[Vector2] = []
 var _minions: Array[Enemy] = []
+## Verso del fendente (+1 o -1): cambia a ogni attacco.
+var _swing_sign := 1.0
+var _walk_phase := 0.0
 ## La zona di pericolo va disegnata sotto i personaggi, non sopra.
 var _telegraph := Node2D.new()
 
@@ -247,6 +254,7 @@ func _physics_process(delta: float) -> void:
 		_telegraph.position.y = -ground_elevation
 	else:
 		position += motion
+	_walk_phase += _velocity.length() * delta * WALK_CYCLE
 	queue_redraw()
 	_telegraph.queue_redraw()
 
@@ -268,6 +276,12 @@ func take_damage(amount: int, direction: Vector2, heavy := false) -> void:
 		# Colpire un evocatore mentre evoca interrompe l'evocazione.
 		_finish_summon()
 	elif _state == State.WANDER:
+		_change_state(State.CHASE)
+
+
+## Fa partire subito l'inseguimento del giocatore (per esempio nelle sfide).
+func alert() -> void:
+	if _state == State.WANDER:
 		_change_state(State.CHASE)
 
 
@@ -330,6 +344,8 @@ func _start_dash(to_player: Vector2) -> void:
 
 
 func _begin_windup(min_time: float, max_time: float, can_feint: bool) -> void:
+	# I fendenti si alternano: una volta da sinistra, una da destra.
+	_swing_sign = -_swing_sign
 	_windup_time = randf_range(min_time, max_time)
 	_windup_tracking = randf_range(WINDUP_TRACKING.x, WINDUP_TRACKING.y)
 	_feint_at = _windup_time * randf_range(0.4, 0.7) if can_feint and randf() < FEINT_CHANCE else -1.0
@@ -420,10 +436,18 @@ func _draw() -> void:
 	if _hit_flash > 0.0:
 		body = Color.WHITE
 
-	# Ombra, corpo con la forma del tipo e un "occhio" che indica la direzione.
+	# Ombra, gambe, corpo con la forma del tipo sopra le gambe e un
+	# "occhio" che indica la direzione.
 	draw_circle(Vector2(0, radius * 0.8), radius * 0.9, Color(0, 0, 0, 0.25))
+	var leg := radius * LEG_FACTOR
+	var walking := _velocity.length() > 15.0 and _state != State.DEAD
+	BodyParts.draw_legs(self, -leg + radius * 0.55, radius * 0.85, radius * 0.35, maxf(4.0, radius * 0.22),
+			_walk_phase, _velocity.normalized(), radius * 0.3 if walking else 0.0, _color.darkened(0.4))
+	draw_set_transform(Vector2(0, -ground_elevation - leg))
 	draw_colored_polygon(_shape_points(), body)
 	draw_circle(_facing * radius * 0.5, maxf(radius * 0.2, 4.0), Color(0.1, 0.05, 0.1))
+	if _state != State.DEAD:
+		_draw_sword()
 
 	if _state == State.STUNNED:
 		for i in 3:
@@ -436,6 +460,30 @@ func _draw() -> void:
 		var origin := Vector2(-width / 2.0, -radius * 1.2 - 14.0)
 		draw_rect(Rect2(origin, Vector2(width, 6)), Color(0, 0, 0, 0.5))
 		draw_rect(Rect2(origin, Vector2(width * health / max_health, 6)), COLOR_DANGER)
+
+
+## Spada: a riposo di lato; durante la carica si porta indietro, poi
+## fende l'arco dell'attacco (il verso cambia a ogni attacco) lasciando
+## una scia.
+func _draw_sword() -> void:
+	var length := radius + float(_type["strike_reach"]) * 0.6
+	var width := maxf(4.0, radius * 0.18)
+	var arc := _strike_arc()
+	var start := _attack_direction.angle() - _swing_sign * arc / 2.0
+	var end := _attack_direction.angle() + _swing_sign * arc / 2.0
+	var angle: float
+	match _state:
+		State.WINDUP:
+			angle = start - _swing_sign * 0.4 * minf(_state_time / _windup_time, 1.0)
+		State.STRIKE:
+			angle = lerpf(start, end, ease(minf(_state_time / STRIKE_TIME, 1.0), 0.6))
+			BodyParts.draw_trail(self, Vector2.ZERO, start, angle, radius * 0.8, radius + float(_type["strike_reach"]), Color(COLOR_DANGER, 0.55))
+		State.RECOVER:
+			angle = end
+		_:
+			angle = _facing.angle() + 0.6
+	var hand := Vector2.from_angle(angle) * radius * 0.8 if _state in [State.WINDUP, State.STRIKE, State.RECOVER] else _facing.orthogonal() * radius * 0.8
+	BodyParts.draw_sword(self, hand, angle, length, width, Color(1.0, 0.9, 0.9) if _state == State.STRIKE else Color.WHITE)
 
 
 func _shape_points() -> PackedVector2Array:

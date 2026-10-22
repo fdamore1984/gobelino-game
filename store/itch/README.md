@@ -30,7 +30,7 @@ godot --path . --resolution 1260x1000 res://tools/store_capture.tscn -- cover
 | Languages | English, Italian |
 | Inputs | Keyboard, Xbox controller, Playstation controller, Touchscreen |
 | Cover image | `cover_en.png` (630×500) |
-| Screenshots | `en_1_combat.png`, `en_2_parry.png`, `en_3_level_up.png`, `en_4_menu.png` (le versioni `it_` sono le stesse in italiano) |
+| Screenshots | `en_1_combat.png`, `en_2_parry.png`, `en_3_level_up.png`, `en_5_challenge.png`, `en_4_menu.png` (le versioni `it_` sono le stesse in italiano) |
 
 ### Tags
 
@@ -68,12 +68,13 @@ IN THIS PROTOTYPE
 - A boundless, randomly generated 3D isometric world made of blocks: grassy platforms stacked in steps at different heights, sloping ramps and dirt paths. Jump to climb onto higher blocks (multiple jumps reach the tallest ones) and drop down to lower ground. Here and there trees, rocks, bushes and thorny brambles (bushes and brambles slow you down, brambles prick)
 - Real-time combat: chain up to 3 attacks in a combo, each hit stronger than the last, and finish it with a power strike for a big bonus
 - Parry, and time it right before the hit for a perfect parry: the enemy is stunned and your attacks are empowered for a few seconds (double damage, faster swings)
-- Dodge, and press again mid-dodge to chain another one in a new direction. Dodge and parry are always available and cancel your combo; attacking cancels a dodge into an immediate strike
+- Dodge and steer it while dodging, and press again mid-dodge to chain another one. Dodge and parry are always available and cancel your combo; attacking cancels a dodge into an immediate strike. You can keep moving while attacking: every strike is a sword slash, alternating left and right
 - Jump over enemy attacks (unlock multiple jumps in mid-air) and combine jumps with dodges
 - Hold R2 to run; dodge while running to slide, and attack, dodge, jump or parry out of the slide
 - Healing potions (you start with 2) and a magic shield that absorbs one hit, recharging in 30 seconds
 - Four kinds of enemies: quick scouts, warriors, heavy brutes and summoners that call in reinforcements (hit them while they summon to interrupt them)
-- Enemies circle around you with quick sidesteps; their attacks are slow but unpredictable: watch the red area on the ground, beware of feints and follow-up strikes
+- Enemies circle around you with quick sidesteps; their sword slashes are slow and wide but unpredictable: watch the red area on the ground, beware of feints and follow-up strikes
+- Stone totems stand in the middle of wide open arenas: touch one to start a 30-second survival challenge with waves of enemies matched to your level, and earn experience and a potion
 - Earn experience to level up: every level raises your base damage and lets you choose an upgrade: one more combo hit, one more chained power strike, one more chained dodge, one more jump, one more health point, one more potion, a faster shield recharge or a faster run, picked from a grid of cards with icons. Your skill levels are always shown on screen, and the active power-ups are listed on the right
 
 CONTROLS
@@ -107,12 +108,13 @@ IN QUESTO PROTOTIPO
 - Un mondo isometrico 3D senza confini, fatto di blocchi e generato a caso: piattaforme d'erba a gradini su diverse altezze, rampe inclinate e sentieri sterrati. Salta per salire sui blocchi più alti (con più salti in aria raggiungi i più alti) e lasciati cadere verso quelli più bassi. Qua e là alberi, sassi, cespugli e rovi spinosi (cespugli e rovi rallentano, i rovi pungono)
 - Combattimento in tempo reale: concatena fino a 3 attacchi in combo, ogni colpo più forte del precedente, e chiudila con un colpo potente per un grosso bonus
 - Para, e fallo appena prima del colpo per una parata perfetta: il nemico resta stordito e i tuoi attacchi sono potenziati per qualche secondo (doppio danno, colpi più rapidi)
-- Schiva, e premi di nuovo durante la schivata per concatenarne un'altra in una nuova direzione. Schivata e parata sono sempre disponibili e interrompono la combo; attaccare interrompe la schivata con un colpo immediato
+- Schiva e cambia direzione durante la schivata, e premi di nuovo per concatenarne un'altra. Schivata e parata sono sempre disponibili e interrompono la combo; attaccare interrompe la schivata con un colpo immediato. Mentre attacchi puoi continuare a muoverti: ogni colpo è un fendente di spada, alternato da sinistra e da destra
 - Salta per evitare gli attacchi dei nemici (sblocca più salti in aria) e combina salti e schivate
 - Tieni premuto R2 per correre; schiva mentre corri per una scivolata, da cui puoi attaccare, schivare, saltare o parare
 - Pozioni curative (ne hai 2 all'inizio) e uno scudo magico che assorbe un colpo e si ricarica in 30 secondi
 - Quattro tipi di nemici: esploratori rapidi, guerrieri, bruti corazzati ed evocatori che chiamano rinforzi (colpiscili mentre evocano per interromperli)
-- I nemici ti girano attorno con scatti laterali; i loro attacchi sono lenti ma imprevedibili: guarda la zona rossa a terra, attento alle finte e ai secondi colpi
+- I nemici ti girano attorno con scatti laterali; i loro fendenti di spada sono lenti e ampi ma imprevedibili: guarda la zona rossa a terra, attento alle finte e ai secondi colpi
+- Al centro di ampie arene ci sono totem di pietra: toccane uno per avviare una sfida di sopravvivenza di 30 secondi con ondate di nemici adatte al tuo livello, e guadagna esperienza e una pozione
 - Guadagna esperienza per salire di livello: ogni livello aumenta i danni base e ti fa scegliere un potenziamento: un colpo in più nella combo, un colpo potente concatenato in più, una schivata concatenata in più, un salto in più, un punto vita in più, una pozione in più, una ricarica più rapida dello scudo o una corsa più veloce, scelti da una griglia di schede con icone. I livelli delle abilità sono sempre visibili a schermo e i potenziamenti attivi sono elencati a destra
 
 COMANDI

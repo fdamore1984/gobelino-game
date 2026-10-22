@@ -42,8 +42,9 @@ Priorità di design indicata: il cuore del gioco sono sistema di gioco, inventar
 | Sistema | Descrizione | Stato |
 |---|---|---|
 | Movimento | Isometrico, 8 direzioni; tastiera, gamepad e touch. Nel prototipo il movimento segue le direzioni dello schermo, con accelerazione e frenata | prototipo |
+| Sfide | Nel prototipo: totem al centro di arene piane che avviano una sfida di sopravvivenza di 30 secondi a ondate, tarata sul livello del giocatore | prototipo |
 | Mondo | Nel prototipo: terreno isometrico 3D a blocchi generato a caso, con piattaforme a gradini su più livelli (si sale saltando, si scende cadendo), rampe inclinate, sentieri sterrati e pochi ostacoli naturali (alberi, sassi, cespugli e rovi che rallentano e pungono) | prototipo |
-| Combattimento | Tempo reale: combo (R1), colpo potente (L2), parata (L1), schivate concatenate (B), salto (A), corsa e scivolata (R2), pozione (croce sinistra), scudo (croce destra); quattro tipi di nemici | prototipo |
+| Combattimento | Tempo reale: combo (R1), colpo potente (L2), parata (L1), schivate concatenate e orientabili (B), salto (A), corsa e scivolata (R2), pozione (croce sinistra), scudo (croce destra); quattro tipi di nemici | prototipo |
 | Progressione | Esperienza, livelli e potenziamenti a scelta | prototipo |
 | Inventario | A slot con limite di peso. Dettagli (numero slot, pesi, deposito nella tana) _da definire_ | da fare |
 | Dialoghi | _da definire_ | da fare |

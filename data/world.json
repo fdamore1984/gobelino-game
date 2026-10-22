@@ -17,6 +17,14 @@
 		"forest_frequency": 0.0022,
 		"bramble_frequency": 0.004
 	},
+	"arena": {
+		"region": 2600,
+		"chance": 0.75,
+		"radius": 420,
+		"plaza_radius": 230,
+		"min_start_distance": 1100,
+		"totem": {"radius": 30, "collision": 26, "stone": [0.52, 0.48, 0.42], "glow": [0.4, 1.0, 0.9], "active": [1.0, 0.4, 0.2], "used": [0.45, 0.45, 0.45]}
+	},
 	"obstacles": {
 		"tree": {
 			"chance": 0.02, "forest_bonus": 0.25,

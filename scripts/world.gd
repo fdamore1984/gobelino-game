@@ -10,7 +10,8 @@ extends Node2D
 ## sui blocchi più alti saltando (un livello col salto normale, di più con
 ## i salti in aria) e si scende cadendo; i nemici non saltano e restano sul
 ## loro livello, salvo le rampe. Sopra ci sono ostacoli naturali: alberi,
-## sassi, cespugli e rovi.
+## sassi, cespugli e rovi. Qua e là ci sono arene: ampie zone piane e
+## libere con al centro un totem che avvia una sfida (vedi Game).
 ##
 ## Le posizioni di personaggi e oggetti sono a terra (il piano x, y);
 ## l'altezza del terreno sotto di loro (elevation_at) li disegna più in
@@ -56,6 +57,11 @@ var level_height := 32.0
 var _terrain: Dictionary = DATA.data["terrain"]
 var _obstacle_types: Dictionary = DATA.data["obstacles"]
 var _decor: Dictionary = DATA.data["decor"]
+var _arena: Dictionary = DATA.data["arena"]
+## Regione -> centro della sua arena (Vector2.INF se non ce l'ha).
+var _arena_cache := {}
+## Totem (centro dell'arena) -> stato: "active" durante la sfida, "used" dopo.
+var _totem_states := {}
 var _levels: int
 var _height_noise := FastNoiseLite.new()
 var _path_noise := FastNoiseLite.new()
@@ -152,6 +158,11 @@ func level_of(cell: Vector2i) -> int:
 	var center := cell_center(cell)
 	if center.length() < float(_terrain["start_flat_radius"]):
 		center = Vector2.ZERO
+	else:
+		# Le arene sono tutte allo stesso livello del loro centro.
+		var arena := arena_near(center)
+		if arena != Vector2.INF and center.distance_to(arena) < float(_arena["radius"]):
+			center = arena
 	var t := _height_noise.get_noise_2dv(center) * float(_terrain["height_contrast"]) * 0.5 + 0.5
 	var level := clampi(floori(t * _levels), 0, _levels - 1)
 	if _level_cache.size() > CACHE_LIMIT:
@@ -168,8 +179,11 @@ func ramp_of(cell: Vector2i) -> Vector2i:
 		return _ramp_cache[cell]
 	var result := Vector2i.ZERO
 	var level := level_of(cell)
-	var far_from_start := cell_center(cell).length() > float(_terrain["start_flat_radius"]) + CELL * 2.0
-	if far_from_start and _random_unit([seed_value, cell.x, cell.y, "ramp"]) < float(_terrain["ramp_chance"]):
+	var center := cell_center(cell)
+	var far_from_start := center.length() > float(_terrain["start_flat_radius"]) + CELL * 2.0
+	var arena := arena_near(center)
+	var far_from_arena := arena == Vector2.INF or center.distance_to(arena) > float(_arena["radius"]) + CELL * 2.0
+	if far_from_start and far_from_arena and _random_unit([seed_value, cell.x, cell.y, "ramp"]) < float(_terrain["ramp_chance"]):
 		for direction: Vector2i in RAMP_DIRECTIONS:
 			if level_of(cell + direction) == level + 1 and level_of(cell - direction) == level:
 				result = direction
@@ -178,9 +192,72 @@ func ramp_of(cell: Vector2i) -> Vector2i:
 	return result
 
 
-## Sentiero sterrato: una striscia lungo una curva del rumore.
+## Sentiero sterrato: una striscia lungo una curva del rumore, e lo
+## spiazzo di terra attorno al totem delle arene.
 func is_path(cell: Vector2i) -> bool:
-	return absf(_path_noise.get_noise_2dv(cell_center(cell))) < float(_terrain["path_width"])
+	var center := cell_center(cell)
+	var arena := arena_near(center)
+	if arena != Vector2.INF and center.distance_to(arena) < float(_arena["plaza_radius"]):
+		return true
+	return absf(_path_noise.get_noise_2dv(center)) < float(_terrain["path_width"])
+
+
+# --- Arene con il totem -------------------------------------------------
+
+## Centro dell'arena della regione (le regioni sono quadrati del mondo),
+## o Vector2.INF se la regione non ne ha. Lontano dalla partenza.
+func _arena_of_region(region: Vector2i) -> Vector2:
+	if _arena_cache.has(region):
+		return _arena_cache[region]
+	var center := Vector2.INF
+	var size := float(_arena["region"])
+	var margin := float(_arena["radius"]) + CELL * 2.0
+	if _random_unit([seed_value, region.x, region.y, "arena"]) < float(_arena["chance"]):
+		var offset := Vector2(_random_unit([seed_value, region.x, region.y, "arena_x"]), _random_unit([seed_value, region.x, region.y, "arena_y"]))
+		var candidate := Vector2(region) * size + Vector2(margin, margin) + offset * (size - 2.0 * margin)
+		if candidate.length() > float(_arena["min_start_distance"]):
+			center = candidate
+	_arena_cache[region] = center
+	return center
+
+
+## Centro dell'arena che contiene il punto (o la più vicina nelle regioni
+## attorno), Vector2.INF se non ce ne sono.
+func arena_near(point: Vector2) -> Vector2:
+	var size := float(_arena["region"])
+	var region := Vector2i(floori(point.x / size), floori(point.y / size))
+	var best := Vector2.INF
+	for i in range(-1, 2):
+		for j in range(-1, 2):
+			var center := _arena_of_region(region + Vector2i(i, j))
+			if center != Vector2.INF and (best == Vector2.INF or point.distance_to(center) < point.distance_to(best)):
+				best = center
+	return best
+
+
+func arena_radius() -> float:
+	return _arena["radius"]
+
+
+## Totem toccato da chi sta in point (stesso livello e abbastanza vicino):
+## restituisce il centro della sua arena, o Vector2.INF.
+func totem_touched(point: Vector2, reach: float) -> Vector2:
+	var arena := arena_near(point)
+	if arena == Vector2.INF:
+		return Vector2.INF
+	var totem: Dictionary = _arena["totem"]
+	if point.distance_to(arena) > reach + float(totem["collision"]) or absf(elevation_at(point) - elevation_at(arena)) > STEP_TOLERANCE:
+		return Vector2.INF
+	return arena
+
+
+## Stato del totem: "ready", "active" (sfida in corso) o "used".
+func totem_state(arena: Vector2) -> String:
+	return _totem_states.get(arena, "ready")
+
+
+func set_totem_state(arena: Vector2, state: String) -> void:
+	_totem_states[arena] = state
 
 
 ## Altezza del terreno in un punto (u, v) del rombo, tra 0 e 1.
@@ -343,6 +420,15 @@ func _generate_obstacles(chunk: Vector2i) -> Array:
 				"slow": type.get("slow", 1.0), "damage": type.get("damage", 0),
 				"damage_interval": type.get("damage_interval", 0.0), "variant": rng.randi(),
 			})
+	# Il totem al centro dell'arena è un ostacolo solido del pezzo che lo contiene.
+	var arena := arena_near(_from_uv((chunk.x + 0.5) * CHUNK_CELLS * CELL, (chunk.y + 0.5) * CHUNK_CELLS * CELL))
+	if arena != Vector2.INF and _chunk_of(cell_at(arena)) == chunk:
+		var totem: Dictionary = _arena["totem"]
+		result.append({
+			"type": "totem", "position": arena, "elevation": elevation_at(arena), "radius": totem["radius"],
+			"collision": totem["collision"], "solid": true, "slow": 1.0, "damage": 0,
+			"damage_interval": 0.0, "variant": 0,
+		})
 	return result
 
 
@@ -351,6 +437,9 @@ func _generate_obstacles(chunk: Vector2i) -> Array:
 func _pick_obstacle(cell: Vector2i, rng: RandomNumberGenerator) -> String:
 	var center := cell_center(cell)
 	if center.length() < float(_terrain["start_clear_radius"]) or is_path(cell) or ramp_of(cell) != Vector2i.ZERO:
+		return ""
+	var arena := arena_near(center)
+	if arena != Vector2.INF and center.distance_to(arena) < float(_arena["radius"]) + CELL:
 		return ""
 	var forest := clampf(_forest_noise.get_noise_2dv(center) * 2.0, 0.0, 1.0)
 	var brambles := clampf(_bramble_noise.get_noise_2dv(center) * 2.5 - 0.6, 0.0, 1.0)
@@ -438,7 +527,7 @@ func _show_chunk(chunk: Vector2i) -> void:
 	if entities:
 		for data: Dictionary in _obstacles_of(chunk):
 			var obstacle := Obstacle.new()
-			obstacle.setup(data, _obstacle_types[data["type"]])
+			obstacle.setup(data, _arena["totem"] if data["type"] == "totem" else _obstacle_types[data["type"]])
 			entities.add_child(obstacle)
 			nodes.append(obstacle)
 		for i in CHUNK_CELLS:
