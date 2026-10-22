@@ -16,6 +16,9 @@ const COLORS := {
 	"run": Color(1.0, 0.85, 0.3),
 	"empowered": Color(1.0, 0.8, 0.25),
 	"bubble": Color(0.55, 0.85, 1.0),
+	"mana": Color(0.45, 0.65, 1.0),
+	"spell": Color(1.0, 0.5, 0.15),
+	"torch": Color(1.0, 0.75, 0.35),
 }
 
 @export var kind := "":
@@ -89,6 +92,22 @@ func _draw() -> void:
 				var direction := Vector2.from_angle(TAU * k / 8.0)
 				draw_line(direction * 0.45, direction * 0.75, color, 0.1)
 			draw_circle(Vector2.ZERO, 0.35, color)
+		"mana":
+			# Goccia di mana.
+			draw_circle(Vector2(0, 0.18), 0.38, color)
+			draw_colored_polygon(PackedVector2Array([Vector2(-0.33, 0.0), Vector2(0.33, 0.0), Vector2(0, -0.62)]), color)
+			draw_circle(Vector2(-0.12, 0.1), 0.1, Color(1, 1, 1, 0.6))
+		"spell":
+			# Palla di fuoco con la scia.
+			for k in 3:
+				draw_circle(Vector2(-0.45 + k * 0.15, 0.3 - k * 0.1), 0.1 + k * 0.04, Color(color, 0.4 + 0.2 * k))
+			draw_circle(Vector2(0.15, -0.1), 0.38, color)
+			draw_circle(Vector2(0.15, -0.1), 0.18, Color(1.0, 0.95, 0.6))
+		"torch":
+			# Torcia accesa.
+			draw_line(Vector2(0, 0.65), Vector2(0, -0.1), Color(0.55, 0.36, 0.2), 0.16)
+			draw_circle(Vector2(0, -0.3), 0.28, color)
+			draw_circle(Vector2(0, -0.36), 0.14, Color(1.0, 0.95, 0.6))
 		"bubble":
 			# Bolla dello scudo attivo.
 			draw_circle(Vector2.ZERO, 0.6, Color(color, 0.3))

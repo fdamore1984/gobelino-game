@@ -7,8 +7,11 @@ extends Node2D
 ## attacchi consecutivi in combo sempre più potenti (R1), attacco potente
 ## che chiude la combo con un bonus (L2), parata tenendo premuto (L1),
 ## schivate concatenate con cambio di direzione (B), salti anche multipli (A),
-## corsa tenendo premuto R2, pozioni che curano (croce sinistra) e scudo
-## che assorbe un colpo (croce destra).
+## corsa tenendo premuto R2, palla di fuoco che insegue i nemici (X, costa
+## mana), scudo che assorbe un colpo (Y), pozioni di vita (croce sinistra)
+## e di mana (croce destra), torcia (croce giù). Il colpo potente si carica
+## tenendo premuto, fino al doppio del danno. Equipaggiamento e libri
+## dell'inventario migliorano le caratteristiche (vedi Inventory).
 ## Schivata e parata interrompono la combo in qualsiasi momento; attaccare
 ## durante una schivata la interrompe e attacca subito. Salti e schivate si
 ## combinano; schivando mentre si corre si fa una scivolata, durante la
@@ -126,6 +129,30 @@ const HIT_HEIGHT_REACH := 40.0
 const CAMERA_HEIGHT_FOLLOW := 6.0
 const START_JUMPS := 1
 
+## Mana: serve per le magie e si ricarica piano da solo.
+const START_MANA := 60.0
+const MANA_REGEN := 2.0
+const MANA_UPGRADE := 20.0
+const MANA_POTION_RESTORE := 40.0
+const START_MANA_POTIONS := 1
+const MAX_MANA_POTIONS := 2
+## Palla di fuoco: costo, attesa tra un lancio e l'altro, danni (crescono
+## con il livello e con i potenziamenti della magia, +20% ciascuno).
+const SPELL_COST := 20.0
+const SPELL_COOLDOWN := 0.45
+const FIREBALL_DAMAGE := 18
+const FIREBALL_DAMAGE_PER_LEVEL := 4
+const SPELL_UPGRADE := 0.2
+
+## Tenendo premuto il colpo potente si carica: in questo tempo arriva al
+## massimo, che raddoppia il danno.
+const HEAVY_CHARGE_TIME := 0.9
+
+## Torcia: luce attorno al personaggio, utile di notte.
+const TORCH_COLOR := Color(1.0, 0.78, 0.45)
+const TORCH_ENERGY := 1.15
+const TORCH_SCALE := 1.15
+
 ## Ogni pozione cura questi punti vita.
 const POTION_HEAL := 3
 const START_POTIONS := 2
@@ -161,8 +188,21 @@ const COLOR_HEAVY := Color(1.0, 0.5, 0.2)
 const COLOR_EMPOWERED := Color(1.0, 0.8, 0.25)
 const COLOR_HEAL := Color(0.5, 1.0, 0.5)
 const COLOR_BUBBLE := Color(0.55, 0.85, 1.0)
+const COLOR_MANA := Color(0.45, 0.65, 1.0)
+const COLOR_FLAME := Color(1.0, 0.6, 0.2)
 
 var max_health := START_HEALTH
+## Vita massima senza l'equipaggiamento (cresce con i potenziamenti).
+var _base_max_health := START_HEALTH
+var mana := START_MANA
+var max_mana := START_MANA
+var _base_max_mana := START_MANA
+var mana_potions := START_MANA_POTIONS
+var max_mana_potions := MAX_MANA_POTIONS
+## Bonus alla potenza della magia dai potenziamenti (0.2 = +20%).
+var spell_bonus := 0.0
+var inventory := Inventory.new()
+var torch_on := false
 var health := START_HEALTH
 var level := 1
 var experience := 0
@@ -218,6 +258,11 @@ var _walk_velocity := Vector2.ZERO
 var _swing_sign := 1.0
 ## Fase del passo per l'animazione delle gambe.
 var _walk_phase := 0.0
+var _spell_cooldown := 0.0
+## Carica del colpo potente (0-1) e se il tasto è ancora tenuto premuto.
+var _charge := 0.0
+var _charging := false
+var _torch := PointLight2D.new()
 ## Tempo passato nei rovi dall'ultima puntura.
 var _thorns_time := 0.0
 ## Potenziamento -> quante volte è stato scelto, nell'ordine di scelta.
@@ -227,6 +272,13 @@ var ground_elevation := 0.0
 
 
 func _ready() -> void:
+	if not _torch.is_inside_tree():
+		_torch.texture = LightTexture.get_texture()
+		_torch.color = TORCH_COLOR
+		_torch.energy = TORCH_ENERGY
+		_torch.texture_scale = TORCH_SCALE
+		_torch.enabled = torch_on
+		add_child(_torch)
 	if World.current:
 		ground_elevation = World.current.elevation_at(position)
 	if _camera:
@@ -242,6 +294,9 @@ func _physics_process(delta: float) -> void:
 	_block_flash = maxf(_block_flash - delta, 0.0)
 	_combo_timer = maxf(_combo_timer - delta, 0.0)
 	shield_cooldown = maxf(shield_cooldown - delta, 0.0)
+	_spell_cooldown = maxf(_spell_cooldown - delta, 0.0)
+	if _state != State.DEAD:
+		mana = minf(mana + MANA_REGEN * delta, max_mana)
 
 	var input := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	var dodge_input := Input.get_vector("move_left", "move_right", "move_up", "move_down", DODGE_STICK_DEADZONE)
@@ -251,13 +306,21 @@ func _physics_process(delta: float) -> void:
 			_drink_potion()
 		if Input.is_action_just_pressed("shield"):
 			_raise_shield()
+		if Input.is_action_just_pressed("mana_potion"):
+			_drink_mana_potion()
+		if Input.is_action_just_pressed("spell"):
+			_cast_fireball(input)
+	if Input.is_action_just_pressed("torch") and _state != State.DEAD:
+		torch_on = not torch_on
+		_torch.enabled = torch_on
+		Sfx.play("torch", global_position)
 
 	match _state:
 		State.NORMAL:
 			if input != Vector2.ZERO:
 				_target_facing = input.normalized()
 			var running := Input.is_action_pressed("run") and input != Vector2.ZERO
-			_velocity = _accelerate(_velocity, input * (run_speed() if running else SPEED), delta)
+			_velocity = _accelerate(_velocity, input * (run_speed() if running else walk_speed()), delta)
 			if Input.is_action_just_pressed("jump"):
 				_jump()
 			if Input.is_action_just_pressed("dodge"):
@@ -287,7 +350,7 @@ func _physics_process(delta: float) -> void:
 		State.PARRY:
 			if input != Vector2.ZERO:
 				_target_facing = input.normalized()
-			_velocity = _accelerate(_velocity, input * SPEED * PARRY_SPEED_FACTOR, delta)
+			_velocity = _accelerate(_velocity, input * walk_speed() * PARRY_SPEED_FACTOR, delta)
 			if Input.is_action_just_pressed("dodge") and _dodge_cooldown == 0.0:
 				_start_dodge(dodge_input)
 			elif not Input.is_action_pressed("parry"):
@@ -366,6 +429,10 @@ func _physics_process(delta: float) -> void:
 	_update_height(delta)
 	_move(delta)
 	_walk_phase += _velocity.length() * delta * WALK_CYCLE
+	if torch_on:
+		# La fiamma tremola.
+		_torch.position = Vector2(0, -altitude() - LEG_LENGTH)
+		_torch.energy = TORCH_ENERGY * randf_range(0.92, 1.05)
 	if _camera:
 		_camera.position.y = lerpf(_camera.position.y, -ground_elevation, minf(CAMERA_HEIGHT_FOLLOW * delta, 1.0))
 	queue_redraw()
@@ -448,14 +515,27 @@ func _update_attack(input: Vector2, delta: float) -> void:
 	var windup := (HEAVY_WINDUP if _attack_heavy else ATTACK_WINDUP) / _attack_speed
 	var active := (HEAVY_ACTIVE if _attack_heavy else ATTACK_ACTIVE) / _attack_speed
 	var recovery := _attack_recovery() / _attack_speed
+	if _charging:
+		# Finché si tiene premuto, il colpo potente resta in carica.
+		if Input.is_action_pressed("heavy_attack") and _state_time >= windup * 0.9:
+			var was_full := _charge >= 1.0
+			_charge = minf(_charge + delta / HEAVY_CHARGE_TIME, 1.0)
+			_state_time = windup * 0.9
+			if _charge >= 1.0 and not was_full:
+				Sfx.play("charge_full", global_position)
+				HitFeedback.vibrate(0.25, 0.1)
+		elif not Input.is_action_pressed("heavy_attack"):
+			_charging = false
 	# Lo slancio di una scivolata si esaurisce durante l'attacco.
 	_carry_velocity = _carry_velocity.move_toward(Vector2.ZERO, DECELERATION * delta)
 	# Mentre si attacca ci si può muovere (più piano) in qualsiasi
 	# direzione; il colpo resta nella direzione in cui è partito, con un
 	# piccolo affondo in avanti.
-	_walk_velocity = _accelerate(_walk_velocity, input * SPEED * ATTACK_MOVE_FACTOR, delta)
+	_walk_velocity = _accelerate(_walk_velocity, input * walk_speed() * ATTACK_MOVE_FACTOR, delta)
 	var lunge := Vector2.ZERO
-	if _state_time >= windup * 0.5 and _state_time < windup + active:
+	# Durante la carica del colpo potente si resta fermi sul posto (ci si
+	# può solo spostare piano); l'affondo parte al rilascio.
+	if _state_time >= windup * 0.5 and _state_time < windup + active and not _charging:
 		lunge = facing * (HEAVY_LUNGE_SPEED if _attack_heavy else ATTACK_LUNGE_SPEED * (1.0 + 0.2 * (_combo_step - 1)))
 	_velocity = _walk_velocity + lunge + _carry_velocity
 	# Si memorizza la pressione solo se può davvero continuare la combo:
@@ -542,6 +622,7 @@ func receive_hit(from: Vector2, damage: int) -> String:
 		_velocity = -to_attacker * HURT_KNOCKBACK
 		_invulnerable_time = HURT_INVULNERABLE_TIME
 		Sfx.play("hurt", global_position)
+		HitFeedback.vibrate(0.8, 0.25)
 	return "hit"
 
 
@@ -567,8 +648,19 @@ func is_airborne() -> bool:
 	return _height > 0.0
 
 
+## Velocità del passo, con il bonus degli stivali.
+func walk_speed() -> float:
+	return SPEED * (1.0 + inventory.bonus("speed"))
+
+
 func run_speed() -> float:
-	return SPEED * RUN_SPEED_FACTOR * (1.0 + run_speed_bonus)
+	return walk_speed() * RUN_SPEED_FACTOR * (1.0 + run_speed_bonus)
+
+
+## Danni della palla di fuoco.
+func spell_damage() -> int:
+	var base := FIREBALL_DAMAGE + FIREBALL_DAMAGE_PER_LEVEL * (level - 1)
+	return roundi(base * (1.0 + spell_bonus + inventory.bonus("spell")))
 
 
 ## Danni del primo colpo della combo al livello attuale.
@@ -605,9 +697,9 @@ func apply_upgrade(upgrade: String) -> void:
 		"dodge":
 			max_chained_dodges += 1
 		"health":
-			max_health += 1
+			_base_max_health += 1
 			health += 1
-			health_changed.emit(health, max_health)
+			_refresh_stats()
 		"potion":
 			max_potions += 1
 			potions += 1
@@ -618,6 +710,12 @@ func apply_upgrade(upgrade: String) -> void:
 			max_jumps += 1
 		"run":
 			run_speed_bonus += RUN_SPEED_UPGRADE
+		"mana":
+			_base_max_mana += MANA_UPGRADE
+			mana += MANA_UPGRADE
+			_refresh_stats()
+		"spell":
+			spell_bonus += SPELL_UPGRADE
 
 
 func _change_state(new_state: State) -> void:
@@ -679,6 +777,7 @@ func _start_heavy(input: Vector2) -> void:
 	_heavy_step += 1
 	_attack_heavy = true
 	_begin_attack(input)
+	_charging = true
 	Sfx.play("heavy_swing", global_position, 1.0 + 0.08 * (_heavy_step - 1))
 	if _combo_step > 0 or _heavy_step > 1:
 		FloatingText.spawn(get_parent(), global_position, tr("FX_HEAVY"), COLOR_HEAVY, 12.0)
@@ -686,7 +785,9 @@ func _start_heavy(input: Vector2) -> void:
 
 func _begin_attack(input: Vector2) -> void:
 	_attack_speed = EMPOWER_ATTACK_SPEED if is_empowered() else 1.0
-	_walk_velocity = _velocity.limit_length(SPEED * ATTACK_MOVE_FACTOR) if _state != State.ATTACK else _walk_velocity
+	_charge = 0.0
+	_charging = false
+	_walk_velocity = _velocity.limit_length(walk_speed() * ATTACK_MOVE_FACTOR) if _state != State.ATTACK else _walk_velocity
 	# I fendenti si alternano: una volta da sinistra, una da destra.
 	_swing_sign = -_swing_sign
 	_queued_attack = ""
@@ -756,6 +857,99 @@ func _drink_potion() -> void:
 	Sfx.play("potion", global_position)
 
 
+func _drink_mana_potion() -> void:
+	if mana_potions == 0 or mana >= max_mana:
+		return
+	mana_potions -= 1
+	mana = minf(mana + MANA_POTION_RESTORE, max_mana)
+	FloatingText.spawn(get_parent(), global_position, tr("FX_MANA_POTION"), COLOR_MANA)
+	Sfx.play("mana_potion", global_position)
+
+
+## Palla di fuoco verso dove si guarda (o si punta la levetta): poi
+## insegue da sola il nemico più vicino.
+func _cast_fireball(input: Vector2) -> void:
+	if _spell_cooldown > 0.0:
+		return
+	if mana < SPELL_COST:
+		FloatingText.spawn(get_parent(), global_position, tr("FX_NO_MANA"), COLOR_MANA)
+		_spell_cooldown = SPELL_COOLDOWN
+		return
+	mana -= SPELL_COST
+	_spell_cooldown = SPELL_COOLDOWN
+	var fireball := Fireball.new()
+	fireball.direction = input.normalized() if input != Vector2.ZERO else facing
+	fireball.damage = spell_damage()
+	fireball.altitude = ground_elevation
+	fireball.position = position + fireball.direction * RADIUS
+	get_parent().add_child(fireball)
+	Sfx.play("fireball", global_position)
+
+
+## Raccoglie un oggetto: le monete vanno nel borsello, le pozioni nella
+## cintura se c'è posto, il resto nell'inventario.
+func pickup(id: String, amount := 1) -> void:
+	match id:
+		"gold":
+			inventory.gold += amount
+			Sfx.play("coin", global_position)
+			FloatingText.spawn(get_parent(), global_position, tr("FX_GOLD") % amount, Items.color(id))
+			return
+		"potion_health":
+			if potions < max_potions:
+				potions += 1
+				_pickup_text(id)
+				return
+		"potion_mana":
+			if mana_potions < max_mana_potions:
+				mana_potions += 1
+				_pickup_text(id)
+				return
+	inventory.add(id)
+	_pickup_text(id)
+
+
+func _pickup_text(id: String) -> void:
+	Sfx.play("pickup", global_position)
+	FloatingText.spawn(get_parent(), global_position, tr(Items.name_key(id)), Items.color(id))
+
+
+## Usa un oggetto dell'inventario: indossa o toglie l'equipaggiamento,
+## legge i libri (bonus permanente), beve le pozioni.
+func use_item(index: int) -> void:
+	var id := inventory.items[index]
+	match Items.category(id):
+		"book":
+			inventory.learn(id)
+			inventory.remove(index)
+			Sfx.play("level_up", global_position, 1.3)
+		"potion":
+			var heal := int(Items.stat(id, "heal"))
+			var restore := Items.stat(id, "restore_mana")
+			if (heal > 0 and health >= max_health) or (restore > 0.0 and mana >= max_mana):
+				return
+			health = mini(health + heal, max_health)
+			mana = minf(mana + restore, max_mana)
+			health_changed.emit(health, max_health)
+			inventory.remove(index)
+			Sfx.play("potion" if heal > 0 else "mana_potion", global_position)
+		_:
+			inventory.toggle_equip(index)
+			Sfx.play("block", global_position, 1.4, -8.0)
+	_refresh_stats()
+
+
+## Ricalcola vita e mana massimi con equipaggiamento e libri.
+func _refresh_stats() -> void:
+	var old_max_health := max_health
+	max_health = _base_max_health + int(inventory.bonus("health"))
+	health = clampi(health + maxi(max_health - old_max_health, 0), 1 if health > 0 else 0, max_health)
+	var old_max_mana := max_mana
+	max_mana = _base_max_mana + inventory.bonus("mana")
+	mana = clampf(mana + maxf(max_mana - old_max_mana, 0.0), 0.0, max_mana)
+	health_changed.emit(health, max_health)
+
+
 func _raise_shield() -> void:
 	if shield_active or shield_cooldown > 0.0:
 		return
@@ -788,6 +982,8 @@ func _attack_damage() -> int:
 		multiplier = 1.0 + COMBO_DAMAGE_STEP * (_combo_step - 1)
 	if _attack_speed > 1.0:
 		multiplier *= EMPOWER_DAMAGE_FACTOR
+	# Carica del colpo potente (fino al doppio) e bonus dell'arma.
+	multiplier *= (1.0 + _charge) * (1.0 + inventory.bonus("damage"))
 	return roundi(base_damage() * multiplier)
 
 
@@ -808,6 +1004,11 @@ func _resolve_attack() -> void:
 			landed = true
 	if landed:
 		Sfx.play("hit", global_position, 0.8 if _attack_heavy else 1.0 + 0.1 * (_combo_step - 1))
+		# Vibrazione e un attimo di fermo: si sente il colpo.
+		if _attack_heavy:
+			HitFeedback.hit(get_tree(), 0.6 + 0.4 * _charge, 0.09 + 0.06 * _charge)
+		else:
+			HitFeedback.hit(get_tree(), 0.3 + 0.1 * _combo_step, 0.05)
 
 
 func _draw() -> void:
@@ -849,6 +1050,8 @@ func _draw() -> void:
 
 	if _state != State.DEAD:
 		_draw_sword()
+		if torch_on:
+			_draw_torch()
 
 	if _state == State.PARRY:
 		var shield := COLOR_SHIELD
@@ -868,6 +1071,8 @@ func _draw() -> void:
 ## attacco, lasciando una scia.
 func _draw_sword() -> void:
 	var tint := Color.WHITE
+	if inventory.equipped.has("weapon"):
+		tint = Items.color(inventory.items[inventory.equipped["weapon"]]).lightened(0.3)
 	if is_empowered():
 		tint = Color(1.0, 0.95, 0.7)
 	if _state != State.ATTACK:
@@ -885,6 +1090,10 @@ func _draw_sword() -> void:
 		angle = start - _swing_sign * 0.35 * _state_time / windup
 		if _attack_heavy:
 			draw_arc(Vector2.ZERO, RADIUS + 6.0, facing.angle() - arc / 2.0, facing.angle() + arc / 2.0, 24, Color(COLOR_HEAVY, _state_time / windup), 4.0)
+			if _charge > 0.0:
+				# Carica: un anello che si riempie e diventa bianco al massimo.
+				var ring := Color.WHITE if _charge >= 1.0 else COLOR_HEAVY
+				draw_arc(Vector2.ZERO, RADIUS + 14.0, -PI / 2.0, -PI / 2.0 + TAU * _charge, 32, ring, 4.0)
 	elif _state_time < windup + active:
 		angle = lerpf(start, end, ease((_state_time - windup) / active, 0.6))
 		var slash := COLOR_HEAVY if _attack_heavy else COLOR_SLASH
@@ -895,3 +1104,13 @@ func _draw_sword() -> void:
 		BodyParts.draw_trail(self, Vector2.ZERO, start, angle, RADIUS + 6.0, _attack_range() + RADIUS, Color(slash, minf(alpha, 0.9)))
 	var length := HEAVY_SWORD_LENGTH if _attack_heavy else SWORD_LENGTH
 	BodyParts.draw_sword(self, Vector2.from_angle(angle) * RADIUS * 0.8, angle, length, SWORD_WIDTH * (1.3 if _attack_heavy else 1.0), tint)
+
+
+## Torcia nell'altra mano: bastone e fiamma che tremola.
+func _draw_torch() -> void:
+	var hand := -facing.orthogonal() * RADIUS * 0.9
+	var top := hand + Vector2(0, -18)
+	draw_line(hand + Vector2(0, 6), top, Color(0.4, 0.26, 0.14), 4.0)
+	var flicker := randf_range(0.85, 1.15)
+	draw_circle(top + Vector2(0, -4), 7.0 * flicker, Color(COLOR_FLAME, 0.85))
+	draw_circle(top + Vector2(0, -6), 4.0 * flicker, Color(1.0, 0.95, 0.6))

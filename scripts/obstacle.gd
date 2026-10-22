@@ -1,7 +1,7 @@
 class_name Obstacle
 extends Node2D
 ## Ostacolo naturale del mondo, disegnato con forme geometriche: albero,
-## sasso, cespuglio, rovi o il totem al centro di un'arena. La posizione è la base a terra, così
+## sasso, cespuglio, rovi, cassa o il totem al centro di un'arena. La posizione è la base a terra, così
 ## l'ordinamento per y lo mette davanti o dietro ai personaggi; viene
 ## disegnato più in alto quanto il blocco di terreno su cui si trova. Gli effetti (blocco,
 ## rallentamento, danni dei rovi) sono gestiti da World.
@@ -14,6 +14,7 @@ var radius := 20.0
 var _type: Dictionary
 var _variant := 0
 var _canopy_alpha := 1.0
+var _opened := false
 ## Altezza del terreno sotto l'ostacolo.
 var _lift := 0.0
 
@@ -28,11 +29,16 @@ func setup(data: Dictionary, type: Dictionary) -> void:
 	# Disegnato una volta sola; solo gli alberi controllano il giocatore e
 	# il totem si anima.
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
-	set_process(type_id in ["tree", "totem"])
+	set_process(type_id in ["tree", "totem", "chest"])
 
 
 func _process(_delta: float) -> void:
 	if type_id == "totem":
+		queue_redraw()
+		return
+	if type_id == "chest":
+		# Brilla finché è chiusa; poi si ridisegna aperta.
+		_opened = World.current != null and World.current.is_chest_opened(position)
 		queue_redraw()
 		return
 	var player: Node2D = World.current.player if World.current else null
@@ -75,6 +81,8 @@ func _draw() -> void:
 			_draw_bramble(rng)
 		"totem":
 			_draw_totem()
+		"chest":
+			_draw_chest()
 
 
 func _draw_shadow(width: float) -> void:
@@ -201,3 +209,26 @@ func _draw_totem() -> void:
 		draw_line(Vector2(-width * 0.4, y + height * 0.75), Vector2(width * 0.2, y + height * 0.75), stone.darkened(0.45), 3.0)
 	# In cima una punta.
 	draw_colored_polygon(PackedVector2Array([Vector2(-radius * 0.5, y), Vector2(radius * 0.5, y), Vector2(0, y - radius * 0.7)]), stone.lightened(0.1))
+
+
+## Cassa di legno con le fasce di metallo: chiusa brilla un poco, aperta
+## mostra il coperchio alzato e l'interno vuoto.
+func _draw_chest() -> void:
+	_draw_shadow(radius * 1.2)
+	var wood := _color(0)
+	var metal := _type_color("metal")
+	var width := radius * 1.3
+	var height := radius * 0.9
+	draw_rect(Rect2(-width, -height, width * 2.0, height), wood)
+	draw_rect(Rect2(width * 0.55, -height, width * 0.45, height), wood.darkened(0.25))
+	for x: float in [-width * 0.6, width * 0.4]:
+		draw_rect(Rect2(x, -height, width * 0.18, height), metal.darkened(0.2))
+	if _opened:
+		draw_rect(Rect2(-width, -height - 4.0, width * 2.0, 6.0), wood.darkened(0.6))
+		draw_colored_polygon(PackedVector2Array([Vector2(-width, -height - 2.0), Vector2(width, -height - 2.0), Vector2(width * 0.9, -height - radius * 1.1), Vector2(-width * 0.9, -height - radius * 1.1)]), wood.lightened(0.05))
+		return
+	var lid := PackedVector2Array([Vector2(-width, -height), Vector2(width, -height), Vector2(width * 0.85, -height - radius * 0.6), Vector2(-width * 0.85, -height - radius * 0.6)])
+	draw_colored_polygon(lid, wood.lightened(0.12))
+	draw_rect(Rect2(-4.0, -height - 3.0, 8.0, 9.0), metal)
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 300.0)
+	draw_circle(Vector2(width * 0.7, -height - radius * 0.7), 2.0 + pulse * 1.5, Color(1.0, 0.95, 0.6, 0.6 + 0.4 * pulse))

@@ -27,6 +27,8 @@ const UPGRADE_NAMES := {
 	"potion": "UPGRADE_POTION",
 	"shield": "UPGRADE_SHIELD",
 	"run": "UPGRADE_RUN",
+	"mana": "UPGRADE_MANA",
+	"spell": "UPGRADE_SPELL",
 }
 
 @onready var _health: Label = %Health
@@ -40,6 +42,9 @@ const UPGRADE_NAMES := {
 @onready var _deck_hint: Label = %DeckHint
 @onready var _power_ups: VBoxContainer = %PowerUps
 @onready var _challenge: Label = %Challenge
+@onready var _mana: Label = %Mana
+@onready var _gold: Label = %Gold
+var _inventory_panel := InventoryPanel.new()
 @onready var _hint: Label = %Hint
 @onready var _message: Label = %Message
 @onready var _level_up: Control = %LevelUp
@@ -54,6 +59,8 @@ const UPGRADE_NAMES := {
 	"potion": %UpgradePotion as Button,
 	"shield": %UpgradeShield as Button,
 	"run": %UpgradeRun as Button,
+	"mana": %UpgradeMana as Button,
+	"spell": %UpgradeSpell as Button,
 }
 
 ## Giocatore di cui mostrare pozioni e scudo, che cambiano di continuo.
@@ -74,6 +81,7 @@ func _ready() -> void:
 	_deck_hint.text = tr("DECK_HINT")
 	_message.visible = false
 	_challenge.visible = false
+	add_child(_inventory_panel)
 	_level_up.visible = false
 	for upgrade: String in _upgrade_buttons:
 		var button: Button = _upgrade_buttons[upgrade]
@@ -92,7 +100,10 @@ func _process(delta: float) -> void:
 	_deck_hint.visible = Platform.needs_deck_controller_hint()
 	if player == null:
 		return
+	_inventory_panel.player = player
 	_potions.text = tr("HUD_POTIONS") % [player.potions, player.max_potions]
+	_mana.text = tr("HUD_MANA") % [floori(player.mana), roundi(player.max_mana), player.mana_potions, player.max_mana_potions]
+	_gold.text = tr("HUD_GOLD") % player.inventory.gold
 	if player.shield_active:
 		_shield.text = tr("HUD_SHIELD_ACTIVE")
 	elif player.shield_cooldown > 0.0:
@@ -115,6 +126,8 @@ func _update_power_ups() -> void:
 		rows.append(["empowered", tr("POWERUP_EMPOWERED") % ceili(player.empowered_time())])
 	if player.shield_active:
 		rows.append(["bubble", tr("POWERUP_SHIELD_ACTIVE")])
+	if player.torch_on:
+		rows.append(["torch", tr("POWERUP_TORCH")])
 	for upgrade: String in player.upgrades_taken:
 		var name_key := "POWERUP_" + upgrade.to_upper()
 		rows.append([upgrade, tr("POWERUP_UPGRADE") % [tr(name_key), _upgrade_value(upgrade), player.upgrades_taken[upgrade]]])
@@ -167,6 +180,10 @@ func _upgrade_value(upgrade: String) -> String:
 			return "%.1f s" % player.shield_cooldown_max
 		"run":
 			return "%d%%" % roundi(100.0 * (1.0 + player.run_speed_bonus))
+		"mana":
+			return str(roundi(player.max_mana))
+		"spell":
+			return str(player.spell_damage())
 	return ""
 
 
@@ -213,6 +230,12 @@ func _build_card(button: Button, upgrade: String) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Inventario: si apre durante il gioco (non in pausa né da morti).
+	if event.is_action_pressed("inventory") and not get_tree().paused and player and not player.is_dead() \
+			and not _inventory_panel.is_open():
+		_inventory_panel.open()
+		get_viewport().set_input_as_handled()
+		return
 	if _level_up.visible and UiNav.handle(event, get_viewport(), _upgrade_buttons["combo"]) and is_inside_tree():
 		get_viewport().set_input_as_handled()
 
@@ -270,6 +293,9 @@ func show_level_up(level: int, damage_before: int, damage_after: int) -> void:
 	_card_values["jump"].text = tr("UPGRADE_VALUE") % [player.max_jumps, player.max_jumps + 1]
 	var run_now := roundi(100.0 * (1.0 + player.run_speed_bonus))
 	_card_values["run"].text = tr("UPGRADE_VALUE_PERCENT") % [run_now, run_now + roundi(100.0 * Player.RUN_SPEED_UPGRADE)]
+	_card_values["mana"].text = tr("UPGRADE_VALUE") % [roundi(player.max_mana), roundi(player.max_mana + Player.MANA_UPGRADE)]
+	var spell_bonus := player.spell_bonus + player.inventory.bonus("spell")
+	_card_values["spell"].text = tr("UPGRADE_VALUE") % [player.spell_damage(), roundi(player.spell_damage() * (1.0 + spell_bonus + Player.SPELL_UPGRADE) / (1.0 + spell_bonus))]
 	_level_up.visible = true
 	for button: Button in _upgrade_buttons.values():
 		button.disabled = true

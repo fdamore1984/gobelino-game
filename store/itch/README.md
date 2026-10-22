@@ -30,7 +30,7 @@ godot --path . --resolution 1260x1000 res://tools/store_capture.tscn -- cover
 | Languages | English, Italian |
 | Inputs | Keyboard, Xbox controller, Playstation controller, Touchscreen |
 | Cover image | `cover_en.png` (630×500) |
-| Screenshots | `en_1_combat.png`, `en_2_parry.png`, `en_3_level_up.png`, `en_5_challenge.png`, `en_4_menu.png` (le versioni `it_` sono le stesse in italiano) |
+| Screenshots | `en_1_combat.png`, `en_2_parry.png`, `en_5_challenge.png`, `en_6_inventory.png`, `en_3_level_up.png`, `en_4_menu.png` (le versioni `it_` sono le stesse in italiano) |
 
 ### Tags
 
@@ -74,19 +74,27 @@ IN THIS PROTOTYPE
 - Healing potions (you start with 2) and a magic shield that absorbs one hit, recharging in 30 seconds
 - Four kinds of enemies: quick scouts, warriors, heavy brutes and summoners that call in reinforcements (hit them while they summon to interrupt them)
 - Enemies circle around you with quick sidesteps; their sword slashes are slow and wide but unpredictable: watch the red area on the ground, beware of feints and follow-up strikes
+- Hold the power strike to charge it up to double damage; every hit you land shakes the controller and freezes the action for an instant
+- Cast fireballs that seek out and chase the nearest enemy (they cost mana: drink mana potions to refill)
+- Day turns to night: light your torch to see in the dark. A minimap shows the area around you, enemies as red dots, chests and totems
+- Open chests to find gold, weapons, armor, boots, amulets, rings, spell books and potions; equip them, read the books and drink the potions from your inventory
 - Stone totems stand in the middle of wide open arenas: touch one to start a 30-second survival challenge with waves of enemies matched to your level, and earn experience and a potion
-- Earn experience to level up: every level raises your base damage and lets you choose an upgrade: one more combo hit, one more chained power strike, one more chained dodge, one more jump, one more health point, one more potion, a faster shield recharge or a faster run, picked from a grid of cards with icons. Your skill levels are always shown on screen, and the active power-ups are listed on the right
+- Earn experience to level up: every level raises your base damage and lets you choose an upgrade: one more combo hit, one more chained power strike, one more chained dodge, one more jump, one more health point, one more potion, a faster shield recharge, a faster run, more mana or a stronger spell, picked from a grid of cards with icons. Your skill levels are always shown on screen, and the active power-ups are listed on the right
 
 CONTROLS
 - Move: left stick / WASD / on-screen stick
 - Attack (combo): R1 / J
-- Power strike (ends the combo): L2 / L
+- Power strike (ends the combo; hold to charge): L2 / L
 - Parry (hold): L1 / K
 - Dodge (press again to chain): B / Space
 - Jump: A / F
 - Run (hold; dodge while running = slide): R2 / Shift
+- Fireball: X / U
+- Shield: Y / R
 - Potion: D-pad left / Q
-- Shield: D-pad right / R
+- Mana potion: D-pad right / T
+- Torch: D-pad down / G
+- Inventory: D-pad up / I
 - Menu: Start / Esc
 
 Play with a controller, keyboard, or touch on Android. Available in English and Italian.
@@ -114,19 +122,27 @@ IN QUESTO PROTOTIPO
 - Pozioni curative (ne hai 2 all'inizio) e uno scudo magico che assorbe un colpo e si ricarica in 30 secondi
 - Quattro tipi di nemici: esploratori rapidi, guerrieri, bruti corazzati ed evocatori che chiamano rinforzi (colpiscili mentre evocano per interromperli)
 - I nemici ti girano attorno con scatti laterali; i loro fendenti di spada sono lenti e ampi ma imprevedibili: guarda la zona rossa a terra, attento alle finte e ai secondi colpi
+- Tieni premuto il colpo potente per caricarlo fino al doppio del danno; ogni colpo a segno fa vibrare il controller e ferma l'azione per un istante
+- Lancia palle di fuoco che cercano e inseguono il nemico più vicino (costano mana: bevi le pozioni di mana per ricaricarlo)
+- Il giorno lascia il posto alla notte: accendi la torcia per vedere al buio. Una minimappa mostra l'area attorno, i nemici come puntini rossi, le casse e i totem
+- Apri le casse per trovare monete, armi, armature, stivali, amuleti, anelli, libri di magia e pozioni; dall'inventario puoi equipaggiarli, leggere i libri e bere le pozioni
 - Al centro di ampie arene ci sono totem di pietra: toccane uno per avviare una sfida di sopravvivenza di 30 secondi con ondate di nemici adatte al tuo livello, e guadagna esperienza e una pozione
-- Guadagna esperienza per salire di livello: ogni livello aumenta i danni base e ti fa scegliere un potenziamento: un colpo in più nella combo, un colpo potente concatenato in più, una schivata concatenata in più, un salto in più, un punto vita in più, una pozione in più, una ricarica più rapida dello scudo o una corsa più veloce, scelti da una griglia di schede con icone. I livelli delle abilità sono sempre visibili a schermo e i potenziamenti attivi sono elencati a destra
+- Guadagna esperienza per salire di livello: ogni livello aumenta i danni base e ti fa scegliere un potenziamento: un colpo in più nella combo, un colpo potente concatenato in più, una schivata concatenata in più, un salto in più, un punto vita in più, una pozione in più, una ricarica più rapida dello scudo, una corsa più veloce, più mana o una magia più potente, scelti da una griglia di schede con icone. I livelli delle abilità sono sempre visibili a schermo e i potenziamenti attivi sono elencati a destra
 
 COMANDI
 - Movimento: levetta sinistra / WASD / levetta a schermo
 - Attacco (combo): R1 / J
-- Colpo potente (chiude la combo): L2 / L
+- Colpo potente (chiude la combo; tieni premuto per caricarlo): L2 / L
 - Parata (tieni premuto): L1 / K
 - Schivata (premi di nuovo per concatenare): B / Spazio
 - Salto: A / F
 - Corsa (tieni premuto; schivata mentre corri = scivolata): R2 / Maiusc
+- Palla di fuoco: X / U
+- Scudo: Y / R
 - Pozione: croce sinistra / Q
-- Scudo: croce destra / R
+- Pozione di mana: croce destra / T
+- Torcia: croce giù / G
+- Inventario: croce su / I
 - Menù: Start / Esc
 
 Gioca con il controller, con la tastiera o col touch su Android. Disponibile in italiano e in inglese.

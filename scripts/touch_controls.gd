@@ -23,6 +23,10 @@ const BUTTONS := [
 	{"action": "shield", "label": "TOUCH_SHIELD", "offset": Vector2(-335, -180), "radius": SMALL_BUTTON_RADIUS},
 	{"action": "jump", "label": "TOUCH_JUMP", "offset": Vector2(-90, -320), "radius": BUTTON_RADIUS},
 	{"action": "run", "label": "TOUCH_RUN", "offset": Vector2(-335, -300), "radius": SMALL_BUTTON_RADIUS},
+	{"action": "spell", "label": "TOUCH_SPELL", "offset": Vector2(-210, -370), "radius": SMALL_BUTTON_RADIUS},
+	{"action": "mana_potion", "label": "TOUCH_MANA", "offset": Vector2(-450, -60), "radius": SMALL_BUTTON_RADIUS},
+	{"action": "torch", "label": "TOUCH_TORCH", "offset": Vector2(-450, -180), "radius": SMALL_BUTTON_RADIUS},
+	{"action": "inventory", "label": "TOUCH_INVENTORY", "offset": Vector2(-450, -300), "radius": SMALL_BUTTON_RADIUS},
 ]
 
 var _stick_touch := -1
@@ -53,6 +57,12 @@ func _input(event: InputEvent) -> void:
 			if action != "":
 				_held[touch.index] = action
 				Input.action_press(action)
+				if action == "inventory":
+					# L'inventario si apre e si chiude con un evento, come da tastiera.
+					var open_event := InputEventAction.new()
+					open_event.action = action
+					open_event.pressed = true
+					Input.parse_input_event(open_event)
 			elif touch.position.x < size.x / 2.0 and _stick_touch == -1:
 				_stick_touch = touch.index
 				_stick_origin = touch.position
@@ -94,8 +104,9 @@ func _action_at(point: Vector2) -> String:
 	return ""
 
 
+## A sinistra della minimappa.
 func _menu_button_center() -> Vector2:
-	return Vector2(size.x - 60, 60)
+	return Vector2(size.x - 250, 56)
 
 
 func _draw() -> void:

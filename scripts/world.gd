@@ -10,7 +10,7 @@ extends Node2D
 ## sui blocchi più alti saltando (un livello col salto normale, di più con
 ## i salti in aria) e si scende cadendo; i nemici non saltano e restano sul
 ## loro livello, salvo le rampe. Sopra ci sono ostacoli naturali: alberi,
-## sassi, cespugli e rovi. Qua e là ci sono arene: ampie zone piane e
+## sassi, cespugli, rovi e casse con il bottino. Qua e là ci sono arene: ampie zone piane e
 ## libere con al centro un totem che avvia una sfida (vedi Game).
 ##
 ## Le posizioni di personaggi e oggetti sono a terra (il piano x, y);
@@ -62,6 +62,8 @@ var _arena: Dictionary = DATA.data["arena"]
 var _arena_cache := {}
 ## Totem (centro dell'arena) -> stato: "active" durante la sfida, "used" dopo.
 var _totem_states := {}
+## Casse già aperte (posizione -> true).
+var _opened_chests := {}
 var _levels: int
 var _height_noise := FastNoiseLite.new()
 var _path_noise := FastNoiseLite.new()
@@ -251,6 +253,51 @@ func totem_touched(point: Vector2, reach: float) -> Vector2:
 	return arena
 
 
+## Cassa toccata da chi sta in point: il suo dizionario, o vuoto. Le
+## casse già aperte non contano.
+func chest_touched(point: Vector2, reach: float) -> Dictionary:
+	for obstacle: Dictionary in obstacles_near(point):
+		if obstacle["type"] == "chest" and not is_chest_opened(obstacle["position"]) \
+				and point.distance_to(obstacle["position"]) <= reach + obstacle["collision"] \
+				and absf(elevation_at(point) - obstacle["elevation"]) <= STEP_TOLERANCE:
+			return obstacle
+	return {}
+
+
+func is_chest_opened(at: Vector2) -> bool:
+	return _opened_chests.has(at)
+
+
+func open_chest(at: Vector2) -> void:
+	_opened_chests[at] = true
+
+
+## Casse e totem nei pezzi di mondo attorno al punto (per la minimappa).
+func points_of_interest(center: Vector2, radius: float) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var corners := [center + Vector2(-radius, -radius), center + Vector2(radius, radius), center + Vector2(-radius, radius), center + Vector2(radius, -radius)]
+	var min_chunk := _chunk_of(cell_at(corners[0]))
+	var max_chunk := min_chunk
+	for corner: Vector2 in corners:
+		var chunk := _chunk_of(cell_at(corner))
+		min_chunk = min_chunk.min(chunk)
+		max_chunk = max_chunk.max(chunk)
+	for i in range(min_chunk.x, max_chunk.x + 1):
+		for j in range(min_chunk.y, max_chunk.y + 1):
+			for obstacle: Dictionary in _obstacles_of(Vector2i(i, j)):
+				if obstacle["type"] in ["chest", "totem"]:
+					result.append(obstacle)
+	return result
+
+
+## Colore del terreno nel punto, per la minimappa.
+func map_color(point: Vector2) -> Color:
+	var cell := cell_at(point)
+	if is_path(cell):
+		return _color(_terrain["path_color"])
+	return _color(_terrain["grass_colors"][level_of(cell)])
+
+
 ## Stato del totem: "ready", "active" (sfida in corso) o "used".
 func totem_state(arena: Vector2) -> String:
 	return _totem_states.get(arena, "ready")
@@ -420,6 +467,16 @@ func _generate_obstacles(chunk: Vector2i) -> Array:
 				"slow": type.get("slow", 1.0), "damage": type.get("damage", 0),
 				"damage_interval": type.get("damage_interval", 0.0), "variant": rng.randi(),
 			})
+	# Una cassa vicino alla partenza, per scoprirle subito.
+	var start_chest_data: Array = _terrain["start_chest"]
+	var start_chest := Vector2(start_chest_data[0], start_chest_data[1])
+	if _chunk_of(cell_at(start_chest)) == chunk:
+		var chest: Dictionary = _obstacle_types["chest"]
+		result.append({
+			"type": "chest", "position": start_chest, "elevation": elevation_at(start_chest), "radius": 18.0,
+			"collision": 18.0 * float(chest["collision"]), "solid": true, "slow": 1.0, "damage": 0,
+			"damage_interval": 0.0, "variant": 1,
+		})
 	# Il totem al centro dell'arena è un ostacolo solido del pezzo che lo contiene.
 	var arena := arena_near(_from_uv((chunk.x + 0.5) * CHUNK_CELLS * CELL, (chunk.y + 0.5) * CHUNK_CELLS * CELL))
 	if arena != Vector2.INF and _chunk_of(cell_at(arena)) == chunk:

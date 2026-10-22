@@ -44,9 +44,9 @@ Priorità di design indicata: il cuore del gioco sono sistema di gioco, inventar
 | Movimento | Isometrico, 8 direzioni; tastiera, gamepad e touch. Nel prototipo il movimento segue le direzioni dello schermo, con accelerazione e frenata | prototipo |
 | Sfide | Nel prototipo: totem al centro di arene piane che avviano una sfida di sopravvivenza di 30 secondi a ondate, tarata sul livello del giocatore | prototipo |
 | Mondo | Nel prototipo: terreno isometrico 3D a blocchi generato a caso, con piattaforme a gradini su più livelli (si sale saltando, si scende cadendo), rampe inclinate, sentieri sterrati e pochi ostacoli naturali (alberi, sassi, cespugli e rovi che rallentano e pungono) | prototipo |
-| Combattimento | Tempo reale: combo (R1), colpo potente (L2), parata (L1), schivate concatenate e orientabili (B), salto (A), corsa e scivolata (R2), pozione (croce sinistra), scudo (croce destra); quattro tipi di nemici | prototipo |
+| Combattimento | Tempo reale: combo (R1), colpo potente (L2), parata (L1), schivate concatenate e orientabili (B), salto (A), corsa e scivolata (R2), palla di fuoco che insegue (X), scudo (Y), pozioni di vita e di mana (croce sinistra e destra), torcia (croce giù), inventario (croce su); colpo potente caricabile, vibrazione e fermo all'impatto; quattro tipi di nemici | prototipo |
 | Progressione | Esperienza, livelli e potenziamenti a scelta | prototipo |
-| Inventario | A slot con limite di peso. Dettagli (numero slot, pesi, deposito nella tana) _da definire_ | da fare |
+| Inventario | Nel prototipo: oggetti dalle casse (armi, armature, stivali, amuleti, anelli, libri di magia, pozioni, monete), un oggetto indossato per tipo. Limite di peso e deposito nella tana _da definire_ | prototipo |
 | Dialoghi | _da definire_ | da fare |
 | Quest | _da definire_ | da fare |
 | Salvataggi | _da definire_ | da fare |
