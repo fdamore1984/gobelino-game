@@ -443,22 +443,11 @@ func _separation() -> Vector2:
 	return push
 
 
-## Zona di pericolo dell'attacco, che si riempie durante la carica, e
-## cerchi dove compariranno i nemici evocati.
+## Cerchi dove compariranno i nemici evocati. L'attacco in carica non ha
+## più una zona a terra: si riconosce dal corpo che si accende e dalla spada
+## (o dal bastone) portata indietro.
 func _draw_telegraph() -> void:
-	if _state == State.WINDUP and _is_ranged():
-		# Linea di mira che si accende durante la carica.
-		var progress := _state_time / _windup_time
-		var length: float = _type["ranged"]["range"]
-		var side := _attack_direction.orthogonal() * 5.0
-		var tip := _attack_direction * length
-		_telegraph.draw_colored_polygon(PackedVector2Array([side, tip + side, tip - side, -side]), Color(COLOR_DANGER, 0.12))
-		_telegraph.draw_line(Vector2.ZERO, tip * progress, Color(COLOR_DANGER, 0.45), 4.0)
-	elif _state == State.WINDUP:
-		var progress := _state_time / _windup_time
-		_draw_sector(_attack_direction, _strike_reach(), Color(COLOR_DANGER, 0.15))
-		_draw_sector(_attack_direction, _strike_reach() * progress, Color(COLOR_DANGER, 0.3))
-	elif _state == State.SUMMON:
+	if _state == State.SUMMON:
 		var progress: float = _state_time / _type["summon"]["channel_time"]
 		for offset in _summon_positions:
 			_telegraph.draw_circle(offset, 24.0, Color(COLOR_SUMMON, 0.12))
@@ -603,16 +592,3 @@ func _shape_points() -> PackedVector2Array:
 				points.append(Vector2.from_angle(TAU * i / 6.0) * radius * 1.1)
 			return points
 	return PackedVector2Array([Vector2(0, -radius * 1.2), Vector2(radius, 0), Vector2(0, radius * 1.2), Vector2(-radius, 0)])
-
-
-func _draw_sector(direction: Vector2, sector_radius: float, color: Color) -> void:
-	if _strike_arc() >= TAU - 0.01:
-		# Attacco tutto attorno (nemico rotante): la zona è un cerchio.
-		_telegraph.draw_circle(Vector2.ZERO, sector_radius, color)
-		return
-	var points := PackedVector2Array([Vector2.ZERO])
-	var steps := 16
-	var start := direction.angle() - _strike_arc() / 2.0
-	for i in steps + 1:
-		points.append(Vector2.from_angle(start + _strike_arc() * i / steps) * sector_radius)
-	_telegraph.draw_colored_polygon(points, color)
