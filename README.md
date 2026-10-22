@@ -65,6 +65,8 @@ All'avvio c'è un menù (Inizia / Esci / lingua). Il livello di test è un piano
 | Colpo potente (chiude la combo) | L | L2 | pulsante "Potente" |
 | Parata (tieni premuto) | K | L1 | pulsante "Parata" |
 | Schivata (ripeti per concatenare) | Spazio | B | pulsante "Schivata" |
+| Salto | F | Y | pulsante "Salto" |
+| Corsa (tieni premuto) | Maiusc | R2 | pulsante "Corsa" |
 | Pozione | Q | croce sinistra | pulsante "Pozione" |
 | Scudo | R | croce destra | pulsante "Scudo" |
 | Torna al menù | Esc | Start | pulsante "Menu" |
@@ -72,17 +74,19 @@ All'avvio c'è un menù (Inizia / Esci / lingua). Il livello di test è un piano
 - **Movimento**: accelerazione e frenata, con interpolazione fisica per restare fluido anche su schermi a 90/120 Hz.
 - **Combo**: attacchi ravvicinati formano una combo (3 colpi all'inizio); ogni colpo fa il 50% in più del precedente. Le pressioni in più a combo finita vengono ignorate.
 - **Colpo potente**: più lento e ampio, 2,5 volte i danni base; in fondo a una combo prende anche il bonus dei colpi già fatti. Chiude la combo, a meno di aver sbloccato altri colpi potenti concatenati (ognuno +50% del precedente).
+- **Salto**: l'altezza è solo visiva, ma in aria gli attacchi dei nemici passano sotto. Un salto all'inizio, i potenziamenti ne aggiungono altri in aria. Salti e schivate si combinano (schivata in aria, salto durante la schivata).
+- **Corsa e scivolata**: tenendo premuto R2 si corre (+60%); schivando mentre si corre si fa una scivolata, durante la quale si può attaccare continuando la combo (con lo slancio della scivolata), schivare, saltare o parare.
 - **Pozioni**: curano 3 punti vita; se ne hanno 2 all'inizio.
 - **Scudo**: assorbe un colpo da qualsiasi direzione; ricarica di 30 secondi dall'attivazione.
 - **Parata**: blocca i colpi frontali; una parata perfetta, iniziata appena prima del colpo, stordisce il nemico e per 4 secondi raddoppia i danni e velocizza gli attacchi.
 - **Interruzioni**: schivata e parata si possono usare in qualsiasi momento, anche durante una combo, che si interrompe; attaccare durante una schivata la interrompe e attacca subito.
 - **Schivata**: invulnerabilità per un istante; premendo di nuovo durante la schivata (o subito dopo) se ne concatena un'altra (2 all'inizio). All'inizio di ogni schivata la direzione segue ancora la levetta, così cambiare direzione è facile.
-- **Esperienza e livelli**: ogni nemico sconfitto dà esperienza; servono 100 punti per il livello 2, 200 per il 3 e così via. Ogni livello aumenta i danni base e fa scegliere un potenziamento: +1 colpo nella combo, +1 colpo potente concatenato, +1 schivata concatenata, +1 punto vita, +1 pozione o ricarica dello scudo -2%.
+- **Esperienza e livelli**: ogni nemico sconfitto dà esperienza; servono 100 punti per il livello 2, 200 per il 3 e così via. Ogni livello aumenta i danni base e fa scegliere un potenziamento: +1 colpo nella combo, +1 colpo potente concatenato, +1 schivata concatenata, +1 salto, +1 punto vita, +1 pozione, ricarica dello scudo -2% o velocità di corsa +2%. I livelli delle abilità sono mostrati nell'HUD.
 - **Nemici** (`data/enemies.json`): esploratori rapidi, guerrieri, bruti lenti e resistenti che fanno 2 danni, evocatori che restano a distanza ed evocano esploratori (colpirli mentre evocano li interrompe). Girano attorno al giocatore con scatti laterali; l'attacco è annunciato dalla zona rossa a terra, con durata variabile, finte e secondi attacchi. Salendo di livello compaiono più spesso i nemici forti.
 
 ## Steam Deck
 
-Per usare i comandi integrati come controller conviene aggiungere il gioco a Steam come gioco non Steam e avviarlo da lì, anche in modalità Desktop. Avviato fuori da Steam, in modalità Desktop Steam trasforma i comandi in tastiera e mouse: i menù accettano comunque frecce, WASD, Invio/Spazio e J, e in basso a sinistra mostrano quale controller vede il gioco.
+Per usare i comandi integrati come controller conviene aggiungere il gioco a Steam come gioco non Steam e avviarlo da lì, anche in modalità Desktop. Avviato fuori da Steam, in modalità Desktop Steam trasforma i comandi in tastiera e mouse: i menù accettano comunque croce, frecce, WASD, Invio/Spazio e J, e in basso a sinistra mostrano quale controller vede il gioco e l'ultimo comando ricevuto.
 
 ## Lingue
 

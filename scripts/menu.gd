@@ -11,6 +11,9 @@ const GAME_SCENE := "res://scenes/game.tscn"
 @onready var _language: Button = %Language
 @onready var _info: Label = %Info
 
+## Ultimo comando ricevuto, mostrato per capire cosa arriva dal controller.
+var _last_input := ""
+
 
 func _ready() -> void:
 	_start.pressed.connect(_on_start_pressed)
@@ -25,9 +28,6 @@ func _ready() -> void:
 
 	for button: Button in [_start, _quit, _language]:
 		button.focus_entered.connect(Sfx.play_ui.bind("ui_move"))
-		# Col mouse o col trackpad il pulsante sotto il puntatore prende il
-		# focus, così chi passa poi al controller riparte da lì.
-		button.mouse_entered.connect(button.grab_focus)
 	Input.joy_connection_changed.connect(_on_joy_connection_changed)
 	_start.grab_focus()
 	_update_info()
@@ -35,6 +35,12 @@ func _ready() -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_TRANSLATION_CHANGED and is_node_ready():
+		_update_info()
+
+
+func _input(event: InputEvent) -> void:
+	if event.is_pressed() and not event.is_echo() and not event is InputEventMouseMotion:
+		_last_input = event.as_text()
 		_update_info()
 
 
@@ -55,6 +61,8 @@ func _update_info() -> void:
 	var joypads := Input.get_connected_joypads()
 	var controller := tr("MENU_CONTROLLER") % Input.get_joy_name(joypads[0]) if not joypads.is_empty() else tr("MENU_NO_CONTROLLER")
 	_info.text = (tr("MENU_VERSION") % version) + "\n" + platform + "\n" + controller
+	if _last_input != "":
+		_info.text += "\n" + tr("MENU_LAST_INPUT") % _last_input
 
 
 func _on_joy_connection_changed(_device: int, _connected: bool) -> void:

@@ -6,10 +6,13 @@ extends Node2D
 ## Azioni: movimento in tutte le direzioni con accelerazione e frenata,
 ## attacchi consecutivi in combo sempre più potenti (R1), attacco potente
 ## che chiude la combo con un bonus (L2), parata tenendo premuto (L1),
-## schivate concatenate con cambio di direzione (B), pozioni che curano
-## (croce sinistra) e scudo che assorbe un colpo (croce destra).
+## schivate concatenate con cambio di direzione (B), salti anche multipli (Y),
+## corsa tenendo premuto R2, pozioni che curano (croce sinistra) e scudo
+## che assorbe un colpo (croce destra).
 ## Schivata e parata interrompono la combo in qualsiasi momento; attaccare
-## durante una schivata la interrompe e attacca subito.
+## durante una schivata la interrompe e attacca subito. Salti e schivate si
+## combinano; schivando mentre si corre si fa una scivolata, durante la
+## quale si può attaccare (anche in combo), schivare, saltare o parare.
 ## Una parata perfetta potenzia gli attacchi per qualche secondo.
 ## Sconfiggere nemici dà esperienza; a ogni livello aumentano i danni
 ## base e si sceglie un potenziamento.
@@ -19,7 +22,7 @@ signal experience_changed(current: int, needed: int, level: int)
 signal leveled_up(level: int)
 signal died
 
-enum State { NORMAL, ATTACK, PARRY, DODGE, HURT, DEAD }
+enum State { NORMAL, ATTACK, PARRY, DODGE, SLIDE, HURT, DEAD }
 
 const RADIUS := 22.0
 const START_HEALTH := 5
@@ -93,6 +96,27 @@ const DODGE_STEER_TIME := 0.1
 const DODGE_STICK_DEADZONE := 0.2
 const DODGE_COOLDOWN := 0.4
 
+## Corsa tenendo premuto R2: più veloce del passo normale. Ogni
+## potenziamento aggiunge il 2% alla velocità di corsa.
+const RUN_SPEED_FACTOR := 1.6
+const RUN_SPEED_UPGRADE := 0.02
+
+## Scivolata: schivando mentre si corre si scivola in avanti, rallentando.
+const SLIDE_TIME := 0.55
+const SLIDE_SPEED_FACTOR := 1.35
+const SLIDE_INVULNERABLE_TIME := 0.25
+
+## Salto: l'altezza è solo visiva (la visuale è dall'alto), ma in aria gli
+## attacchi dei nemici passano sotto. Si parte con un salto; i
+## potenziamenti permettono salti consecutivi in aria.
+const JUMP_SPEED := 520.0
+const GRAVITY := 1800.0
+## Durante una schivata in aria si scende più piano.
+const AIR_DODGE_GRAVITY_FACTOR := 0.3
+## Sopra questa altezza i colpi dei nemici non arrivano.
+const JUMP_EVADE_HEIGHT := 18.0
+const START_JUMPS := 1
+
 ## Ogni pozione cura questi punti vita.
 const POTION_HEAL := 3
 const START_POTIONS := 2
@@ -122,6 +146,9 @@ var experience := 0
 var max_combo_hits := START_COMBO_HITS
 var max_heavy_chain := START_HEAVY_CHAIN
 var max_chained_dodges := START_CHAINED_DODGES
+var max_jumps := START_JUMPS
+## Bonus alla velocità di corsa (0.02 = +2%).
+var run_speed_bonus := 0.0
 var max_potions := START_POTIONS
 var potions := START_POTIONS
 var shield_cooldown_max := SHIELD_COOLDOWN
@@ -153,6 +180,14 @@ var _attack_resolved := false
 var _attack_speed := 1.0
 var _empowered_time := 0.0
 var _block_flash := 0.0
+## Altezza da terra durante i salti e velocità verticale.
+var _height := 0.0
+var _height_velocity := 0.0
+var _jumps_used := 0
+var _slide_direction := Vector2.RIGHT
+var _slide_speed := 0.0
+## Slancio che resta quando si attacca durante una scivolata.
+var _carry_velocity := Vector2.ZERO
 
 
 func _physics_process(delta: float) -> void:
@@ -178,18 +213,21 @@ func _physics_process(delta: float) -> void:
 		State.NORMAL:
 			if input != Vector2.ZERO:
 				_target_facing = input.normalized()
-			_velocity = _accelerate(_velocity, input * SPEED, delta)
+			var running := Input.is_action_pressed("run") and input != Vector2.ZERO
+			_velocity = _accelerate(_velocity, input * (run_speed() if running else SPEED), delta)
+			if Input.is_action_just_pressed("jump"):
+				_jump()
 			if Input.is_action_just_pressed("dodge"):
-				if _dodge_chain_grace > 0.0 and _dodges_used < max_chained_dodges:
+				if running and not is_airborne():
+					_start_slide(input)
+				elif _dodge_chain_grace > 0.0 and _dodges_used < max_chained_dodges:
 					_chain_dodge(dodge_input)
 				elif _dodge_cooldown == 0.0:
 					_start_dodge(dodge_input)
 			elif Input.is_action_just_pressed("heavy_attack"):
 				_start_heavy(input)
 			elif Input.is_action_just_pressed("attack"):
-				# Dopo un colpo potente o dopo l'ultimo colpo la combo è finita: si ricomincia.
-				var continues := _combo_timer > 0.0 and _heavy_step == 0 and _combo_step < max_combo_hits
-				_start_attack(_combo_step + 1 if continues else 1, input)
+				_start_attack(_next_combo_step(), input)
 			elif Input.is_action_pressed("parry"):
 				_change_state(State.PARRY)
 
@@ -225,6 +263,9 @@ func _physics_process(delta: float) -> void:
 			elif Input.is_action_just_pressed("dodge") and _dodges_used < max_chained_dodges \
 					and _state_time >= DODGE_CHAIN_MIN_TIME:
 				_chain_dodge(dodge_input)
+			elif Input.is_action_just_pressed("jump"):
+				# Salto e schivata si combinano: la schivata continua in aria.
+				_jump()
 			elif _state_time <= DODGE_STEER_TIME and dodge_input != Vector2.ZERO:
 				_dodge_direction = dodge_input.normalized()
 				_target_facing = _dodge_direction
@@ -235,6 +276,28 @@ func _physics_process(delta: float) -> void:
 				if _state_time >= DODGE_TIME:
 					_dodge_cooldown = DODGE_COOLDOWN
 					_dodge_chain_grace = DODGE_CHAIN_GRACE
+					_change_state(State.NORMAL)
+
+		State.SLIDE:
+			# Durante la scivolata si può attaccare (continuando la combo),
+			# schivare, saltare o parare: la scivolata si interrompe.
+			if Input.is_action_just_pressed("attack"):
+				_carry_velocity = _velocity
+				_start_attack(_next_combo_step(), input)
+			elif Input.is_action_just_pressed("heavy_attack"):
+				_carry_velocity = _velocity
+				_start_heavy(input)
+			elif Input.is_action_just_pressed("dodge") and _dodge_cooldown == 0.0:
+				_start_dodge(dodge_input)
+			elif Input.is_action_just_pressed("jump"):
+				_change_state(State.NORMAL)
+				_jump()
+			elif Input.is_action_just_pressed("parry"):
+				_change_state(State.PARRY)
+			else:
+				var t := _state_time / SLIDE_TIME
+				_velocity = _slide_direction * _slide_speed * (1.0 - 0.7 * t)
+				if _state_time >= SLIDE_TIME:
 					_change_state(State.NORMAL)
 
 		State.HURT:
@@ -251,8 +314,22 @@ func _physics_process(delta: float) -> void:
 		var target := _target_facing.angle()
 		facing = Vector2.from_angle(angle + clampf(angle_difference(angle, target), -TURN_SPEED * delta, TURN_SPEED * delta))
 
+	_update_height(delta)
 	position += _velocity * delta
 	queue_redraw()
+
+
+## Salto e caduta: con più salti disponibili si può saltare di nuovo in aria.
+func _update_height(delta: float) -> void:
+	if _height <= 0.0 and _height_velocity <= 0.0:
+		return
+	var gravity := GRAVITY * (AIR_DODGE_GRAVITY_FACTOR if _state == State.DODGE else 1.0)
+	_height_velocity -= gravity * delta
+	_height += _height_velocity * delta
+	if _height <= 0.0:
+		_height = 0.0
+		_height_velocity = 0.0
+		_jumps_used = 0
 
 
 ## Avanzamento dell'attacco in corso: affondo, colpo, combo e recupero.
@@ -260,11 +337,13 @@ func _update_attack(input: Vector2, delta: float) -> void:
 	var windup := (HEAVY_WINDUP if _attack_heavy else ATTACK_WINDUP) / _attack_speed
 	var active := (HEAVY_ACTIVE if _attack_heavy else ATTACK_ACTIVE) / _attack_speed
 	var recovery := _attack_recovery() / _attack_speed
+	# Lo slancio di una scivolata si esaurisce durante l'attacco.
+	_carry_velocity = _carry_velocity.move_toward(Vector2.ZERO, DECELERATION * delta)
 	if _state_time < windup + active:
 		var lunge := HEAVY_LUNGE_SPEED if _attack_heavy else ATTACK_LUNGE_SPEED * (1.0 + 0.2 * (_combo_step - 1))
-		_velocity = facing * lunge if _state_time >= windup * 0.5 else _velocity * 0.8
+		_velocity = (facing * lunge if _state_time >= windup * 0.5 else _velocity * 0.8) + _carry_velocity
 	else:
-		_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * delta)
+		_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * delta) + _carry_velocity
 	# Si memorizza la pressione solo se può davvero continuare la combo:
 	# alla fine della combo le pressioni in più vengono ignorate.
 	if Input.is_action_just_pressed("heavy_attack") and _can_chain_heavy():
@@ -284,6 +363,7 @@ func _update_attack(input: Vector2, delta: float) -> void:
 			_end_combo()
 		else:
 			_combo_timer = COMBO_WINDOW
+		_carry_velocity = Vector2.ZERO
 		_change_state(State.NORMAL)
 
 
@@ -299,8 +379,12 @@ func _end_combo() -> void:
 func receive_hit(from: Vector2, damage: int) -> String:
 	if _state == State.DEAD or _invulnerable_time > 0.0:
 		return "ignored"
-	if _state == State.DODGE and _state_time <= DODGE_INVULNERABLE_TIME:
+	if (_state == State.DODGE and _state_time <= DODGE_INVULNERABLE_TIME) \
+			or (_state == State.SLIDE and _state_time <= SLIDE_INVULNERABLE_TIME):
 		FloatingText.spawn(get_parent(), global_position, tr("FX_DODGED"), COLOR_BODY)
+		return "dodged"
+	if _height > JUMP_EVADE_HEIGHT:
+		FloatingText.spawn(get_parent(), global_position, tr("FX_JUMPED"), COLOR_BODY)
 		return "dodged"
 
 	var to_attacker := (from - global_position).normalized()
@@ -347,6 +431,14 @@ func is_empowered() -> bool:
 	return _empowered_time > 0.0
 
 
+func is_airborne() -> bool:
+	return _height > 0.0
+
+
+func run_speed() -> float:
+	return SPEED * RUN_SPEED_FACTOR * (1.0 + run_speed_bonus)
+
+
 ## Danni del primo colpo della combo al livello attuale.
 func base_damage() -> int:
 	return BASE_DAMAGE + DAMAGE_PER_LEVEL * (level - 1)
@@ -389,6 +481,10 @@ func apply_upgrade(upgrade: String) -> void:
 		"shield":
 			shield_cooldown_max *= SHIELD_COOLDOWN_UPGRADE
 			shield_cooldown = minf(shield_cooldown, shield_cooldown_max)
+		"jump":
+			max_jumps += 1
+		"run":
+			run_speed_bonus += RUN_SPEED_UPGRADE
 
 
 func _change_state(new_state: State) -> void:
@@ -467,10 +563,36 @@ func _begin_attack(input: Vector2) -> void:
 	_change_state(State.ATTACK)
 
 
+## Colpo successivo: continua la combo se c'è ancora tempo, altrimenti
+## ricomincia (anche dopo un colpo potente o dopo l'ultimo colpo).
+func _next_combo_step() -> int:
+	var continues := _combo_timer > 0.0 and _heavy_step == 0 and _combo_step < max_combo_hits
+	return _combo_step + 1 if continues else 1
+
+
+func _jump() -> void:
+	if _jumps_used >= max_jumps:
+		return
+	_jumps_used += 1
+	_height_velocity = JUMP_SPEED
+	Sfx.play("jump", global_position, 1.0 + 0.15 * (_jumps_used - 1))
+
+
+## La scivolata parte almeno alla velocità di corsa, così funziona anche
+## subito dopo un attacco, quando non si è ancora ripresa velocità.
+func _start_slide(input: Vector2) -> void:
+	_slide_direction = input.normalized()
+	_slide_speed = maxf(_velocity.length(), run_speed()) * SLIDE_SPEED_FACTOR
+	_target_facing = _slide_direction
+	Sfx.play("slide", global_position)
+	_change_state(State.SLIDE)
+
+
 func _start_dodge(input: Vector2) -> void:
 	# Senza direzione si schiva all'indietro rispetto a dove si guarda.
 	_dodge_direction = input.normalized() if input != Vector2.ZERO else -facing
 	_dodges_used = 1
+	_carry_velocity = Vector2.ZERO
 	_combo_step = 0
 	_heavy_step = 0
 	Sfx.play("dodge", global_position)
@@ -564,8 +686,14 @@ func _draw() -> void:
 	if _state == State.DODGE:
 		body.a = 0.5 - 0.1 * (_dodges_used - 1)
 
-	# Ombra, aura del potenziamento, corpo e "naso" che indica la direzione.
-	draw_circle(Vector2(0, RADIUS * 0.8), RADIUS * 0.9, Color(0, 0, 0, 0.25))
+	# L'ombra resta a terra e si rimpicciolisce durante il salto; tutto il
+	# resto sale con il personaggio. In scivolata il corpo si schiaccia.
+	var shadow_scale := clampf(1.0 - _height / 160.0, 0.5, 1.0)
+	draw_circle(Vector2(0, RADIUS * 0.8), RADIUS * 0.9 * shadow_scale, Color(0, 0, 0, 0.25))
+	var body_scale := Vector2(1.2, 0.6) if _state == State.SLIDE else Vector2.ONE
+	draw_set_transform(Vector2(0, -_height + (RADIUS * 0.4 if _state == State.SLIDE else 0.0)), 0.0, body_scale)
+
+	# Aura del potenziamento, corpo e "naso" che indica la direzione.
 	if is_empowered() and _state != State.DEAD:
 		var pulse := 0.5 + 0.5 * sin(_empowered_time * 10.0)
 		draw_circle(Vector2.ZERO, RADIUS + 8.0 + pulse * 4.0, Color(COLOR_EMPOWERED, 0.25))
@@ -599,6 +727,7 @@ func _draw() -> void:
 	if shield_active and _state != State.DEAD:
 		draw_circle(Vector2.ZERO, RADIUS + 16.0, Color(COLOR_BUBBLE, 0.15))
 		draw_arc(Vector2.ZERO, RADIUS + 16.0, 0.0, TAU, 40, Color(COLOR_BUBBLE, 0.7), 2.5)
+	draw_set_transform(Vector2.ZERO)
 
 
 ## Disegna un settore circolare "a fascia" orientato verso direction.

@@ -18,6 +18,7 @@ const LEVEL_UP_INPUT_DELAY := 0.5
 @onready var _kills: Label = %Kills
 @onready var _potions: Label = %Potions
 @onready var _shield: Label = %Shield
+@onready var _stats: Label = %Stats
 @onready var _hint: Label = %Hint
 @onready var _message: Label = %Message
 @onready var _level_up: Control = %LevelUp
@@ -27,9 +28,11 @@ const LEVEL_UP_INPUT_DELAY := 0.5
 	"combo": %UpgradeCombo as Button,
 	"heavy": %UpgradeHeavy as Button,
 	"dodge": %UpgradeDodge as Button,
+	"jump": %UpgradeJump as Button,
 	"health": %UpgradeHealth as Button,
 	"potion": %UpgradePotion as Button,
 	"shield": %UpgradeShield as Button,
+	"run": %UpgradeRun as Button,
 }
 
 ## Giocatore di cui mostrare pozioni e scudo, che cambiano di continuo.
@@ -58,6 +61,11 @@ func _process(_delta: float) -> void:
 		_shield.text = tr("HUD_SHIELD_COOLDOWN") % ceili(player.shield_cooldown)
 	else:
 		_shield.text = tr("HUD_SHIELD_READY")
+	# Livelli delle abilità, che crescono con i potenziamenti.
+	_stats.text = tr("HUD_STATS") % [
+		player.max_combo_hits, player.max_heavy_chain, player.max_chained_dodges,
+		player.max_jumps, roundi(100.0 * (1.0 + player.run_speed_bonus)),
+	]
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -95,6 +103,9 @@ func show_level_up(level: int, damage_before: int, damage_after: int) -> void:
 	_upgrade_buttons["potion"].text = tr("UPGRADE_POTION") % [player.max_potions, player.max_potions + 1]
 	var cooldown_after := player.shield_cooldown_max * Player.SHIELD_COOLDOWN_UPGRADE
 	_upgrade_buttons["shield"].text = tr("UPGRADE_SHIELD") % [player.shield_cooldown_max, cooldown_after]
+	_upgrade_buttons["jump"].text = tr("UPGRADE_JUMP") % [player.max_jumps, player.max_jumps + 1]
+	var run_now := roundi(100.0 * (1.0 + player.run_speed_bonus))
+	_upgrade_buttons["run"].text = tr("UPGRADE_RUN") % [run_now, run_now + roundi(100.0 * Player.RUN_SPEED_UPGRADE)]
 	_level_up.visible = true
 	for button: Button in _upgrade_buttons.values():
 		button.disabled = true
