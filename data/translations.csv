@@ -50,3 +50,4 @@ UPGRADE_RUN,Velocità di corsa +2%%   (%d%% → %d%%),Run speed +2%%   (%d%% →
 TOUCH_JUMP,Salto,Jump
 TOUCH_RUN,Corsa,Run
 MENU_LAST_INPUT,Ultimo comando: %s,Last input: %s
+DECK_HINT,"Steam Deck: per usare i comandi integrati come controller tieni premuto il tasto Menu (Start) per 1 secondo, oppure avvia il gioco da Steam","Steam Deck: to use the built-in controls as a controller hold the Menu (Start) button for 1 second, or launch the game from Steam"

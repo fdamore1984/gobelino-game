@@ -10,6 +10,7 @@ const GAME_SCENE := "res://scenes/game.tscn"
 @onready var _quit: Button = %Quit
 @onready var _language: Button = %Language
 @onready var _info: Label = %Info
+@onready var _deck_hint: Label = %DeckHint
 
 ## Ultimo comando ricevuto, mostrato per capire cosa arriva dal controller.
 var _last_input := ""
@@ -61,6 +62,8 @@ func _update_info() -> void:
 	var joypads := Input.get_connected_joypads()
 	var controller := tr("MENU_CONTROLLER") % Input.get_joy_name(joypads[0]) if not joypads.is_empty() else tr("MENU_NO_CONTROLLER")
 	_info.text = (tr("MENU_VERSION") % version) + "\n" + platform + "\n" + controller
+	_deck_hint.text = tr("DECK_HINT")
+	_deck_hint.visible = Platform.needs_deck_controller_hint()
 	if _last_input != "":
 		_info.text += "\n" + tr("MENU_LAST_INPUT") % _last_input
 

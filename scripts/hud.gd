@@ -19,6 +19,7 @@ const LEVEL_UP_INPUT_DELAY := 0.5
 @onready var _potions: Label = %Potions
 @onready var _shield: Label = %Shield
 @onready var _stats: Label = %Stats
+@onready var _deck_hint: Label = %DeckHint
 @onready var _hint: Label = %Hint
 @onready var _message: Label = %Message
 @onready var _level_up: Control = %LevelUp
@@ -43,6 +44,7 @@ func _ready() -> void:
 	_hint.text = tr("HUD_HINT") + "\n" + tr("HUD_HINT_2")
 	# Sui dispositivi touch i comandi sono già scritti sui pulsanti a schermo.
 	_hint.visible = not Platform.use_touch_controls()
+	_deck_hint.text = tr("DECK_HINT")
 	_message.visible = false
 	_level_up.visible = false
 	for upgrade: String in _upgrade_buttons:
@@ -52,6 +54,9 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	# Sparisce appena il gioco vede un controller (per esempio dopo aver
+	# tenuto premuto Menu sullo Steam Deck).
+	_deck_hint.visible = Platform.needs_deck_controller_hint()
 	if player == null:
 		return
 	_potions.text = tr("HUD_POTIONS") % [player.potions, player.max_potions]
