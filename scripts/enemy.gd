@@ -25,7 +25,7 @@ const TURN_RATE := 9.0
 const SHARD_COUNT := 7
 const LEASH_RANGE := 700.0
 const SEPARATION_RANGE := 60.0
-const KNOCKBACK := 260.0
+const KNOCKBACK := 320.0
 const HEAVY_KNOCKBACK_FACTOR := 1.6
 
 ## Ogni tanto cambia verso di rotazione o fa uno scatto laterale.

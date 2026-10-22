@@ -475,6 +475,9 @@ func _move(delta: float) -> void:
 	var altitude := world.elevation_at(position) + _height
 	position = world.move(position, motion, RADIUS * 0.8, _height, true)
 	ground_elevation = world.elevation_at(position)
+	# Si illumina quello che blocca il movimento: ostacoli toccati e blocchi
+	# di terreno troppo alti da salire.
+	world.highlight_contacts(position, RADIUS * 0.8)
 	# L'altezza dal terreno cambia con il terreno sotto: scendendo da un
 	# gradino si cade, salendo su un blocco si atterra sopra.
 	_height = altitude - ground_elevation
@@ -1025,13 +1028,17 @@ func _resolve_attack() -> void:
 		if offset.length() <= RADIUS + enemy.radius or absf(facing.angle_to(offset)) <= _attack_arc() / 2.0:
 			enemy.take_damage(damage, offset.normalized(), heavy)
 			landed = true
+			# Scintilla nel punto di contatto, sul lato del nemico rivolto verso di noi.
+			var contact := enemy.global_position - offset.normalized() * enemy.radius * 0.8
+			HitSpark.spawn(get_parent(), contact, enemy.ground_elevation + enemy.radius * 0.9,
+					40.0 if _attack_heavy else 28.0, COLOR_HEAVY if _attack_heavy else COLOR_SLASH)
 	if landed:
 		Sfx.play("hit", global_position, 0.8 if _attack_heavy else 1.0 + 0.1 * (_combo_step - 1))
 		# Vibrazione e un attimo di fermo: si sente il colpo.
 		if _attack_heavy:
-			HitFeedback.hit(get_tree(), 0.6 + 0.4 * _charge, 0.09 + 0.06 * _charge)
+			HitFeedback.hit(get_tree(), 0.6 + 0.4 * _charge, 0.12 + 0.05 * _charge)
 		else:
-			HitFeedback.hit(get_tree(), 0.3 + 0.1 * _combo_step, 0.05)
+			HitFeedback.hit(get_tree(), 0.3 + 0.1 * _combo_step, 0.09)
 
 
 func _draw() -> void:

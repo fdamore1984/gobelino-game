@@ -76,6 +76,10 @@ var _chunk_obstacles := {}
 ## Pezzo -> {"view": nodo del terreno, "nodes": ostacoli e blocchi tra i personaggi}.
 var _chunk_views := {}
 var _maintain_timer := 0.0
+## Ultimo rombo troppo alto che ha fermato un movimento (vedi move).
+var _blocking_cell := Vector2i.ZERO
+var _has_blocking_cell := false
+var _wall_glow := WallGlow.new()
 
 
 func _ready() -> void:
@@ -97,6 +101,8 @@ func _ready() -> void:
 func _exit_tree() -> void:
 	if current == self:
 		current = null
+	if not _wall_glow.is_inside_tree():
+		_wall_glow.free()
 
 
 func _setup_noise(noise: FastNoiseLite, offset: int, frequency: float, octaves: int) -> void:
@@ -345,6 +351,7 @@ func _top_height(cell: Vector2i) -> float:
 ## con can_drop. Ci si ferma contro i gradini scivolando lungo il bordo e
 ## si viene spinti fuori dagli ostacoli solidi.
 func move(from: Vector2, motion: Vector2, radius: float, climb := 0.0, can_drop := false) -> Vector2:
+	_has_blocking_cell = false
 	var to := from + motion
 	if not _can_pass(from, to, radius, climb, can_drop):
 		var along_x := from + Vector2(motion.x, 0.0)
@@ -371,6 +378,8 @@ func _can_pass(from: Vector2, to: Vector2, radius: float, climb: float, can_drop
 	for probe: Vector2 in [to, to + ahead]:
 		var height := elevation_at(probe)
 		if height > base + climb + STEP_TOLERANCE:
+			_blocking_cell = cell_at(probe)
+			_has_blocking_cell = true
 			return false
 		if not can_drop and height < base - STEP_TOLERANCE:
 			return false
@@ -386,6 +395,22 @@ func _push_out(point: Vector2, radius: float) -> Vector2:
 		if offset.length() < minimum:
 			point = obstacle["position"] + (offset.normalized() if offset != Vector2.ZERO else Vector2.DOWN) * minimum
 	return point
+
+
+## Evidenzia ciò che ha appena fermato chi si muove in point: gli ostacoli
+## solidi che tocca e il blocco di terreno troppo alto incontrato
+## dall'ultima chiamata a move. Da chiamare subito dopo move.
+func highlight_contacts(point: Vector2, radius: float) -> void:
+	for obstacle: Dictionary in obstacles_near(point):
+		if obstacle["solid"] and point.distance_to(obstacle["position"]) <= radius + obstacle["collision"] + 1.5:
+			var node: Obstacle = obstacle.get("node")
+			if is_instance_valid(node):
+				node.flash_contact()
+	if _has_blocking_cell and entities:
+		if not _wall_glow.is_inside_tree():
+			_wall_glow.world = self
+			entities.add_child(_wall_glow)
+		_wall_glow.flash(_blocking_cell)
 
 
 ## Ostacoli dei pezzi di mondo attorno al punto.
@@ -585,6 +610,7 @@ func _show_chunk(chunk: Vector2i) -> void:
 		for data: Dictionary in _obstacles_of(chunk):
 			var obstacle := Obstacle.new()
 			obstacle.setup(data, _arena["totem"] if data["type"] == "totem" else _obstacle_types[data["type"]])
+			data["node"] = obstacle
 			entities.add_child(obstacle)
 			nodes.append(obstacle)
 		for i in CHUNK_CELLS:
@@ -776,3 +802,61 @@ class TerrainBlock:
 
 	func _draw() -> void:
 		world.draw_cell(self, cell, -position)
+
+
+## Contorno luminoso del blocco di terreno che ferma il giocatore (troppo
+## alto da salire): faccia superiore e pareti davanti, finché dura il
+## contatto e poi per un attimo.
+class WallGlow:
+	extends Node2D
+
+	const HOLD := 0.15
+	const COLOR := Color(1.0, 0.9, 0.45)
+
+	var world: World
+	var cell := Vector2i.ZERO
+	var _time := 0.0
+
+	func _ready() -> void:
+		z_index = 1
+		physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+
+	func flash(blocking: Vector2i) -> void:
+		if blocking != cell:
+			cell = blocking
+		_time = HOLD
+		visible = true
+		queue_redraw()
+
+	func _process(delta: float) -> void:
+		if _time <= 0.0:
+			visible = false
+			return
+		_time -= delta
+		queue_redraw()
+
+	func _draw() -> void:
+		var corners := World.cell_corners(cell)
+		var top := PackedVector2Array()
+		var bottom := PackedVector2Array()
+		# Vertici della faccia superiore e, sotto, il terreno dei vicini davanti.
+		var below := [
+			world.corner_height(cell + Vector2i(-1, 0), 1), world.corner_height(cell + Vector2i(1, 0), 0),
+			world.corner_height(cell + Vector2i(1, 0), 3), world.corner_height(cell + Vector2i(0, 1), 0),
+		]
+		for k in 4:
+			var height := world.corner_height(cell, k)
+			top.append(corners[k] - Vector2(0, height))
+			bottom.append(corners[k] - Vector2(0, minf(below[k], height)))
+		var pulse := 0.6 + 0.4 * sin(Time.get_ticks_msec() / 70.0)
+		var alpha := clampf(_time / HOLD, 0.0, 1.0) * pulse
+		var outline := top.duplicate()
+		outline.append(top[0])
+		draw_colored_polygon(top, Color(COLOR, 0.18 * alpha))
+		draw_polyline(outline, Color(COLOR, 0.35 * alpha), 8.0)
+		draw_polyline(outline, Color(COLOR, alpha), 3.0)
+		# Spigoli verticali delle pareti davanti (destra, basso, sinistra).
+		for k in [1, 2, 3]:
+			if top[k].y < bottom[k].y - 1.0:
+				draw_line(top[k], bottom[k], Color(COLOR, alpha), 3.0)
+		draw_polyline(PackedVector2Array([bottom[1], bottom[2], bottom[3]]), Color(COLOR, 0.6 * alpha), 2.0)
