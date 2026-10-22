@@ -41,7 +41,7 @@ UPGRADE_SHIELD,Ricarica scudo -2%%   (%.1f s → %.1f s),Shield recharge -2%%   
 TOUCH_HEAVY,Potente,Power
 TOUCH_POTION,Pozione,Potion
 TOUCH_SHIELD,Scudo,Shield
-MENU_CONTROLLER,Controller: %s,Controller: %s
+MENU_CONTROLLER,Controller %d: %s · %s · %s,Controller %d: %s · %s · %s
 MENU_NO_CONTROLLER,Nessun controller rilevato,No controller detected
 HUD_STATS,Combo %d · Colpi potenti %d · Schivate %d · Salti %d · Corsa %d%%,Combo %d · Power strikes %d · Dodges %d · Jumps %d · Run %d%%
 FX_JUMPED,Saltato!,Jumped!
@@ -51,3 +51,7 @@ TOUCH_JUMP,Salto,Jump
 TOUCH_RUN,Corsa,Run
 MENU_LAST_INPUT,Ultimo comando: %s,Last input: %s
 DECK_HINT,"Steam Deck: per usare i comandi integrati come controller tieni premuto il tasto Menu (Start) per 1 secondo, oppure avvia il gioco da Steam","Steam Deck: to use the built-in controls as a controller hold the Menu (Start) button for 1 second, or launch the game from Steam"
+MENU_JOY_MAPPED,pulsanti riconosciuti,buttons recognized
+MENU_JOY_UNMAPPED,pulsanti NON riconosciuti,buttons NOT recognized
+MENU_DESKTOP_INPUT_OFF,Steam Deck: tastiera e mouse ignorati finché c'è un controller,Steam Deck: keyboard and mouse ignored while a controller is connected
+MENU_DEVICE,controller %d,controller %d
