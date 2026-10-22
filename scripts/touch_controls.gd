@@ -21,6 +21,8 @@ const BUTTONS := [
 	{"action": "dodge", "label": "TOUCH_DODGE", "offset": Vector2(-90, -80), "radius": BUTTON_RADIUS},
 	{"action": "potion", "label": "TOUCH_POTION", "offset": Vector2(-330, -60), "radius": SMALL_BUTTON_RADIUS},
 	{"action": "shield", "label": "TOUCH_SHIELD", "offset": Vector2(-335, -180), "radius": SMALL_BUTTON_RADIUS},
+	{"action": "jump", "label": "TOUCH_JUMP", "offset": Vector2(-90, -320), "radius": BUTTON_RADIUS},
+	{"action": "run", "label": "TOUCH_RUN", "offset": Vector2(-335, -300), "radius": SMALL_BUTTON_RADIUS},
 ]
 
 var _stick_touch := -1

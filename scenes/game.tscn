@@ -87,6 +87,15 @@ offset_bottom = 182.0
 theme_override_colors/font_color = Color(0.55, 0.85, 1, 1)
 theme_override_font_sizes/font_size = 20
 
+[node name="Stats" type="Label" parent="HUD"]
+unique_name_in_owner = true
+offset_left = 24.0
+offset_top = 180.0
+offset_right = 824.0
+offset_bottom = 206.0
+theme_override_colors/font_color = Color(1, 0.85, 0.55, 0.9)
+theme_override_font_sizes/font_size = 18
+
 [node name="Hint" type="Label" parent="HUD"]
 unique_name_in_owner = true
 anchors_preset = 12
@@ -175,44 +184,57 @@ theme_override_font_sizes/font_size = 22
 text = "LEVELUP_CHOOSE"
 horizontal_alignment = 1
 
-[node name="UpgradeCombo" type="Button" parent="HUD/LevelUp/Center/VBox"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(560, 54)
+[node name="Upgrades" type="GridContainer" parent="HUD/LevelUp/Center/VBox"]
 layout_mode = 2
 size_flags_horizontal = 4
-theme_override_font_sizes/font_size = 24
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 10
+columns = 2
 
-[node name="UpgradeHeavy" type="Button" parent="HUD/LevelUp/Center/VBox"]
+[node name="UpgradeCombo" type="Button" parent="HUD/LevelUp/Center/VBox/Upgrades"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(560, 54)
+custom_minimum_size = Vector2(470, 56)
 layout_mode = 2
-size_flags_horizontal = 4
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 21
 
-[node name="UpgradeDodge" type="Button" parent="HUD/LevelUp/Center/VBox"]
+[node name="UpgradeHeavy" type="Button" parent="HUD/LevelUp/Center/VBox/Upgrades"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(560, 54)
+custom_minimum_size = Vector2(470, 56)
 layout_mode = 2
-size_flags_horizontal = 4
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 21
 
-[node name="UpgradeHealth" type="Button" parent="HUD/LevelUp/Center/VBox"]
+[node name="UpgradeDodge" type="Button" parent="HUD/LevelUp/Center/VBox/Upgrades"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(560, 54)
+custom_minimum_size = Vector2(470, 56)
 layout_mode = 2
-size_flags_horizontal = 4
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 21
 
-[node name="UpgradePotion" type="Button" parent="HUD/LevelUp/Center/VBox"]
+[node name="UpgradeJump" type="Button" parent="HUD/LevelUp/Center/VBox/Upgrades"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(560, 54)
+custom_minimum_size = Vector2(470, 56)
 layout_mode = 2
-size_flags_horizontal = 4
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 21
 
-[node name="UpgradeShield" type="Button" parent="HUD/LevelUp/Center/VBox"]
+[node name="UpgradeHealth" type="Button" parent="HUD/LevelUp/Center/VBox/Upgrades"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(560, 54)
+custom_minimum_size = Vector2(470, 56)
 layout_mode = 2
-size_flags_horizontal = 4
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 21
+
+[node name="UpgradePotion" type="Button" parent="HUD/LevelUp/Center/VBox/Upgrades"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(470, 56)
+layout_mode = 2
+theme_override_font_sizes/font_size = 21
+
+[node name="UpgradeShield" type="Button" parent="HUD/LevelUp/Center/VBox/Upgrades"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(470, 56)
+layout_mode = 2
+theme_override_font_sizes/font_size = 21
+
+[node name="UpgradeRun" type="Button" parent="HUD/LevelUp/Center/VBox/Upgrades"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(470, 56)
+layout_mode = 2
+theme_override_font_sizes/font_size = 21

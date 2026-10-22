@@ -91,6 +91,10 @@ func _build_sounds() -> void:
 	_streams["shield_break"] = _render(0.35, func(t: float, d: float) -> float:
 		var glass := sin(TAU * 1800.0 * t) * 0.3 + sin(TAU * 2700.0 * t) * 0.2
 		return (glass + _noise() * 0.35) * _env(t, d, 0.002) * exp(-t * 6.0))
+	_streams["jump"] = _render(0.18, func(t: float, d: float) -> float:
+		return _triangle(lerpf(300.0, 700.0, t / d) * t) * 0.3 * _env(t, d, 0.005))
+	_streams["slide"] = _render_filtered(0.4, Vector2(0.25, 0.08), func(t: float, d: float) -> float:
+		return _noise() * 0.5 * _env(t, d, 0.02))
 	_streams["xp"] = _render(0.08, func(t: float, d: float) -> float:
 		return sin(TAU * lerpf(1200.0, 1600.0, t / d) * t) * 0.25 * _env(t, d, 0.005))
 	# Nemici
