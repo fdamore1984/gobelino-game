@@ -34,6 +34,7 @@ func _ready() -> void:
 			await _capture_parry(language)
 			await _capture_level_up(language)
 			await _capture_challenge(language)
+			await _capture_inventory(language)
 	get_tree().quit()
 
 
@@ -148,6 +149,18 @@ func _capture_challenge(language: String) -> void:
 	_enemy("brute", _player.position + Vector2(230, 90), Enemy.State.WINDUP, 0.9)
 	_enemy("scout", _player.position + Vector2(-300, -150), Enemy.State.CHASE, 0.0)
 	_enemy("warrior", _player.position + Vector2(-260, 190), Enemy.State.WINDUP, 0.4)
+	# Di notte, con la torcia accesa e una palla di fuoco in volo.
+	(_game.get_node("DayNight") as DayNight).time = 0.7
+	_player.torch_on = true
+	_player._torch.enabled = true
+	_player._torch.position = Vector2(0, -_player.altitude() - Player.LEG_LENGTH)
+	var fireball := Fireball.new()
+	fireball.position = _player.position + Vector2(120, -70)
+	fireball.direction = Vector2(1, -0.4).normalized()
+	fireball.altitude = _player.ground_elevation
+	_entities().add_child(fireball)
+	fireball.set_physics_process(false)
+	fireball._light.position.y = -fireball.altitude - Fireball.FLIGHT_HEIGHT
 	# Il mondo attorno alla nuova posizione va generato prima della foto.
 	var camera: Camera2D = _player.get_node("Camera")
 	camera.reset_physics_interpolation()
@@ -156,6 +169,25 @@ func _capture_challenge(language: String) -> void:
 	world._update_chunks()
 	await _frames(20)
 	await _save("%s_5_challenge.png" % language)
+	_end_game()
+
+
+## Inventario con qualche oggetto trovato nelle casse.
+func _capture_inventory(language: String) -> void:
+	_start_game(Vector2(0, 0), 1.0)
+	_player.level = 4
+	_hud_stats()
+	for id in ["sword_steel", "armor_leather", "boots_swift", "amulet_mana", "ring_fire", "book_fire", "potion_health", "potion_mana", "sword_iron"]:
+		_player.inventory.add(id)
+	_player.inventory.gold = 137
+	_player.inventory.equipped = {"weapon": 0, "armor": 1, "boots": 2}
+	_player._refresh_stats()
+	var hud: Hud = _game.get_node("HUD")
+	hud._inventory_panel.player = _player
+	hud._inventory_panel.open()
+	await _frames(4)
+	await _save("%s_6_inventory.png" % language)
+	hud._inventory_panel.close()
 	_end_game()
 
 
@@ -200,6 +232,7 @@ func _start_game(camera_offset: Vector2, zoom: float) -> void:
 	for enemy in get_tree().get_nodes_in_group("enemies"):
 		enemy.queue_free()
 	_player = _game.get_node("Entities/Player")
+	(_game.get_node("DayNight") as DayNight).time = 0.2
 	_player.set_physics_process(false)
 	var camera: Camera2D = _player.get_node("Camera")
 	camera.offset = camera_offset

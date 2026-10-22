@@ -97,6 +97,34 @@ func _build_sounds() -> void:
 		return _noise() * 0.5 * _env(t, d, 0.02))
 	_streams["xp"] = _render(0.08, func(t: float, d: float) -> float:
 		return sin(TAU * lerpf(1200.0, 1600.0, t / d) * t) * 0.25 * _env(t, d, 0.005))
+	_streams["charge_full"] = _render(0.25, func(t: float, d: float) -> float:
+		return (sin(TAU * 1500.0 * t) + sin(TAU * 2250.0 * t) * 0.5) * 0.18 * _env(t, d, 0.003))
+	_streams["mana_potion"] = _render(0.5, func(t: float, d: float) -> float:
+		var shimmer := sin(TAU * lerpf(700.0, 1400.0, t / d) * t) * 0.6 + sin(TAU * 2100.0 * t) * 0.2
+		return shimmer * 0.25 * sin(PI * t / d))
+	# Magia
+	_streams["fireball"] = _render_filtered(0.45, Vector2(0.15, 0.4), func(t: float, d: float) -> float:
+		var roar := sin(TAU * lerpf(120.0, 220.0, t / d) * t) * 0.4
+		return (_noise() * 0.6 + roar) * _env(t, d, 0.03))
+	_streams["fireball_hit"] = _render_filtered(0.5, Vector2(0.5, 0.05), func(t: float, d: float) -> float:
+		var boom := sin(TAU * lerpf(110.0, 40.0, t / d) * t) * 0.6
+		return (_noise() * 0.7 + boom) * _env(t, d, 0.004))
+	# Oggetti
+	_streams["torch"] = _render_filtered(0.3, Vector2(0.4, 0.15), func(t: float, d: float) -> float:
+		return _noise() * 0.4 * _env(t, d, 0.01))
+	_streams["chest_open"] = _render(0.5, func(t: float, d: float) -> float:
+		# Cigolio del coperchio e poi un accordo.
+		var creak := signf(sin(TAU * (180.0 + 60.0 * sin(TAU * 9.0 * t)) * t)) * 0.12 * exp(-t * 8.0)
+		var chord := 0.0
+		if t > 0.15:
+			var local := t - 0.15
+			chord = (sin(TAU * 660.0 * t) + sin(TAU * 880.0 * t) + sin(TAU * 1100.0 * t)) * 0.12 * exp(-local * 5.0)
+		return (creak + chord) * _env(t, d, 0.005))
+	_streams["pickup"] = _render(0.15, func(t: float, d: float) -> float:
+		return _triangle(lerpf(700.0, 1300.0, t / d) * t) * 0.3 * _env(t, d, 0.003))
+	_streams["coin"] = _render(0.2, func(t: float, _d: float) -> float:
+		var note := 1800.0 if t < 0.06 else 2400.0
+		return sin(TAU * note * t) * 0.25 * exp(-fmod(t, 0.06) * 25.0))
 	# Nemici
 	_streams["enemy_windup"] = _render(0.5, func(t: float, d: float) -> float:
 		return _triangle(lerpf(180.0, 420.0, t / d) * t) * 0.25 * _env(t, d, 0.05))

@@ -9,6 +9,9 @@ extends Node2D
 ## sopravvivenza (parametri in data/challenge.json): per 30 secondi
 ## arrivano ondate di nemici, più numerose e forti salendo di livello.
 ## Superarla dà esperienza e una pozione.
+##
+## Toccando una cassa la si apre: escono monete e oggetti a caso
+## (data/items.json), adatti al livello, da raccogliere passandoci sopra.
 
 const MENU_SCENE := "res://scenes/menu.tscn"
 
@@ -63,6 +66,7 @@ func _process(delta: float) -> void:
 		_back_to_menu()
 		return
 	_update_challenge(delta)
+	_check_chests()
 	_maintain_timer -= delta
 	if _maintain_timer <= 0.0:
 		_maintain_timer = MAINTAIN_INTERVAL
@@ -115,6 +119,37 @@ func _update_challenge(delta: float) -> void:
 		_hud.hide_challenge()
 	elif _challenge_time <= 0.0:
 		_finish_challenge()
+
+
+func _check_chests() -> void:
+	if _player.is_dead():
+		return
+	var chest := _world.chest_touched(_player.position, Player.RADIUS + 10.0)
+	if chest.is_empty():
+		return
+	var at: Vector2 = chest["position"]
+	_world.open_chest(at)
+	Sfx.play("chest_open", at)
+	var data := Items.chest_data()
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var drops: Array[Array] = []
+	var gold: Array = data["gold"]
+	drops.append(["gold", rng.randi_range(gold[0], gold[1]) + int(data["gold_per_level"]) * (_player.level - 1)])
+	var count: Array = data["items"]
+	for i in rng.randi_range(count[0], count[1]):
+		var id := Items.pick_random(_player.level, rng)
+		drops.append([id, rng.randi_range(5, 15) + 2 * _player.level if id == "gold" else 1])
+	# Gli oggetti saltano fuori dalla cassa a ventaglio, verso il giocatore.
+	var away := (_player.position - at).normalized()
+	for i in drops.size():
+		var loot := Loot.new()
+		loot.item_id = drops[i][0]
+		loot.amount = drops[i][1]
+		loot.player = _player
+		var angle := away.angle() + (i - (drops.size() - 1) / 2.0) * 0.7
+		loot.launch(at, _world.free_position_near(at + Vector2.from_angle(angle) * 60.0, 10.0))
+		_entities.add_child(loot)
 
 
 func _start_challenge(arena: Vector2) -> void:
@@ -223,6 +258,11 @@ func _on_player_died() -> void:
 	get_tree().create_timer(GAME_OVER_DELAY).timeout.connect(_back_to_menu)
 
 
+func _exit_tree() -> void:
+	HitFeedback.reset()
+
+
 func _back_to_menu() -> void:
 	get_tree().paused = false
+	HitFeedback.reset()
 	get_tree().change_scene_to_file(MENU_SCENE)

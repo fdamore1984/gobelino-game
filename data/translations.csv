@@ -6,7 +6,7 @@ MENU_VERSION,Versione %s,Version %s
 HUD_HEALTH,Vita  %d / %d,Health  %d / %d
 HUD_KILLS,Nemici sconfitti  %d,Enemies defeated  %d
 HUD_DEFEAT,Sconfitto!,Defeated!
-HUD_HINT,Muovi: WASD / levetta    Attacco (combo): J / R1    Attacco potente: L / L2    Parata: K / L1 tenuto    Schivata (ripeti per concatenare): Spazio / B,Move: WASD / stick    Attack (combo): J / R1    Power strike: L / L2    Parry: K / L1 hold    Dodge (repeat to chain): Space / B
+HUD_HINT,Muovi: WASD / levetta    Attacco: J / R1    Potente (tieni premuto per caricare): L / L2    Parata: K / L1    Schivata: Spazio / B    Salto: F / A    Corsa: Maiusc / R2,Move: WASD / stick    Attack: J / R1    Power strike (hold to charge): L / L2    Parry: K / L1    Dodge: Space / B    Jump: F / A    Run: Shift / R2
 FX_DODGED,Schivato!,Dodged!
 FX_BLOCKED,Parato,Blocked
 FX_PERFECT_PARRY,Parata perfetta!,Perfect parry!
@@ -26,7 +26,7 @@ LEVELUP_CHOOSE,Scegli un potenziamento,Choose an upgrade
 UPGRADE_COMBO,Colpi in combo +1,Combo hits +1
 UPGRADE_DODGE,Schivate concatenate +1,Chained dodges +1
 UPGRADE_HEALTH,Punti vita +1,Health +1
-HUD_HINT_2,Salto: F / A    Corsa: Maiusc / R2 tenuto (+ schivata = scivolata)    Pozione: Q / croce sinistra    Scudo: R / croce destra    Menu: Esc / Start,Jump: F / A    Run: Shift / R2 hold (+ dodge = slide)    Potion: Q / D-pad left    Shield: R / D-pad right    Menu: Esc / Start
+HUD_HINT_2,Palla di fuoco: U / X    Scudo: R / Y    Pozione: Q / croce sinistra    Mana: T / croce destra    Torcia: G / croce giù    Inventario: I / croce su    Menu: Esc / Start,Fireball: U / X    Shield: R / Y    Potion: Q / D-pad left    Mana: T / D-pad right    Torch: G / D-pad down    Inventory: I / D-pad up    Menu: Esc / Start
 HUD_POTIONS,Pozioni  %d / %d,Potions  %d / %d
 HUD_SHIELD_READY,Scudo: pronto,Shield: ready
 HUD_SHIELD_ACTIVE,Scudo: attivo,Shield: active
@@ -75,3 +75,46 @@ CHALLENGE_HINT,Tocca il totem per avviare una sfida di sopravvivenza,Touch the t
 CHALLENGE_STATUS,Sopravvivi! %d s · Nemici: %d,Survive! %d s · Enemies: %d
 CHALLENGE_WON,Sfida superata! +%d EXP e una pozione,Challenge complete! +%d XP and a potion
 FX_CHALLENGE,Sfida!,Challenge!
+HUD_MANA,Mana %d/%d · Pozioni di mana %d/%d,Mana %d/%d · Mana potions %d/%d
+HUD_GOLD,Monete %d,Gold %d
+POWERUP_TORCH,Torcia accesa,Torch lit
+POWERUP_MANA,Mana massimo,Max mana
+POWERUP_SPELL,Palla di fuoco,Fireball
+UPGRADE_MANA,Mana massimo +20,Max mana +20
+UPGRADE_SPELL,Potenza della magia +20%,Spell power +20%
+FX_MANA_POTION,+Mana,+Mana
+FX_NO_MANA,Mana insufficiente,Not enough mana
+FX_GOLD,+%d monete,+%d gold
+INVENTORY_TITLE,Inventario,Inventory
+INVENTORY_EQUIPPED,"Equipaggiamento: arma, armatura, stivali, amuleto, anello","Equipment: weapon, armor, boots, amulet, ring"
+INVENTORY_EMPTY,Ancora niente: apri le casse per trovare oggetti,Nothing yet: open chests to find items
+INVENTORY_HINT,A / Invio: usa · B / Esc / I: chiudi,A / Enter: use · B / Esc / I: close
+INVENTORY_GOLD,Monete: %d,Gold: %d
+INVENTORY_USE_EQUIP,A: equipaggia,A: equip
+INVENTORY_USE_UNEQUIP,A: togli,A: unequip
+INVENTORY_USE_READ,A: leggi (bonus permanente),A: read (permanent bonus)
+INVENTORY_USE_DRINK,A: bevi,A: drink
+STAT_DAMAGE,+%d%% danni,+%d%% damage
+STAT_HEALTH,+%d vita massima,+%d max health
+STAT_SPEED,+%d%% velocità,+%d%% speed
+STAT_MANA,+%d mana massimo,+%d max mana
+STAT_SPELL,+%d%% potenza della magia,+%d%% spell power
+STAT_HEAL,cura %d punti vita,heals %d health
+STAT_RESTORE_MANA,+%d mana,+%d mana
+ITEM_GOLD,Monete,Gold
+ITEM_SWORD_IRON,Spada di ferro,Iron sword
+ITEM_SWORD_STEEL,Spada d'acciaio,Steel sword
+ITEM_SWORD_RUNE,Spada runica,Rune sword
+ITEM_ARMOR_LEATHER,Armatura di cuoio,Leather armor
+ITEM_ARMOR_CHAIN,Cotta di maglia,Chain mail
+ITEM_BOOTS_SWIFT,Stivali rapidi,Swift boots
+ITEM_AMULET_MANA,Amuleto del mana,Mana amulet
+ITEM_RING_FIRE,Anello del fuoco,Ring of fire
+ITEM_BOOK_FIRE,Libro: Fiamme,Book: Flames
+ITEM_BOOK_MANA,Libro: Mente arcana,Book: Arcane mind
+ITEM_POTION_HEALTH,Pozione di vita,Health potion
+ITEM_POTION_MANA,Pozione di mana,Mana potion
+TOUCH_SPELL,Magia,Spell
+TOUCH_MANA,Mana,Mana
+TOUCH_TORCH,Torcia,Torch
+TOUCH_INVENTORY,Zaino,Bag
