@@ -12,6 +12,8 @@ const OUTPUT := "res://store/itch/"
 const LANGUAGES := ["en", "it"]
 const SUBTITLE := {"it": "RPG d'azione · prototipo", "en": "Action RPG · prototype"}
 const COVER_SIZE := Vector2i(630, 500)
+## Seme del mondo usato per le immagini, così il terreno è sempre lo stesso.
+const WORLD_SEED := 1234
 
 var _game: Node2D
 var _player: Player
@@ -60,6 +62,8 @@ func _capture_combat(language: String) -> void:
 	_player.shield_active = true
 	_player.shield_cooldown = 21.0
 	_player.potions = 1
+	_player.apply_upgrade("combo")
+	_player.apply_upgrade("dodge")
 	_hud_stats()
 	var warrior := _enemy("warrior", Vector2(95, -25), Enemy.State.CHASE, 0.0)
 	warrior.health = 15
@@ -145,6 +149,7 @@ func _capture_cover(language: String) -> void:
 
 func _start_game(camera_offset: Vector2, zoom: float) -> void:
 	_game = (load("res://scenes/game.tscn") as PackedScene).instantiate()
+	(_game.get_node("World") as World).seed_value = WORLD_SEED
 	add_child(_game)
 	_game.set_process(false)
 	for enemy in get_tree().get_nodes_in_group("enemies"):
