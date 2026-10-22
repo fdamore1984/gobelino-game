@@ -59,7 +59,8 @@ func _physics_process(delta: float) -> void:
 	if _trail.size() > 8:
 		_trail.pop_back()
 	position += direction * SPEED * delta
-	_light.position.y = -altitude - FLIGHT_HEIGHT
+	# La luce cade a terra sotto la palla, come un'ellisse isometrica.
+	_light.position.y = -altitude
 	for node in get_tree().get_nodes_in_group("enemies"):
 		var enemy := node as Enemy
 		if enemy == null or enemy.is_dead() or absf(enemy.ground_elevation - altitude) > HIT_HEIGHT_REACH:

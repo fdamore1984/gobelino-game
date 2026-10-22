@@ -154,16 +154,17 @@ func _capture_challenge(language: String) -> void:
 	(_game.get_node("DayNight") as DayNight).time = 0.7
 	_player.torch_on = true
 	_player._torch.enabled = true
-	_player._torch.position = Vector2(0, -_player.altitude() - Player.LEG_LENGTH)
+	_player._torch.position = Vector2(0, -_player.ground_elevation + Player.RADIUS * 0.6)
 	var fireball := Fireball.new()
 	fireball.position = _player.position + Vector2(120, -70)
 	fireball.direction = Vector2(1, -0.4).normalized()
 	fireball.altitude = _player.ground_elevation
 	_entities().add_child(fireball)
 	fireball.set_physics_process(false)
-	fireball._light.position.y = -fireball.altitude - Fireball.FLIGHT_HEIGHT
+	fireball._light.position.y = -fireball.altitude
 	# Il mondo attorno alla nuova posizione va generato prima della foto.
 	var camera: Camera2D = _player.get_node("Camera")
+	camera.position_smoothing_enabled = false
 	camera.reset_physics_interpolation()
 	camera.reset_smoothing()
 	await _frames(2)
@@ -238,6 +239,8 @@ func _start_game(camera_offset: Vector2, zoom: float) -> void:
 	(_game.get_node("DayNight") as DayNight).time = 0.2
 	_player.set_physics_process(false)
 	var camera: Camera2D = _player.get_node("Camera")
+	# Per le foto la telecamera deve stare subito al suo posto, senza inseguire.
+	camera.position_smoothing_enabled = false
 	camera.offset = camera_offset
 	camera.zoom = Vector2(zoom, zoom)
 

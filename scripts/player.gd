@@ -118,8 +118,11 @@ const SLIDE_INVULNERABLE_TIME := 0.25
 ## i potenziamenti permettono salti consecutivi in aria.
 const JUMP_SPEED := 520.0
 const GRAVITY := 1800.0
-## Durante una schivata in aria si scende più piano.
+## A terra la schivata è una capriola; in aria è uno scatto nella direzione
+## di movimento, durante il quale si scende più piano.
 const AIR_DODGE_GRAVITY_FACTOR := 0.3
+const ROLL_CURL := 0.45
+const AIR_DASH_TRAIL := 3
 ## Sopra questa altezza i colpi dei nemici non arrivano.
 const JUMP_EVADE_HEIGHT := 18.0
 ## Colpi dati e ricevuti arrivano solo tra chi sta più o meno alla stessa
@@ -272,6 +275,8 @@ var _squash := 0.0
 var _look_ahead := Vector2.ZERO
 var _camera_height := 0.0
 var _spell_cooldown := 0.0
+## La schivata in corso è uno scatto in aria (altrimenti è una capriola).
+var _air_dash := false
 ## Carica del colpo potente (0-1) e se il tasto è ancora tenuto premuto.
 var _charge := 0.0
 var _charging := false
@@ -387,8 +392,9 @@ func _physics_process(delta: float) -> void:
 					and _state_time >= DODGE_CHAIN_MIN_TIME:
 				_chain_dodge(dodge_input)
 			elif Input.is_action_just_pressed("jump"):
-				# Salto e schivata si combinano: la schivata continua in aria.
+				# Salto e schivata si combinano: la schivata continua in aria come scatto.
 				_jump()
+				_air_dash = true
 			elif dodge_input != Vector2.ZERO:
 				# La schivata segue la levetta per tutta la sua durata: subito
 				# all'inizio, poi curvando verso la nuova direzione.
@@ -448,7 +454,8 @@ func _physics_process(delta: float) -> void:
 	_walk_phase += _velocity.length() * delta * WALK_CYCLE
 	if torch_on:
 		# La fiamma tremola.
-		_torch.position = Vector2(0, -altitude() - LEG_LENGTH)
+		# La luce è un'ellisse a terra centrata sotto il personaggio.
+		_torch.position = Vector2(0, -ground_elevation + RADIUS * 0.6)
 		_torch.energy = TORCH_ENERGY * randf_range(0.92, 1.05)
 	_squash = move_toward(_squash, 0.0, SQUASH_RECOVERY * delta)
 	if _camera:
@@ -852,8 +859,9 @@ func _start_slide(input: Vector2) -> void:
 
 
 func _start_dodge(input: Vector2) -> void:
-	# Senza direzione si schiva all'indietro rispetto a dove si guarda.
-	_dodge_direction = input.normalized() if input != Vector2.ZERO else -facing
+	# Senza direzione a terra si rotola all'indietro; in aria si scatta in avanti.
+	_set_air_dash()
+	_dodge_direction = input.normalized() if input != Vector2.ZERO else (facing if _air_dash else -facing)
 	_dodges_used = 1
 	_carry_velocity = Vector2.ZERO
 	_combo_step = 0
@@ -862,9 +870,17 @@ func _start_dodge(input: Vector2) -> void:
 	_change_state(State.DODGE)
 
 
+## In aria la schivata è uno scatto: si smette di cadere e si scivola nell'aria.
+func _set_air_dash() -> void:
+	_air_dash = is_airborne()
+	if _air_dash:
+		_height_velocity = maxf(_height_velocity, 0.0)
+
+
 ## Schivata concatenata: riparte a piena velocità, nella nuova direzione.
 func _chain_dodge(input: Vector2) -> void:
 	_dodges_used += 1
+	_set_air_dash()
 	if input != Vector2.ZERO:
 		_dodge_direction = input.normalized()
 		_target_facing = _dodge_direction
@@ -1050,8 +1066,6 @@ func _draw() -> void:
 	# Lampeggia mentre è invulnerabile dopo un colpo.
 	if _invulnerable_time > 0.0 and int(_invulnerable_time * 12.0) % 2 == 0:
 		body.a = 0.35
-	if _state == State.DODGE:
-		body.a = 0.5 - 0.1 * (_dodges_used - 1)
 
 	# L'ombra resta a terra e si rimpicciolisce durante il salto; tutto il
 	# resto sale con il personaggio. In scivolata il corpo si schiaccia.
@@ -1062,7 +1076,13 @@ func _draw() -> void:
 	draw_set_transform(Vector2(0, lift), 0.0, body_scale)
 	# Gambe: camminano quando ci si muove, raccolte in aria e in scivolata.
 	var walking := _velocity.length() > 20.0 and not is_airborne() and _state != State.DEAD
-	if _state != State.SLIDE:
+	var rolling := _state == State.DODGE and not _air_dash
+	var dashing := _state == State.DODGE and _air_dash
+	if dashing:
+		# Scatto in aria: immagini che restano indietro lungo la traiettoria.
+		for k in range(AIR_DASH_TRAIL, 0, -1):
+			draw_circle(-_dodge_direction * k * 16.0 + Vector2(0, -LEG_LENGTH), RADIUS * (1.0 - 0.15 * k), Color(body, 0.35 / k))
+	if _state != State.SLIDE and not rolling:
 		var foot_y := RADIUS * 0.85 - (6.0 if is_airborne() else 0.0)
 		BodyParts.draw_legs(self, -LEG_LENGTH + RADIUS * 0.55, foot_y, 8.0, 6.0, _walk_phase,
 				_velocity.normalized(), STRIDE if walking else 0.0, body.darkened(0.35))
@@ -1073,7 +1093,17 @@ func _draw() -> void:
 	var squash := Vector2(1.0 + SQUASH_AMOUNT * _squash, 1.0 - SQUASH_AMOUNT * _squash)
 	if _height_velocity > 200.0:
 		squash = Vector2(0.92, 1.08)
-	draw_set_transform(Vector2(0, lift - LEG_LENGTH - bob), lean, body_scale * squash)
+	var rotation_angle := lean
+	var body_lift := lift - LEG_LENGTH - bob
+	if rolling:
+		# Capriola: il corpo raccolto fa un giro completo nel verso del movimento.
+		var t := clampf(_state_time / DODGE_TIME, 0.0, 1.0)
+		rotation_angle = TAU * ease(t, 0.7) * (1.0 if _dodge_direction.x >= 0.0 else -1.0)
+		body_lift = lift - LEG_LENGTH * ROLL_CURL
+		squash = Vector2(1.05, 0.92)
+	elif dashing:
+		squash = Vector2(1.15, 0.88)
+	draw_set_transform(Vector2(0, body_lift), rotation_angle, body_scale * squash)
 
 	# Aura del potenziamento, corpo e "naso" che indica la direzione.
 	if is_empowered() and _state != State.DEAD:

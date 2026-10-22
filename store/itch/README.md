@@ -68,12 +68,12 @@ IN THIS PROTOTYPE
 - A boundless, randomly generated 3D isometric world made of blocks: grassy platforms stacked in steps at different heights, sloping ramps and dirt paths. Jump to climb onto higher blocks (multiple jumps reach the tallest ones) and drop down to lower ground. Here and there trees, rocks, bushes and thorny brambles (bushes and brambles slow you down, brambles prick)
 - Real-time combat: chain up to 3 attacks in a combo, each hit stronger than the last, and finish it with a power strike for a big bonus
 - Parry, and time it right before the hit for a perfect parry: the enemy is stunned and your attacks are empowered for a few seconds (double damage, faster swings)
-- Dodge and steer it while dodging, and press again mid-dodge to chain another one. Dodge and parry are always available and cancel your combo; attacking cancels a dodge into an immediate strike. You can keep moving while attacking: every strike is a sword slash, alternating left and right
+- Dodge with a roll on the ground or an air dash mid-jump, steer it while dodging, and press again mid-dodge to chain another one. Dodge and parry are always available and cancel your combo; attacking cancels a dodge into an immediate strike. You can keep moving while attacking: every strike is a sword slash, alternating left and right
 - Jump over enemy attacks (unlock multiple jumps in mid-air) and combine jumps with dodges
 - Hold R2 to run; dodge while running to slide, and attack, dodge, jump or parry out of the slide
 - Healing potions (you start with 2) and a magic shield that absorbs one hit, recharging in 30 seconds
 - Eight kinds of enemies: quick scouts, warriors, heavy brutes, summoners that call in reinforcements (hit them while they summon to interrupt them), lancers with long thrusts, whirlers that strike all around, huge golems and casters that hurl magic bolts from afar
-- Enemies circle around you with quick sidesteps; their sword slashes are slow and wide but unpredictable: watch the red area on the ground, beware of feints and follow-up strikes
+- Enemies circle around you with quick sidesteps; their sword slashes are slow and wide but unpredictable: watch them wind up (they light up and pull back their weapon), beware of feints and follow-up strikes
 - Hold the power strike to charge it up to double damage; every hit you land shakes the controller, freezes the action for an instant, throws sparks and knocks the enemy back. Whatever blocks your way (rocks, trees, chests, walls too high to climb) lights up while you bump into it
 - Cast fireballs that seek out and chase the nearest enemy (they cost mana: drink mana potions to refill)
 - Day turns to night: light your torch to see in the dark. A minimap shows the area around you, enemies as red dots, chests and totems
@@ -116,12 +116,12 @@ IN QUESTO PROTOTIPO
 - Un mondo isometrico 3D senza confini, fatto di blocchi e generato a caso: piattaforme d'erba a gradini su diverse altezze, rampe inclinate e sentieri sterrati. Salta per salire sui blocchi più alti (con più salti in aria raggiungi i più alti) e lasciati cadere verso quelli più bassi. Qua e là alberi, sassi, cespugli e rovi spinosi (cespugli e rovi rallentano, i rovi pungono)
 - Combattimento in tempo reale: concatena fino a 3 attacchi in combo, ogni colpo più forte del precedente, e chiudila con un colpo potente per un grosso bonus
 - Para, e fallo appena prima del colpo per una parata perfetta: il nemico resta stordito e i tuoi attacchi sono potenziati per qualche secondo (doppio danno, colpi più rapidi)
-- Schiva e cambia direzione durante la schivata, e premi di nuovo per concatenarne un'altra. Schivata e parata sono sempre disponibili e interrompono la combo; attaccare interrompe la schivata con un colpo immediato. Mentre attacchi puoi continuare a muoverti: ogni colpo è un fendente di spada, alternato da sinistra e da destra
+- Schiva con una capriola a terra o uno scatto in aria durante il salto, cambia direzione durante la schivata, e premi di nuovo per concatenarne un'altra. Schivata e parata sono sempre disponibili e interrompono la combo; attaccare interrompe la schivata con un colpo immediato. Mentre attacchi puoi continuare a muoverti: ogni colpo è un fendente di spada, alternato da sinistra e da destra
 - Salta per evitare gli attacchi dei nemici (sblocca più salti in aria) e combina salti e schivate
 - Tieni premuto R2 per correre; schiva mentre corri per una scivolata, da cui puoi attaccare, schivare, saltare o parare
 - Pozioni curative (ne hai 2 all'inizio) e uno scudo magico che assorbe un colpo e si ricarica in 30 secondi
 - Otto tipi di nemici: esploratori rapidi, guerrieri, bruti corazzati, evocatori che chiamano rinforzi (colpiscili mentre evocano per interromperli), lancieri con affondi lunghi, rotanti che colpiscono tutto attorno, golem enormi e lanciatori che scagliano dardi magici da lontano
-- I nemici ti girano attorno con scatti laterali; i loro fendenti di spada sono lenti e ampi ma imprevedibili: guarda la zona rossa a terra, attento alle finte e ai secondi colpi
+- I nemici ti girano attorno con scatti laterali; i loro fendenti di spada sono lenti e ampi ma imprevedibili: guardali caricare (si accendono e portano indietro l'arma), attento alle finte e ai secondi colpi
 - Tieni premuto il colpo potente per caricarlo fino al doppio del danno; ogni colpo a segno fa vibrare il controller, ferma l'azione per un istante, fa scintille e spinge indietro il nemico. Quello che ti blocca il passo (sassi, alberi, casse, muri troppo alti da salire) si illumina finché ci sbatti contro
 - Lancia palle di fuoco che cercano e inseguono il nemico più vicino (costano mana: bevi le pozioni di mana per ricaricarlo)
 - Il giorno lascia il posto alla notte: accendi la torcia per vedere al buio. Una minimappa mostra l'area attorno, i nemici come puntini rossi, le casse e i totem
