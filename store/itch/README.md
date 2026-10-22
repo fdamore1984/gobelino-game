@@ -74,7 +74,7 @@ IN THIS PROTOTYPE
 - Healing potions (you start with 2) and a magic shield that absorbs one hit, recharging in 30 seconds
 - Eight kinds of enemies: quick scouts, warriors, heavy brutes, summoners that call in reinforcements (hit them while they summon to interrupt them), lancers with long thrusts, whirlers that strike all around, huge golems and casters that hurl magic bolts from afar
 - Enemies circle around you with quick sidesteps; their sword slashes are slow and wide but unpredictable: watch the red area on the ground, beware of feints and follow-up strikes
-- Hold the power strike to charge it up to double damage; every hit you land shakes the controller and freezes the action for an instant
+- Hold the power strike to charge it up to double damage; every hit you land shakes the controller, freezes the action for an instant, throws sparks and knocks the enemy back. Whatever blocks your way (rocks, trees, chests, walls too high to climb) lights up while you bump into it
 - Cast fireballs that seek out and chase the nearest enemy (they cost mana: drink mana potions to refill)
 - Day turns to night: light your torch to see in the dark. A minimap shows the area around you, enemies as red dots, chests and totems
 - Open chests to find gold, weapons, armor, boots, amulets, rings, spell books and potions; equip them, read the books and drink the potions from your inventory
@@ -122,7 +122,7 @@ IN QUESTO PROTOTIPO
 - Pozioni curative (ne hai 2 all'inizio) e uno scudo magico che assorbe un colpo e si ricarica in 30 secondi
 - Otto tipi di nemici: esploratori rapidi, guerrieri, bruti corazzati, evocatori che chiamano rinforzi (colpiscili mentre evocano per interromperli), lancieri con affondi lunghi, rotanti che colpiscono tutto attorno, golem enormi e lanciatori che scagliano dardi magici da lontano
 - I nemici ti girano attorno con scatti laterali; i loro fendenti di spada sono lenti e ampi ma imprevedibili: guarda la zona rossa a terra, attento alle finte e ai secondi colpi
-- Tieni premuto il colpo potente per caricarlo fino al doppio del danno; ogni colpo a segno fa vibrare il controller e ferma l'azione per un istante
+- Tieni premuto il colpo potente per caricarlo fino al doppio del danno; ogni colpo a segno fa vibrare il controller, ferma l'azione per un istante, fa scintille e spinge indietro il nemico. Quello che ti blocca il passo (sassi, alberi, casse, muri troppo alti da salire) si illumina finché ci sbatti contro
 - Lancia palle di fuoco che cercano e inseguono il nemico più vicino (costano mana: bevi le pozioni di mana per ricaricarlo)
 - Il giorno lascia il posto alla notte: accendi la torcia per vedere al buio. Una minimappa mostra l'area attorno, i nemici come puntini rossi, le casse e i totem
 - Apri le casse per trovare monete, armi, armature, stivali, amuleti, anelli, libri di magia e pozioni; dall'inventario puoi equipaggiarli, leggere i libri e bere le pozioni
