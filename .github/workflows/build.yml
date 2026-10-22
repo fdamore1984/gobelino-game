@@ -15,29 +15,22 @@ jobs:
       image: barichello/godot-ci:4.4.1
     strategy:
       fail-fast: false
+      # Per ora si pubblica solo la build Linux (SteamOS / Steam Deck). I
+      # preset "Windows Desktop" e "Android" restano in export_presets.cfg:
+      # per riattivarli basta aggiungerli di nuovo qui (Android con
+      # --export-debug, firmato con la chiave di debug).
       matrix:
         include:
-          - preset: "Windows Desktop"
-            dir: windows
-            channel: windows
-            mode: --export-release
           - preset: "Linux"
             dir: linux
             channel: linux
             mode: --export-release
-          # Build di test firmata con la chiave di debug. Per Google Play
-          # servirà un job release con keystore nei secrets di GitHub.
-          - preset: "Android"
-            dir: android
-            channel: android
-            mode: --export-debug
     steps:
       - uses: actions/checkout@v4
         with:
           lfs: true
 
-      # L'immagine installa template ed editor settings (SDK Android, Java,
-      # keystore di debug) sotto /root, ma nei container di GitHub Actions
+      # L'immagine installa template ed editor settings sotto /root, ma nei container di GitHub Actions
       # HOME è /github/home: li spostiamo dove Godot li cerca.
       - name: Prepara template ed editor settings
         run: |
@@ -56,7 +49,7 @@ jobs:
         run: |
           mkdir -p build/${{ matrix.dir }}
           godot --headless --verbose ${{ matrix.mode }} "${{ matrix.preset }}"
-          # Elenco dei file prodotti: Windows e Linux devono essere un file solo.
+          # Elenco dei file prodotti: la build Linux deve essere un file solo.
           ls -la build/${{ matrix.dir }}
 
       # Sulle PR basta verificare che l'export riesca: si carica su itch.io

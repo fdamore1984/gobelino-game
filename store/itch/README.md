@@ -23,12 +23,12 @@ godot --path . --resolution 1260x1000 res://tools/store_capture.tscn -- cover
 | Kind of project | Downloadable |
 | Release status | Prototype |
 | Pricing | No payments (oppure "Donate" se vuoi accettare offerte) |
-| Uploads | Caricati dalla CI con butler: canali `windows`, `linux`, `android`. In *Edit game → Uploads* spunta per ciascuno la piattaforma (Windows / Linux / Android) |
+| Uploads | Caricato dalla CI con butler solo il canale `linux`: in *Edit game → Uploads* spunta la piattaforma Linux. I vecchi caricamenti `windows` e `android` vanno eliminati dalla stessa pagina |
 | Genre | Role Playing |
 | Tags | vedi sotto |
 | AI generation disclosure | Sì: codice, testi e grafica provvisoria sono stati prodotti con l'aiuto di un'IA (Claude) |
 | Languages | English, Italian |
-| Inputs | Keyboard, Xbox controller, Playstation controller, Touchscreen |
+| Inputs | Keyboard, Xbox controller, Playstation controller |
 | Cover image | `cover_en.png` (630×500) |
 | Screenshots | `en_1_combat.png`, `en_2_parry.png`, `en_5_challenge.png`, `en_6_inventory.png`, `en_3_level_up.png`, `en_4_menu.png` (le versioni `it_` sono le stesse in italiano) |
 
@@ -97,10 +97,10 @@ CONTROLS
 - Inventory: D-pad up / I
 - Menu: Start / Esc
 
-Play with a controller, keyboard, or touch on Android. Available in English and Italian.
+Play with a controller (Steam Deck built-in controls included) or keyboard. Available in English and Italian.
 
 PLATFORMS
-Windows, Linux (Steam Deck included) and Android.
+Linux and SteamOS (Steam Deck).
 
 --------------------------------------------------------------
 
@@ -145,10 +145,10 @@ COMANDI
 - Inventario: croce su / I
 - Menù: Start / Esc
 
-Gioca con il controller, con la tastiera o col touch su Android. Disponibile in italiano e in inglese.
+Gioca con il controller (anche i comandi integrati dello Steam Deck) o con la tastiera. Disponibile in italiano e in inglese.
 
 PIATTAFORME
-Windows, Linux (anche Steam Deck) e Android.
+Linux e SteamOS (Steam Deck).
 ```
 
 ---
@@ -160,21 +160,13 @@ Campo *Download & install instructions* (sotto la sezione Uploads).
 ```
 🇬🇧 HOW TO INSTALL
 
-Windows: download the Windows file, extract the archive and run Gobelino.exe. Windows may warn that the app is from an unknown publisher: click "More info" → "Run anyway".
-
 Linux / Steam Deck: download the Linux file, extract it and run Gobelino.x86_64 (if needed, make it executable first: right click → Properties → Allow executing, or chmod +x Gobelino.x86_64). On Steam Deck do this in Desktop Mode, then add it to Steam as a non-Steam game (Steam → Games → Add a Non-Steam Game) and always launch it from Steam: this way the built-in controller works as a gamepad, both in Game Mode and in Desktop Mode. If you launch it from the itch.io app in Desktop Mode instead, hold the Menu (Start) button for 1 second to switch the built-in controls to controller mode: while a controller is connected the game ignores the keys Steam's desktop layout keeps sending. The main menu shows the detected controller and whether its buttons are recognized.
 
-Android: download the .apk file on your phone and open it. Android will ask you to allow installing apps from this source: allow it, then install. To update, download and install the new .apk over the old one.
-
-Tip: with the itch.io app (https://itch.io/app) the game on Windows and Linux updates automatically to the latest build.
+Tip: with the itch.io app (https://itch.io/app) the game updates automatically to the latest build.
 
 🇮🇹 COME INSTALLARE
 
-Windows: scarica il file per Windows, estrai l'archivio e avvia Gobelino.exe. Windows potrebbe avvisare che l'app è di un autore sconosciuto: clicca "Ulteriori informazioni" → "Esegui comunque".
-
 Linux / Steam Deck: scarica il file per Linux, estrailo e avvia Gobelino.x86_64 (se serve, rendilo prima eseguibile: tasto destro → Proprietà → Consenti l'esecuzione, oppure chmod +x Gobelino.x86_64). Su Steam Deck fallo in modalità Desktop, poi aggiungilo a Steam come gioco non Steam (Steam → Giochi → Aggiungi un gioco non Steam) e avvialo sempre da Steam: così i comandi integrati funzionano come un controller, sia in modalità Gioco sia in modalità Desktop. Se invece lo avvii dall'app di itch.io in modalità Desktop, tieni premuto il tasto Menu (Start) per 1 secondo per passare i comandi integrati alla modalità controller: finché c'è un controller il gioco ignora i tasti che il layout desktop di Steam continua a mandare. Il menù iniziale mostra il controller rilevato e se i suoi pulsanti sono riconosciuti.
 
-Android: scarica il file .apk sul telefono e aprilo. Android chiederà di consentire l'installazione di app da questa fonte: consentila e installa. Per aggiornare, scarica e installa il nuovo .apk sopra quello vecchio.
-
-Consiglio: con l'app di itch.io (https://itch.io/app) il gioco su Windows e Linux si aggiorna da solo all'ultima build.
+Consiglio: con l'app di itch.io (https://itch.io/app) il gioco si aggiorna da solo all'ultima build.
 ```
