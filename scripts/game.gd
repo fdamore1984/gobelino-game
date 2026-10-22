@@ -4,6 +4,11 @@ extends Node2D
 ## tipi sparsi a caso attorno al giocatore. I nemici troppo lontani vengono
 ## rimossi e ne compaiono di nuovi fuori dallo schermo, così ce ne sono
 ## sempre. Gestisce anche esperienza, livelli e scelta dei potenziamenti.
+##
+## Toccando il totem al centro di un'arena parte una sfida di
+## sopravvivenza (parametri in data/challenge.json): per 30 secondi
+## arrivano ondate di nemici, più numerose e forti salendo di livello.
+## Superarla dà esperienza e una pozione.
 
 const MENU_SCENE := "res://scenes/menu.tscn"
 
@@ -16,6 +21,9 @@ const DESPAWN_DISTANCE := 2000.0
 const MAINTAIN_INTERVAL := 1.0
 const GAME_OVER_DELAY := 2.5
 const COLOR_XP := Color(0.6, 0.9, 1.0)
+const CHALLENGE := preload("res://data/challenge.json")
+## Distanza dal totem entro cui l'HUD suggerisce di toccarlo.
+const TOTEM_HINT_DISTANCE := 220.0
 
 @onready var _world: World = $World
 @onready var _entities: Node2D = $Entities
@@ -26,6 +34,12 @@ var _kills := 0
 var _maintain_timer := MAINTAIN_INTERVAL
 ## Livelli guadagnati per cui va ancora scelto il potenziamento.
 var _pending_level_ups := 0
+## Sfida in corso: centro dell'arena (Vector2.INF se nessuna), tempo
+## rimasto, ondate ancora da far arrivare e nemici della sfida.
+var _challenge_arena := Vector2.INF
+var _challenge_time := 0.0
+var _challenge_waves: Array = []
+var _challenge_enemies: Array[Enemy] = []
 
 
 func _ready() -> void:
@@ -48,6 +62,7 @@ func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("menu") and not get_tree().paused:
 		_back_to_menu()
 		return
+	_update_challenge(delta)
 	_maintain_timer -= delta
 	if _maintain_timer <= 0.0:
 		_maintain_timer = MAINTAIN_INTERVAL
@@ -67,6 +82,78 @@ func _maintain_enemies() -> void:
 			alive += 1
 	for i in ENEMY_COUNT - alive:
 		_spawn_enemy(EnemyTypes.pick_random(_player.level), _random_position(SPAWN_RANGE))
+
+
+func _update_challenge(delta: float) -> void:
+	var data: Dictionary = CHALLENGE.data
+	if _challenge_arena == Vector2.INF:
+		if _player.is_dead() or get_tree().paused:
+			return
+		var arena := _world.arena_near(_player.position)
+		var touched := _world.totem_touched(_player.position, Player.RADIUS + 12.0)
+		if touched != Vector2.INF and _world.totem_state(touched) == "ready":
+			_start_challenge(touched)
+		elif arena != Vector2.INF and _world.totem_state(arena) == "ready" \
+				and _player.position.distance_to(arena) < TOTEM_HINT_DISTANCE:
+			_hud.show_challenge(tr("CHALLENGE_HINT"))
+		else:
+			_hud.hide_challenge()
+		return
+	_challenge_time -= delta
+	var elapsed: float = float(data["duration"]) - _challenge_time
+	while not _challenge_waves.is_empty() and elapsed >= float(_challenge_waves[0]):
+		_challenge_waves.pop_front()
+		_spawn_challenge_wave()
+	var alive := 0
+	for enemy in _challenge_enemies:
+		if is_instance_valid(enemy) and not enemy.is_dead():
+			alive += 1
+	_hud.show_challenge(tr("CHALLENGE_STATUS") % [ceili(_challenge_time), alive])
+	if _player.is_dead():
+		_world.set_totem_state(_challenge_arena, "used")
+		_challenge_arena = Vector2.INF
+		_hud.hide_challenge()
+	elif _challenge_time <= 0.0:
+		_finish_challenge()
+
+
+func _start_challenge(arena: Vector2) -> void:
+	var data: Dictionary = CHALLENGE.data
+	_challenge_arena = arena
+	_challenge_time = data["duration"]
+	_challenge_waves = (data["wave_times"] as Array).duplicate()
+	_challenge_enemies.clear()
+	_world.set_totem_state(arena, "active")
+	Sfx.play("summon", arena)
+	FloatingText.spawn(_entities, _player.global_position, tr("FX_CHALLENGE"), Player.COLOR_EMPOWERED, 40.0)
+
+
+## Ondata di nemici dal bordo dell'arena: quanti e quanto forti dipende
+## dal livello del giocatore.
+func _spawn_challenge_wave() -> void:
+	var data: Dictionary = CHALLENGE.data
+	var per_wave: Array = data["enemies_per_wave"]
+	var count := floori(float(per_wave[0]) + float(per_wave[1]) * (_player.level - 1))
+	var distance := _world.arena_radius() * float(data["spawn_distance"])
+	var start := randf() * TAU
+	for i in count:
+		var at := _challenge_arena + Vector2.from_angle(start + TAU * i / count) * distance
+		var enemy := _spawn_enemy(EnemyTypes.pick_random(_player.level + int(data["type_level_bonus"])), at)
+		enemy.alert()
+		_challenge_enemies.append(enemy)
+	Sfx.play("summon_pop", _challenge_arena)
+
+
+func _finish_challenge() -> void:
+	var data: Dictionary = CHALLENGE.data
+	var xp := int(data["xp_per_level"]) * _player.level
+	_world.set_totem_state(_challenge_arena, "used")
+	_challenge_arena = Vector2.INF
+	_player.potions = mini(_player.potions + int(data["potion_reward"]), _player.max_potions)
+	_hud.flash_challenge(tr("CHALLENGE_WON") % xp)
+	FloatingText.spawn(_entities, _player.global_position, tr("FX_XP") % xp, COLOR_XP, 24.0)
+	Sfx.play("level_up", _player.global_position)
+	_player.add_experience(xp)
 
 
 func _random_position(distance_range: Vector2) -> Vector2:

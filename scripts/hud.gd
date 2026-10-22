@@ -1,7 +1,7 @@
 class_name Hud
 extends CanvasLayer
 ## Interfaccia del livello di test: vita, livello ed esperienza, pozioni,
-## scudo, nemici sconfitti, comandi, potenziamenti attivi (lista a destra),
+## scudo, nemici sconfitti, comandi, sfida del totem in corso, potenziamenti attivi (lista a destra),
 ## scelta del potenziamento salendo di livello (griglia con icone) e
 ## messaggio di fine partita.
 
@@ -14,6 +14,8 @@ const LEVEL_UP_INPUT_DELAY := 0.5
 const POWER_UP_ICON_SIZE := 28.0
 const CARD_ICON_SIZE := 64.0
 const COLOR_POWER_UPS_TITLE := Color(1, 1, 1, 0.7)
+## Per quanto resta il messaggio di fine sfida.
+const CHALLENGE_FLASH_TIME := 3.5
 
 ## Nome di ogni potenziamento (chiave di traduzione), nell'ordine della griglia.
 const UPGRADE_NAMES := {
@@ -37,6 +39,7 @@ const UPGRADE_NAMES := {
 @onready var _stats: Label = %Stats
 @onready var _deck_hint: Label = %DeckHint
 @onready var _power_ups: VBoxContainer = %PowerUps
+@onready var _challenge: Label = %Challenge
 @onready var _hint: Label = %Hint
 @onready var _message: Label = %Message
 @onready var _level_up: Control = %LevelUp
@@ -60,6 +63,8 @@ var _card_values := {}
 ## Ultimo contenuto della lista dei potenziamenti attivi, per ricostruirla
 ## solo quando cambia.
 var _power_ups_shown := []
+## Tempo rimasto del messaggio di fine sfida: intanto gli altri testi della sfida aspettano.
+var _challenge_flash := 0.0
 
 
 func _ready() -> void:
@@ -68,6 +73,7 @@ func _ready() -> void:
 	_hint.visible = not Platform.use_touch_controls()
 	_deck_hint.text = tr("DECK_HINT")
 	_message.visible = false
+	_challenge.visible = false
 	_level_up.visible = false
 	for upgrade: String in _upgrade_buttons:
 		var button: Button = _upgrade_buttons[upgrade]
@@ -76,7 +82,11 @@ func _ready() -> void:
 		_build_card(button, upgrade)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	if _challenge_flash > 0.0:
+		_challenge_flash -= delta
+		if _challenge_flash <= 0.0:
+			_challenge.visible = false
 	# Sparisce appena il gioco vede un controller (per esempio dopo aver
 	# tenuto premuto Menu sullo Steam Deck).
 	_deck_hint.visible = Platform.needs_deck_controller_hint()
@@ -220,6 +230,26 @@ func set_experience(current: int, needed: int, level: int) -> void:
 
 func set_kills(count: int) -> void:
 	_kills.text = tr("HUD_KILLS") % count
+
+
+## Testo della sfida del totem: suggerimento, tempo e nemici rimasti.
+func show_challenge(text: String) -> void:
+	if _challenge_flash > 0.0:
+		return
+	_challenge.text = text
+	_challenge.visible = true
+
+
+func hide_challenge() -> void:
+	if _challenge_flash <= 0.0:
+		_challenge.visible = false
+
+
+## Messaggio che resta qualche secondo (per esempio a sfida superata).
+func flash_challenge(text: String) -> void:
+	_challenge.text = text
+	_challenge.visible = true
+	_challenge_flash = CHALLENGE_FLASH_TIME
 
 
 func show_message(text: String) -> void:

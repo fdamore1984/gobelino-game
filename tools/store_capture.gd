@@ -33,6 +33,7 @@ func _ready() -> void:
 			await _capture_combat(language)
 			await _capture_parry(language)
 			await _capture_level_up(language)
+			await _capture_challenge(language)
 	get_tree().quit()
 
 
@@ -114,6 +115,50 @@ func _capture_level_up(language: String) -> void:
 	_end_game()
 
 
+## Sfida del totem: il giocatore al centro dell'arena, l'ondata in arrivo.
+func _capture_challenge(language: String) -> void:
+	_start_game(Vector2(0, 30), 1.0)
+	var world: World = _game.get_node("World")
+	# L'arena più vicina alla partenza, cercata regione per regione.
+	var arena := Vector2.INF
+	for distance in range(1, 6):
+		for angle in 8:
+			var candidate := world.arena_near(Vector2.from_angle(TAU * angle / 8.0) * distance * 2000.0)
+			if candidate != Vector2.INF and (arena == Vector2.INF or candidate.length() < arena.length()):
+				arena = candidate
+		if arena != Vector2.INF:
+			break
+	_player.position = arena + Vector2(-40, 70)
+	_player._ready()
+	_player.reset_physics_interpolation()
+	_player.level = 4
+	_player.facing = Vector2(-1, 0.3).normalized()
+	_player._swing_sign = 1.0
+	_player._attack_heavy = false
+	_player._combo_step = 2
+	_player._state = Player.State.ATTACK
+	_player._state_time = Player.ATTACK_WINDUP + 0.05
+	_player.ground_elevation = world.elevation_at(_player.position)
+	_hud_stats()
+	world.set_totem_state(arena, "active")
+	var hud: Hud = _game.get_node("HUD")
+	hud.show_challenge(tr("CHALLENGE_STATUS") % [21, 5])
+	_enemy("warrior", _player.position + Vector2(-110, 20), Enemy.State.STRIKE, 0.15)
+	_enemy("scout", _player.position + Vector2(170, -120), Enemy.State.CHASE, 0.0)
+	_enemy("brute", _player.position + Vector2(230, 90), Enemy.State.WINDUP, 0.9)
+	_enemy("scout", _player.position + Vector2(-300, -150), Enemy.State.CHASE, 0.0)
+	_enemy("warrior", _player.position + Vector2(-260, 190), Enemy.State.WINDUP, 0.4)
+	# Il mondo attorno alla nuova posizione va generato prima della foto.
+	var camera: Camera2D = _player.get_node("Camera")
+	camera.reset_physics_interpolation()
+	await _frames(2)
+	camera.force_update_scroll()
+	world._update_chunks()
+	await _frames(20)
+	await _save("%s_5_challenge.png" % language)
+	_end_game()
+
+
 func _capture_cover(language: String) -> void:
 	_start_game(Vector2(0, -60), 1.7)
 	_game.get_node("HUD").visible = false
@@ -189,6 +234,8 @@ func _enemy(type_id: String, at: Vector2, state: Enemy.State, state_time: float)
 	enemy._state_time = state_time
 	enemy._attack_direction = (_player.position - at).normalized()
 	enemy._facing = enemy._attack_direction
+	if World.current:
+		enemy.ground_elevation = World.current.elevation_at(at)
 	enemy.set_physics_process(false)
 	enemy.queue_redraw()
 	enemy._telegraph.queue_redraw()

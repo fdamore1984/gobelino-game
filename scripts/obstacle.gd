@@ -1,7 +1,7 @@
 class_name Obstacle
 extends Node2D
 ## Ostacolo naturale del mondo, disegnato con forme geometriche: albero,
-## sasso, cespuglio o rovi. La posizione è la base a terra, così
+## sasso, cespuglio, rovi o il totem al centro di un'arena. La posizione è la base a terra, così
 ## l'ordinamento per y lo mette davanti o dietro ai personaggi; viene
 ## disegnato più in alto quanto il blocco di terreno su cui si trova. Gli effetti (blocco,
 ## rallentamento, danni dei rovi) sono gestiti da World.
@@ -25,12 +25,16 @@ func setup(data: Dictionary, type: Dictionary) -> void:
 	_variant = data["variant"]
 	_lift = data["elevation"]
 	_type = type
-	# Disegnato una volta sola; solo gli alberi controllano il giocatore.
+	# Disegnato una volta sola; solo gli alberi controllano il giocatore e
+	# il totem si anima.
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
-	set_process(type_id == "tree")
+	set_process(type_id in ["tree", "totem"])
 
 
 func _process(_delta: float) -> void:
+	if type_id == "totem":
+		queue_redraw()
+		return
 	var player: Node2D = World.current.player if World.current else null
 	var target := 1.0
 	if player:
@@ -69,6 +73,8 @@ func _draw() -> void:
 			_draw_bush(rng)
 		"bramble":
 			_draw_bramble(rng)
+		"totem":
+			_draw_totem()
 
 
 func _draw_shadow(width: float) -> void:
@@ -160,3 +166,38 @@ func _draw_bramble(rng: RandomNumberGenerator) -> void:
 	var berries := _type_color("berries")
 	for k in 5:
 		draw_circle(Vector2(rng.randf_range(-0.8, 0.8), rng.randf_range(-0.6, 0.2)) * radius, 2.5, berries)
+
+
+## Totem di pietra a tre blocchi con occhi luminosi: azzurri e con un
+## anello pulsante a terra quando si può avviare la sfida, rossi durante la
+## sfida, spenti dopo.
+func _draw_totem() -> void:
+	var state := World.current.totem_state(position) if World.current else "ready"
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 250.0)
+	var glow := _type_color("glow")
+	if state == "active":
+		glow = _type_color("active")
+	elif state == "used":
+		glow = _type_color("used")
+	if state != "used":
+		draw_set_transform(Vector2(0, -_lift), 0.0, Vector2(1.0, 0.5))
+		draw_arc(Vector2.ZERO, radius * 2.2 + pulse * 10.0, 0.0, TAU, 40, Color(glow, 0.35 + 0.3 * pulse), 5.0)
+		draw_set_transform(Vector2(0, -_lift))
+	_draw_shadow(radius * 1.1)
+	var stone := _type_color("stone")
+	var y := 0.0
+	for k in 3:
+		var width := radius * (1.0 - k * 0.18)
+		var height := radius * (0.9 - k * 0.1)
+		y -= height
+		# Faccia davanti e lato in ombra, come un blocco squadrato.
+		draw_rect(Rect2(-width, y, width * 2.0, height), stone.darkened(0.05 * k))
+		draw_rect(Rect2(width * 0.55, y, width * 0.45, height), stone.darkened(0.25))
+		draw_line(Vector2(-width, y), Vector2(width, y), stone.lightened(0.2), 2.0)
+		# Occhi e bocca incisi, con la luce dello stato.
+		var eye := Color(glow, 0.6 + 0.4 * pulse) if state != "used" else glow
+		draw_circle(Vector2(-width * 0.38, y + height * 0.38), width * 0.13, eye)
+		draw_circle(Vector2(width * 0.18, y + height * 0.38), width * 0.13, eye)
+		draw_line(Vector2(-width * 0.4, y + height * 0.75), Vector2(width * 0.2, y + height * 0.75), stone.darkened(0.45), 3.0)
+	# In cima una punta.
+	draw_colored_polygon(PackedVector2Array([Vector2(-radius * 0.5, y), Vector2(radius * 0.5, y), Vector2(0, y - radius * 0.7)]), stone.lightened(0.1))

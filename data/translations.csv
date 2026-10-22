@@ -71,3 +71,7 @@ POWERUP_RUN,Corsa,Run speed
 POWERUP_EMPOWERED,Parata perfetta: attacchi potenziati %d s,Perfect parry: empowered attacks %d s
 POWERUP_SHIELD_ACTIVE,Scudo attivo,Shield active
 FX_THORNS,Rovi!,Thorns!
+CHALLENGE_HINT,Tocca il totem per avviare una sfida di sopravvivenza,Touch the totem to start a survival challenge
+CHALLENGE_STATUS,Sopravvivi! %d s · Nemici: %d,Survive! %d s · Enemies: %d
+CHALLENGE_WON,Sfida superata! +%d EXP e una pozione,Challenge complete! +%d XP and a potion
+FX_CHALLENGE,Sfida!,Challenge!

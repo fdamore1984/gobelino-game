@@ -53,6 +53,8 @@ const ATTACK_RANGE := 80.0
 const ATTACK_RANGE_PER_STEP := 10.0
 const ATTACK_ARC := deg_to_rad(110.0)
 const ATTACK_LUNGE_SPEED := 140.0
+## Durante un attacco ci si muove a questa frazione della velocità normale.
+const ATTACK_MOVE_FACTOR := 0.55
 
 ## Attacco potente: più lento, più ampio e molto più forte. In fondo a una
 ## combo prende anche il bonus dei colpi già fatti; chiude la combo, a
@@ -92,6 +94,8 @@ const DODGE_CHAIN_GRACE := 0.15
 ## All'inizio di ogni schivata la direzione segue ancora la levetta, così
 ## cambiare direzione è facile anche premendo un attimo prima di girarla.
 const DODGE_STEER_TIME := 0.1
+## Poi la schivata curva verso la direzione della levetta a questa velocità.
+const DODGE_TURN_RATE := 10.0
 ## Per la direzione delle schivate basta inclinare poco la levetta.
 const DODGE_STICK_DEADZONE := 0.2
 const DODGE_COOLDOWN := 0.4
@@ -138,6 +142,15 @@ const THORNS_INVULNERABLE_TIME := 0.4
 const HURT_TIME := 0.25
 const HURT_KNOCKBACK := 420.0
 const HURT_INVULNERABLE_TIME := 0.8
+
+## Gambe: il corpo sta sopra di LEG_LENGTH; i passi seguono la velocità.
+const LEG_LENGTH := 14.0
+const WALK_CYCLE := 0.08
+const STRIDE := 7.0
+## Spada: lunghezza e larghezza della lama (il colpo potente usa una spada più grande).
+const SWORD_LENGTH := 46.0
+const HEAVY_SWORD_LENGTH := 58.0
+const SWORD_WIDTH := 5.0
 
 const COLOR_BODY := Color(0.35, 0.75, 0.4)
 const COLOR_HURT := Color(0.95, 0.35, 0.3)
@@ -199,6 +212,12 @@ var _slide_direction := Vector2.RIGHT
 var _slide_speed := 0.0
 ## Slancio che resta quando si attacca durante una scivolata.
 var _carry_velocity := Vector2.ZERO
+## Movimento durante l'attacco, senza l'affondo del colpo.
+var _walk_velocity := Vector2.ZERO
+## Verso del fendente in corso (+1 o -1): cambia a ogni attacco.
+var _swing_sign := 1.0
+## Fase del passo per l'animazione delle gambe.
+var _walk_phase := 0.0
 ## Tempo passato nei rovi dall'ultima puntura.
 var _thorns_time := 0.0
 ## Potenziamento -> quante volte è stato scelto, nell'ordine di scelta.
@@ -290,8 +309,14 @@ func _physics_process(delta: float) -> void:
 			elif Input.is_action_just_pressed("jump"):
 				# Salto e schivata si combinano: la schivata continua in aria.
 				_jump()
-			elif _state_time <= DODGE_STEER_TIME and dodge_input != Vector2.ZERO:
-				_dodge_direction = dodge_input.normalized()
+			elif dodge_input != Vector2.ZERO:
+				# La schivata segue la levetta per tutta la sua durata: subito
+				# all'inizio, poi curvando verso la nuova direzione.
+				var wanted := dodge_input.normalized()
+				if _state_time <= DODGE_STEER_TIME:
+					_dodge_direction = wanted
+				else:
+					_dodge_direction = Vector2.from_angle(lerp_angle(_dodge_direction.angle(), wanted.angle(), minf(DODGE_TURN_RATE * delta, 1.0)))
 				_target_facing = _dodge_direction
 			if _state == State.DODGE:
 				# Scatto rapido che rallenta verso la fine.
@@ -340,6 +365,7 @@ func _physics_process(delta: float) -> void:
 
 	_update_height(delta)
 	_move(delta)
+	_walk_phase += _velocity.length() * delta * WALK_CYCLE
 	if _camera:
 		_camera.position.y = lerpf(_camera.position.y, -ground_elevation, minf(CAMERA_HEIGHT_FOLLOW * delta, 1.0))
 	queue_redraw()
@@ -424,11 +450,14 @@ func _update_attack(input: Vector2, delta: float) -> void:
 	var recovery := _attack_recovery() / _attack_speed
 	# Lo slancio di una scivolata si esaurisce durante l'attacco.
 	_carry_velocity = _carry_velocity.move_toward(Vector2.ZERO, DECELERATION * delta)
-	if _state_time < windup + active:
-		var lunge := HEAVY_LUNGE_SPEED if _attack_heavy else ATTACK_LUNGE_SPEED * (1.0 + 0.2 * (_combo_step - 1))
-		_velocity = (facing * lunge if _state_time >= windup * 0.5 else _velocity * 0.8) + _carry_velocity
-	else:
-		_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * delta) + _carry_velocity
+	# Mentre si attacca ci si può muovere (più piano) in qualsiasi
+	# direzione; il colpo resta nella direzione in cui è partito, con un
+	# piccolo affondo in avanti.
+	_walk_velocity = _accelerate(_walk_velocity, input * SPEED * ATTACK_MOVE_FACTOR, delta)
+	var lunge := Vector2.ZERO
+	if _state_time >= windup * 0.5 and _state_time < windup + active:
+		lunge = facing * (HEAVY_LUNGE_SPEED if _attack_heavy else ATTACK_LUNGE_SPEED * (1.0 + 0.2 * (_combo_step - 1)))
+	_velocity = _walk_velocity + lunge + _carry_velocity
 	# Si memorizza la pressione solo se può davvero continuare la combo:
 	# alla fine della combo le pressioni in più vengono ignorate.
 	if Input.is_action_just_pressed("heavy_attack") and _can_chain_heavy():
@@ -449,6 +478,7 @@ func _update_attack(input: Vector2, delta: float) -> void:
 		else:
 			_combo_timer = COMBO_WINDOW
 		_carry_velocity = Vector2.ZERO
+		_velocity = _walk_velocity
 		_change_state(State.NORMAL)
 
 
@@ -656,6 +686,9 @@ func _start_heavy(input: Vector2) -> void:
 
 func _begin_attack(input: Vector2) -> void:
 	_attack_speed = EMPOWER_ATTACK_SPEED if is_empowered() else 1.0
+	_walk_velocity = _velocity.limit_length(SPEED * ATTACK_MOVE_FACTOR) if _state != State.ATTACK else _walk_velocity
+	# I fendenti si alternano: una volta da sinistra, una da destra.
+	_swing_sign = -_swing_sign
 	_queued_attack = ""
 	_attack_resolved = false
 	_combo_timer = 0.0
@@ -794,7 +827,15 @@ func _draw() -> void:
 	var shadow_scale := clampf(1.0 - _height / 160.0, 0.5, 1.0)
 	draw_circle(Vector2(0, RADIUS * 0.8 - ground_elevation), RADIUS * 0.9 * shadow_scale, Color(0, 0, 0, 0.25))
 	var body_scale := Vector2(1.2, 0.6) if _state == State.SLIDE else Vector2.ONE
-	draw_set_transform(Vector2(0, -altitude() + (RADIUS * 0.4 if _state == State.SLIDE else 0.0)), 0.0, body_scale)
+	var lift := -altitude() + (RADIUS * 0.4 if _state == State.SLIDE else 0.0)
+	draw_set_transform(Vector2(0, lift), 0.0, body_scale)
+	# Gambe: camminano quando ci si muove, raccolte in aria e in scivolata.
+	if _state != State.SLIDE:
+		var walking := _velocity.length() > 20.0 and not is_airborne() and _state != State.DEAD
+		var foot_y := RADIUS * 0.85 - (6.0 if is_airborne() else 0.0)
+		BodyParts.draw_legs(self, -LEG_LENGTH + RADIUS * 0.55, foot_y, 8.0, 6.0, _walk_phase,
+				_velocity.normalized(), STRIDE if walking else 0.0, body.darkened(0.35))
+	draw_set_transform(Vector2(0, lift - LEG_LENGTH), 0.0, body_scale)
 
 	# Aura del potenziamento, corpo e "naso" che indica la direzione.
 	if is_empowered() and _state != State.DEAD:
@@ -806,19 +847,8 @@ func _draw() -> void:
 	var side := facing.orthogonal() * 9.0
 	draw_colored_polygon(PackedVector2Array([tip, facing * RADIUS * 0.6 + side, facing * RADIUS * 0.6 - side]), body.darkened(0.3))
 
-	if _state == State.ATTACK:
-		var windup := (HEAVY_WINDUP if _attack_heavy else ATTACK_WINDUP) / _attack_speed
-		var active := (HEAVY_ACTIVE if _attack_heavy else ATTACK_ACTIVE) / _attack_speed
-		if _attack_heavy and _state_time < windup:
-			# Carica del colpo potente: un arco che si accende.
-			draw_arc(Vector2.ZERO, RADIUS + 6.0, facing.angle() - HEAVY_ARC / 2.0, facing.angle() + HEAVY_ARC / 2.0, 24, Color(COLOR_HEAVY, _state_time / windup), 4.0)
-		elif _state_time >= windup and _state_time < windup + active:
-			var slash := COLOR_HEAVY if _attack_heavy else COLOR_SLASH
-			if _attack_speed > 1.0:
-				slash = COLOR_EMPOWERED
-			# I colpi successivi della combo hanno un fendente più ampio e più acceso.
-			var alpha := 0.8 if _attack_heavy else 0.45 + 0.15 * (_combo_step - 1)
-			_draw_arc_band(facing, RADIUS + 6.0, _attack_range() + RADIUS, _attack_arc(), Color(slash, minf(alpha, 0.9)))
+	if _state != State.DEAD:
+		_draw_sword()
 
 	if _state == State.PARRY:
 		var shield := COLOR_SHIELD
@@ -833,13 +863,35 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO)
 
 
-## Disegna un settore circolare "a fascia" orientato verso direction.
-func _draw_arc_band(direction: Vector2, inner: float, outer: float, arc: float, color: Color) -> void:
-	var points := PackedVector2Array()
-	var steps := 16
-	var start := direction.angle() - arc / 2.0
-	for i in steps + 1:
-		points.append(Vector2.from_angle(start + arc * i / steps) * outer)
-	for i in range(steps, -1, -1):
-		points.append(Vector2.from_angle(start + arc * i / steps) * inner)
-	draw_colored_polygon(points, color)
+## Spada: a riposo è tenuta di lato; nell'attacco si porta indietro durante
+## la carica e poi fende l'arco del colpo, alternando il verso a ogni
+## attacco, lasciando una scia.
+func _draw_sword() -> void:
+	var tint := Color.WHITE
+	if is_empowered():
+		tint = Color(1.0, 0.95, 0.7)
+	if _state != State.ATTACK:
+		var rest := facing.angle() + 0.6
+		BodyParts.draw_sword(self, facing.orthogonal() * RADIUS * 0.8, rest, SWORD_LENGTH, SWORD_WIDTH, tint)
+		return
+	var windup := (HEAVY_WINDUP if _attack_heavy else ATTACK_WINDUP) / _attack_speed
+	var active := (HEAVY_ACTIVE if _attack_heavy else ATTACK_ACTIVE) / _attack_speed
+	var arc := _attack_arc()
+	var start := facing.angle() - _swing_sign * arc / 2.0
+	var end := facing.angle() + _swing_sign * arc / 2.0
+	var angle := end
+	if _state_time < windup:
+		# Carica: la spada si porta un po' più indietro.
+		angle = start - _swing_sign * 0.35 * _state_time / windup
+		if _attack_heavy:
+			draw_arc(Vector2.ZERO, RADIUS + 6.0, facing.angle() - arc / 2.0, facing.angle() + arc / 2.0, 24, Color(COLOR_HEAVY, _state_time / windup), 4.0)
+	elif _state_time < windup + active:
+		angle = lerpf(start, end, ease((_state_time - windup) / active, 0.6))
+		var slash := COLOR_HEAVY if _attack_heavy else COLOR_SLASH
+		if _attack_speed > 1.0:
+			slash = COLOR_EMPOWERED
+		# I colpi successivi della combo hanno una scia più accesa.
+		var alpha := 0.85 if _attack_heavy else 0.5 + 0.15 * (_combo_step - 1)
+		BodyParts.draw_trail(self, Vector2.ZERO, start, angle, RADIUS + 6.0, _attack_range() + RADIUS, Color(slash, minf(alpha, 0.9)))
+	var length := HEAVY_SWORD_LENGTH if _attack_heavy else SWORD_LENGTH
+	BodyParts.draw_sword(self, Vector2.from_angle(angle) * RADIUS * 0.8, angle, length, SWORD_WIDTH * (1.3 if _attack_heavy else 1.0), tint)
