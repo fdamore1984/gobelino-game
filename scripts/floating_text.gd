@@ -21,7 +21,9 @@ static func spawn(parent: Node, at: Vector2, text: String, color: Color, height_
 	# Si muove in _process: l'interpolazione fisica non serve.
 	label.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	parent.add_child(label)
-	label.global_position = at + Vector2(0, -50.0 - height_offset)
+	# Sopra i blocchi alti del terreno la scritta sale con il personaggio.
+	var lift := World.current.elevation_at(at) if World.current else 0.0
+	label.global_position = at + Vector2(0, -50.0 - height_offset - lift)
 
 
 func _process(delta: float) -> void:

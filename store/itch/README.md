@@ -65,7 +65,7 @@ You are a lone goblin with no past, living in a den like a wild animal. Starting
 ⚠️ This is a prototype build: characters and enemies are placeholder geometric shapes and the sounds are synthesized placeholders. It's here to test the combat.
 
 IN THIS PROTOTYPE
-- A boundless, randomly generated wild world: plains, hills and plateaus, rocky cliffs you can only jump down from, and woods full of trees, rocks, bushes and thorny brambles (bushes and brambles slow you down, brambles prick)
+- A boundless, randomly generated 3D isometric world made of blocks: grassy platforms stacked in steps at different heights, sloping ramps and dirt paths. Jump to climb onto higher blocks (multiple jumps reach the tallest ones) and drop down to lower ground. Here and there trees, rocks, bushes and thorny brambles (bushes and brambles slow you down, brambles prick)
 - Real-time combat: chain up to 3 attacks in a combo, each hit stronger than the last, and finish it with a power strike for a big bonus
 - Parry, and time it right before the hit for a perfect parry: the enemy is stunned and your attacks are empowered for a few seconds (double damage, faster swings)
 - Dodge, and press again mid-dodge to chain another one in a new direction. Dodge and parry are always available and cancel your combo; attacking cancels a dodge into an immediate strike
@@ -104,7 +104,7 @@ Sei un goblin solitario e senza passato, che vive in una tana come un animale se
 ⚠️ Questa è una build di prototipo: personaggi e nemici sono forme geometriche provvisorie e i suoni sono provvisori, sintetizzati. Serve a provare il combattimento.
 
 IN QUESTO PROTOTIPO
-- Un mondo selvaggio senza confini, generato a caso: pianure, colline e altopiani, dirupi rocciosi da cui si può solo saltare giù, e boschi pieni di alberi, sassi, cespugli e rovi spinosi (cespugli e rovi rallentano, i rovi pungono)
+- Un mondo isometrico 3D senza confini, fatto di blocchi e generato a caso: piattaforme d'erba a gradini su diverse altezze, rampe inclinate e sentieri sterrati. Salta per salire sui blocchi più alti (con più salti in aria raggiungi i più alti) e lasciati cadere verso quelli più bassi. Qua e là alberi, sassi, cespugli e rovi spinosi (cespugli e rovi rallentano, i rovi pungono)
 - Combattimento in tempo reale: concatena fino a 3 attacchi in combo, ogni colpo più forte del precedente, e chiudila con un colpo potente per un grosso bonus
 - Para, e fallo appena prima del colpo per una parata perfetta: il nemico resta stordito e i tuoi attacchi sono potenziati per qualche secondo (doppio danno, colpi più rapidi)
 - Schiva, e premi di nuovo durante la schivata per concatenarne un'altra in una nuova direzione. Schivata e parata sono sempre disponibili e interrompono la combo; attaccare interrompe la schivata con un colpo immediato

@@ -106,15 +106,20 @@ const SLIDE_TIME := 0.55
 const SLIDE_SPEED_FACTOR := 1.35
 const SLIDE_INVULNERABLE_TIME := 0.25
 
-## Salto: l'altezza è solo visiva (la visuale è dall'alto), ma in aria gli
-## attacchi dei nemici passano sotto. Si parte con un salto; i
-## potenziamenti permettono salti consecutivi in aria.
+## Salto: serve per salire sui blocchi più alti del terreno (vedi World)
+## e in aria gli attacchi dei nemici passano sotto. Si parte con un salto;
+## i potenziamenti permettono salti consecutivi in aria.
 const JUMP_SPEED := 520.0
 const GRAVITY := 1800.0
 ## Durante una schivata in aria si scende più piano.
 const AIR_DODGE_GRAVITY_FACTOR := 0.3
 ## Sopra questa altezza i colpi dei nemici non arrivano.
 const JUMP_EVADE_HEIGHT := 18.0
+## Colpi dati e ricevuti arrivano solo tra chi sta più o meno alla stessa
+## altezza (per esempio non a un nemico sul gradino di sotto).
+const HIT_HEIGHT_REACH := 40.0
+## La telecamera segue con dolcezza l'altezza del terreno.
+const CAMERA_HEIGHT_FOLLOW := 6.0
 const START_JUMPS := 1
 
 ## Ogni pozione cura questi punti vita.
@@ -163,6 +168,7 @@ var shield_active := false
 var facing := Vector2.RIGHT
 
 var _state := State.NORMAL
+@onready var _camera: Camera2D = get_node_or_null("Camera")
 var _state_time := 0.0
 var _velocity := Vector2.ZERO
 var _target_facing := Vector2.RIGHT
@@ -197,6 +203,15 @@ var _carry_velocity := Vector2.ZERO
 var _thorns_time := 0.0
 ## Potenziamento -> quante volte è stato scelto, nell'ordine di scelta.
 var upgrades_taken := {}
+## Altezza del terreno sotto il personaggio (vedi World.elevation_at).
+var ground_elevation := 0.0
+
+
+func _ready() -> void:
+	if World.current:
+		ground_elevation = World.current.elevation_at(position)
+	if _camera:
+		_camera.position.y = -ground_elevation
 
 
 func _physics_process(delta: float) -> void:
@@ -325,12 +340,15 @@ func _physics_process(delta: float) -> void:
 
 	_update_height(delta)
 	_move(delta)
+	if _camera:
+		_camera.position.y = lerpf(_camera.position.y, -ground_elevation, minf(CAMERA_HEIGHT_FOLLOW * delta, 1.0))
 	queue_redraw()
 
 
-## Spostamento nel mondo: dirupi e ostacoli solidi fermano il personaggio,
-## cespugli e rovi lo rallentano (ma non durante schivate e scivolate) e i
-## rovi pungono. In aria si può saltare giù da un dirupo.
+## Spostamento nel mondo: si sale sui blocchi più alti solo saltando
+## abbastanza in alto, si scende dai gradini cadendo; gli ostacoli solidi
+## fermano il personaggio, cespugli e rovi lo rallentano (ma non durante
+## schivate e scivolate) e i rovi pungono.
 func _move(delta: float) -> void:
 	var world := World.current
 	if world == null:
@@ -340,13 +358,16 @@ func _move(delta: float) -> void:
 	var grounded := not is_airborne()
 	if grounded and _state != State.DODGE and _state != State.SLIDE:
 		motion *= world.slow_at(position, RADIUS)
-	var from := position
-	position = world.move(position, motion, RADIUS * 0.8, _height > JUMP_EVADE_HEIGHT)
-	if not grounded:
-		var drop := world.cliff_drop(from, position)
-		if drop > 0:
-			# Saltando giù dal dirupo si cade da più in alto.
-			_height += world.face_height(drop)
+	var altitude := world.elevation_at(position) + _height
+	position = world.move(position, motion, RADIUS * 0.8, _height, true)
+	ground_elevation = world.elevation_at(position)
+	# L'altezza dal terreno cambia con il terreno sotto: scendendo da un
+	# gradino si cade, salendo su un blocco si atterra sopra.
+	_height = altitude - ground_elevation
+	if (grounded and absf(_height) <= World.STEP_TOLERANCE) or _height < 0.0:
+		_height = 0.0
+		if _height_velocity <= 0.0:
+			_land()
 	var thorns := world.ground_obstacle_at(position, RADIUS) if grounded else {}
 	if not thorns.is_empty() and thorns["damage"] > 0:
 		_thorns_time += delta
@@ -388,8 +409,12 @@ func _update_height(delta: float) -> void:
 	_height += _height_velocity * delta
 	if _height <= 0.0:
 		_height = 0.0
-		_height_velocity = 0.0
-		_jumps_used = 0
+		_land()
+
+
+func _land() -> void:
+	_height_velocity = 0.0
+	_jumps_used = 0
 
 
 ## Avanzamento dell'attacco in corso: affondo, colpo, combo e recupero.
@@ -443,9 +468,16 @@ func receive_hit(from: Vector2, damage: int) -> String:
 			or (_state == State.SLIDE and _state_time <= SLIDE_INVULNERABLE_TIME):
 		FloatingText.spawn(get_parent(), global_position, tr("FX_DODGED"), COLOR_BODY)
 		return "dodged"
-	if _height > JUMP_EVADE_HEIGHT:
+	# Sopra il nemico (saltando o su un gradino più alto) il colpo passa sotto.
+	var attacker_height := World.current.elevation_at(from) if World.current else 0.0
+	var above := altitude() - attacker_height
+	if above > JUMP_EVADE_HEIGHT:
+		if not is_airborne():
+			return "ignored"
 		FloatingText.spawn(get_parent(), global_position, tr("FX_JUMPED"), COLOR_BODY)
 		return "dodged"
+	if above < -HIT_HEIGHT_REACH:
+		return "ignored"
 
 	var to_attacker := (from - global_position).normalized()
 	if _state == State.PARRY and absf(facing.angle_to(to_attacker)) <= PARRY_ARC / 2.0:
@@ -494,6 +526,11 @@ func is_empowered() -> bool:
 ## Secondi rimasti del potenziamento della parata perfetta.
 func empowered_time() -> float:
 	return _empowered_time
+
+
+## Altezza dei piedi sullo schermo: terreno più salto.
+func altitude() -> float:
+	return ground_elevation + _height
 
 
 func is_airborne() -> bool:
@@ -727,7 +764,7 @@ func _resolve_attack() -> void:
 	var landed := false
 	for node in get_tree().get_nodes_in_group("enemies"):
 		var enemy := node as Enemy
-		if enemy == null or enemy.is_dead():
+		if enemy == null or enemy.is_dead() or absf(enemy.ground_elevation - altitude()) > HIT_HEIGHT_REACH:
 			continue
 		var offset := enemy.global_position - global_position
 		if offset.length() > _attack_range() + enemy.radius:
@@ -755,9 +792,9 @@ func _draw() -> void:
 	# L'ombra resta a terra e si rimpicciolisce durante il salto; tutto il
 	# resto sale con il personaggio. In scivolata il corpo si schiaccia.
 	var shadow_scale := clampf(1.0 - _height / 160.0, 0.5, 1.0)
-	draw_circle(Vector2(0, RADIUS * 0.8), RADIUS * 0.9 * shadow_scale, Color(0, 0, 0, 0.25))
+	draw_circle(Vector2(0, RADIUS * 0.8 - ground_elevation), RADIUS * 0.9 * shadow_scale, Color(0, 0, 0, 0.25))
 	var body_scale := Vector2(1.2, 0.6) if _state == State.SLIDE else Vector2.ONE
-	draw_set_transform(Vector2(0, -_height + (RADIUS * 0.4 if _state == State.SLIDE else 0.0)), 0.0, body_scale)
+	draw_set_transform(Vector2(0, -altitude() + (RADIUS * 0.4 if _state == State.SLIDE else 0.0)), 0.0, body_scale)
 
 	# Aura del potenziamento, corpo e "naso" che indica la direzione.
 	if is_empowered() and _state != State.DEAD:

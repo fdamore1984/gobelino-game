@@ -58,6 +58,8 @@ const COLOR_DAMAGE := Color(1.0, 1.0, 1.0)
 var player: Player
 var type_id := "warrior"
 var radius := 24.0
+## Altezza del terreno sotto il nemico: viene disegnato più in alto.
+var ground_elevation := 0.0
 var health := 40
 var max_health := 40
 ## Esperienza data al giocatore quando viene sconfitto.
@@ -115,6 +117,9 @@ func _ready() -> void:
 	_telegraph.z_index = -5
 	_telegraph.draw.connect(_draw_telegraph)
 	add_child(_telegraph)
+	if World.current:
+		ground_elevation = World.current.elevation_at(position)
+		_telegraph.position.y = -ground_elevation
 
 
 func _physics_process(delta: float) -> void:
@@ -232,11 +237,14 @@ func _physics_process(delta: float) -> void:
 		_facing = _velocity.normalized()
 
 	_knockback = _knockback.move_toward(Vector2.ZERO, 1200.0 * delta)
-	# Dirupi e ostacoli solidi fermano anche i nemici; cespugli e rovi li rallentano.
+	# I nemici non saltano: restano sul loro livello del terreno (le rampe
+	# sì), si fermano contro gli ostacoli solidi e cespugli e rovi li rallentano.
 	var motion := (_velocity + _knockback) * delta
 	var world := World.current
 	if world:
 		position = world.move(position, motion * world.slow_at(position, radius), radius * 0.8)
+		ground_elevation = world.elevation_at(position)
+		_telegraph.position.y = -ground_elevation
 	else:
 		position += motion
 	queue_redraw()
@@ -398,6 +406,7 @@ func _draw_telegraph() -> void:
 
 
 func _draw() -> void:
+	draw_set_transform(Vector2(0, -ground_elevation))
 	var body := _color
 	match _state:
 		State.WINDUP:

@@ -1,8 +1,9 @@
 class_name Obstacle
 extends Node2D
 ## Ostacolo naturale del mondo, disegnato con forme geometriche: albero,
-## sasso, cespuglio o rovi. La posizione è la base, così l'ordinamento per
-## y lo mette davanti o dietro ai personaggi. Gli effetti (blocco,
+## sasso, cespuglio o rovi. La posizione è la base a terra, così
+## l'ordinamento per y lo mette davanti o dietro ai personaggi; viene
+## disegnato più in alto quanto il blocco di terreno su cui si trova. Gli effetti (blocco,
 ## rallentamento, danni dei rovi) sono gestiti da World.
 
 ## La chioma degli alberi diventa trasparente quando il giocatore ci passa dietro.
@@ -13,6 +14,8 @@ var radius := 20.0
 var _type: Dictionary
 var _variant := 0
 var _canopy_alpha := 1.0
+## Altezza del terreno sotto l'ostacolo.
+var _lift := 0.0
 
 
 func setup(data: Dictionary, type: Dictionary) -> void:
@@ -20,6 +23,7 @@ func setup(data: Dictionary, type: Dictionary) -> void:
 	radius = data["radius"]
 	position = data["position"]
 	_variant = data["variant"]
+	_lift = data["elevation"]
 	_type = type
 	# Disegnato una volta sola; solo gli alberi controllano il giocatore.
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
@@ -30,7 +34,9 @@ func _process(_delta: float) -> void:
 	var player: Node2D = World.current.player if World.current else null
 	var target := 1.0
 	if player:
-		var offset := player.global_position - global_position
+		# Confronto sullo schermo: anche il giocatore è disegnato alla sua altezza.
+		var player_lift: float = World.current.elevation_at(player.global_position)
+		var offset := player.global_position - Vector2(0, player_lift) - (global_position - Vector2(0, _lift))
 		# Dietro l'albero (più in alto sullo schermo) e sotto la chioma.
 		if offset.y < 0.0 and offset.y > -radius * 3.2 and absf(offset.x) < radius * 1.1:
 			target = CANOPY_FADE_ALPHA
@@ -53,6 +59,7 @@ func _type_color(key: String) -> Color:
 func _draw() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _variant
+	draw_set_transform(Vector2(0, -_lift))
 	match type_id:
 		"tree":
 			_draw_tree(rng)
@@ -65,9 +72,9 @@ func _draw() -> void:
 
 
 func _draw_shadow(width: float) -> void:
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, 0.45))
+	draw_set_transform(Vector2(0, -_lift), 0.0, Vector2(1.0, 0.45))
 	draw_circle(Vector2.ZERO, width, Color(0, 0, 0, 0.25))
-	draw_set_transform(Vector2.ZERO)
+	draw_set_transform(Vector2(0, -_lift))
 
 
 ## Tronco e chioma: tonda (latifoglia) o a strati di triangoli (abete).
@@ -134,9 +141,9 @@ func _draw_bush(rng: RandomNumberGenerator) -> void:
 
 ## Rovi: un groviglio di rami spinosi con qualche bacca.
 func _draw_bramble(rng: RandomNumberGenerator) -> void:
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, 0.5))
+	draw_set_transform(Vector2(0, -_lift), 0.0, Vector2(1.0, 0.5))
 	draw_circle(Vector2.ZERO, radius, Color(0.12, 0.08, 0.06, 0.45))
-	draw_set_transform(Vector2.ZERO)
+	draw_set_transform(Vector2(0, -_lift))
 	var colors := [_color(0), _color(1)]
 	for k in 9:
 		var color: Color = colors[k % 2]
