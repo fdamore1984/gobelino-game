@@ -56,6 +56,8 @@ jobs:
         run: |
           mkdir -p build/${{ matrix.dir }}
           godot --headless --verbose ${{ matrix.mode }} "${{ matrix.preset }}"
+          # Elenco dei file prodotti: Windows e Linux devono essere un file solo.
+          ls -la build/${{ matrix.dir }}
 
       # Sulle PR basta verificare che l'export riesca: si carica su itch.io
       # solo dai push su main. Servono il secret BUTLER_API_KEY e le

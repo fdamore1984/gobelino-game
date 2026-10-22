@@ -91,4 +91,5 @@ Il gioco è in italiano e in inglese. Al primo avvio usa la lingua del sistema (
 ## Build
 
 Le build vengono prodotte da GitHub Actions (`.github/workflows/build.yml`).
+Windows e Linux sono un unico eseguibile con i dati incorporati (PCK incorporato), così l'app di itch.io ha un solo file da avviare.
 Per una build locale: Progetto → Esporta, usando i preset in `export_presets.cfg`.
