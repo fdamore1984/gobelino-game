@@ -61,6 +61,16 @@ const SUMMON_DISTANCE := 70.0
 const LEG_FACTOR := 0.5
 const WALK_CYCLE := 0.08
 
+## Prestazioni con tanti nemici: la spinta di separazione guarda solo i
+## nemici nelle celle vicine di una griglia rifatta a ogni passo di fisica
+## (le celle sono più larghe della distanza di separazione più grande), e
+## chi è fuori dallo schermo non si ridisegna (VIEW_MARGIN attorno).
+const GRID_CELL := 128.0
+const VIEW_MARGIN := Vector2(160, 220)
+## Oltre questa distanza dal giocatore (fuori dallo schermo, oltre il
+## raggio d'inseguimento) ci si aggiorna a passi alterni.
+const FAR_RANGE := 1000.0
+
 const COLOR_WINDUP := Color(1.0, 0.45, 0.2)
 const COLOR_STUNNED := Color(0.55, 0.55, 0.8)
 const COLOR_DANGER := Color(1.0, 0.25, 0.15)
@@ -112,6 +122,23 @@ var _swing_sign := 1.0
 var _walk_phase := 0.0
 ## La zona di pericolo va disegnata sotto i personaggi, non sopra.
 var _telegraph := Node2D.new()
+## Il segnale dell'evocazione è disegnato: va ancora ridisegnato (per toglierlo).
+var _telegraph_shown := false
+## Mesh del corpo e del suo contorno (vedi Shapes), preparate una volta per raggio.
+var _body_mesh: ArrayMesh
+var _outline_mesh: ArrayMesh
+var _shape_radius := -1.0
+
+## Aggiornamento a passi alterni da lontano: in quali passi (0 o 1) e tempo saltato.
+var _update_slot := randi() % 2
+var _skipped_time := 0.0
+
+## Griglia dei nemici vivi (cella -> nemici) e passo di fisica in cui è stata fatta.
+static var _grid := {}
+static var _grid_frame := -1
+## Parte del mondo visibile (con margine) e frame in cui è stata calcolata.
+static var _view := Rect2()
+static var _view_frame := -1
 
 
 ## Imposta il tipo prima di aggiungere il nemico alla scena.
@@ -145,6 +172,14 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# Lontano dal giocatore ci si aggiorna un passo sì e uno no, con il tempo
+	# di entrambi: non si vede e costa la metà.
+	if player and _state != State.DEAD and global_position.distance_squared_to(player.global_position) > FAR_RANGE * FAR_RANGE \
+			and (Engine.get_physics_frames() + _update_slot) % 2 == 0:
+		_skipped_time += delta
+		return
+	delta += _skipped_time
+	_skipped_time = 0.0
 	_state_time += delta
 	_attack_cooldown = maxf(_attack_cooldown - delta, 0.0)
 	_summon_cooldown = maxf(_summon_cooldown - delta, 0.0)
@@ -283,8 +318,11 @@ func _physics_process(delta: float) -> void:
 	else:
 		position += motion
 	_walk_phase += _velocity.length() * delta * WALK_CYCLE
-	queue_redraw()
-	_telegraph.queue_redraw()
+	if _on_screen():
+		queue_redraw()
+	if _state == State.SUMMON or _telegraph_shown:
+		_telegraph_shown = _state == State.SUMMON
+		_telegraph.queue_redraw()
 
 
 ## heavy: colpo finale della combo, spinge più lontano.
@@ -467,17 +505,50 @@ func _player_in_strike_zone() -> bool:
 
 ## Spinta per non sovrapporsi agli altri nemici.
 func _separation() -> Vector2:
+	var grid := _enemy_grid()
 	var push := Vector2.ZERO
-	for node in get_tree().get_nodes_in_group("enemies"):
-		if node == self:
-			continue
-		var other := node as Enemy
-		var offset := global_position - other.global_position
-		var distance := offset.length()
-		var range := SEPARATION_RANGE + radius + other.radius - 48.0
-		if distance > 0.0 and distance < range:
-			push += offset / distance * (1.0 - distance / range)
+	var home := Vector2i((global_position / GRID_CELL).floor())
+	for i in range(-1, 2):
+		for j in range(-1, 2):
+			for node in grid.get(home + Vector2i(i, j), []):
+				if node == self or not is_instance_valid(node):
+					continue
+				var other := node as Enemy
+				var offset := global_position - other.global_position
+				var distance := offset.length()
+				var range := SEPARATION_RANGE + radius + other.radius - 48.0
+				if distance > 0.0 and distance < range:
+					push += offset / distance * (1.0 - distance / range)
 	return push
+
+
+## Griglia dei nemici vivi, rifatta al primo uso di ogni passo di fisica.
+func _enemy_grid() -> Dictionary:
+	var frame := Engine.get_physics_frames()
+	if frame != _grid_frame:
+		_grid_frame = frame
+		_grid.clear()
+		for node in get_tree().get_nodes_in_group("enemies"):
+			var key := Vector2i(((node as Node2D).global_position / GRID_CELL).floor())
+			if _grid.has(key):
+				_grid[key].append(node)
+			else:
+				_grid[key] = [node]
+	return _grid
+
+
+## Il nemico (disegnato sopra il terreno) è nella parte di mondo visibile.
+func _on_screen() -> bool:
+	var frame := Engine.get_process_frames()
+	if frame != _view_frame:
+		_view_frame = frame
+		var camera := get_viewport().get_camera_2d()
+		if camera == null:
+			_view = Rect2(-1e9, -1e9, 2e9, 2e9)
+		else:
+			var half := get_viewport_rect().size / camera.zoom / 2.0 + VIEW_MARGIN
+			_view = Rect2(camera.get_screen_center_position() - half, half * 2.0)
+	return _view.has_point(global_position - Vector2(0, ground_elevation))
 
 
 ## Cerchi dove compariranno i nemici evocati. L'attacco in carica non ha
@@ -487,8 +558,8 @@ func _draw_telegraph() -> void:
 	if _state == State.SUMMON:
 		var progress: float = _state_time / _type["summon"]["channel_time"]
 		for offset in _summon_positions:
-			_telegraph.draw_circle(offset, 24.0, Color(COLOR_SUMMON, 0.12))
-			_telegraph.draw_circle(offset, 24.0 * progress, Color(COLOR_SUMMON, 0.3))
+			Shapes.disc(_telegraph, offset, 24.0, Color(COLOR_SUMMON, 0.12))
+			Shapes.disc(_telegraph, offset, 24.0 * progress, Color(COLOR_SUMMON, 0.3))
 
 
 func _draw() -> void:
@@ -512,7 +583,7 @@ func _draw() -> void:
 
 	# Ombra, gambe, corpo con la forma del tipo sopra le gambe e un
 	# "occhio" che indica la direzione.
-	draw_circle(Vector2(0, radius * 0.8), radius * 0.9, Color(0, 0, 0, 0.25))
+	Shapes.disc(self, Vector2(0, radius * 0.8), radius * 0.9, Color(0, 0, 0, 0.25))
 	var leg := radius * LEG_FACTOR
 	var walking := _velocity.length() > 15.0 and _state != State.DEAD
 	BodyParts.draw_legs(self, -leg + radius * 0.55, radius * 0.85, radius * 0.35, maxf(4.0, radius * 0.22),
@@ -520,9 +591,14 @@ func _draw() -> void:
 	# Camminando il corpo ondeggia un poco su e giù.
 	var bob := absf(sin(_walk_phase)) * radius * 0.1 if walking else 0.0
 	draw_set_transform(Vector2(0, -ground_elevation - leg - bob))
-	draw_colored_polygon(_shape_points(), body)
-	draw_polyline(_closed(_shape_points()), body.darkened(0.35), 2.0)
-	draw_circle(_facing * radius * 0.5, maxf(radius * 0.2, 4.0), Color(0.1, 0.05, 0.1))
+	if _shape_radius != radius:
+		_shape_radius = radius
+		var key := "%s:%s" % [_type["shape"], radius]
+		_body_mesh = Shapes.polygon_mesh(key, _shape_points())
+		_outline_mesh = Shapes.outline_mesh(key + ":outline", _shape_points(), 2.0)
+	draw_mesh(_body_mesh, null, Transform2D.IDENTITY, body)
+	draw_mesh(_outline_mesh, null, Transform2D.IDENTITY, body.darkened(0.35))
+	Shapes.disc(self, _facing * radius * 0.5, maxf(radius * 0.2, 4.0), Color(0.1, 0.05, 0.1))
 	if is_boss():
 		_draw_crown()
 	if _is_ranged():
@@ -533,7 +609,7 @@ func _draw() -> void:
 	if _state == State.STUNNED:
 		for i in 3:
 			var angle := _state_time * 4.0 + TAU * i / 3.0
-			draw_circle(Vector2(cos(angle) * 18.0, -radius * 1.6 + sin(angle) * 5.0), 4.0, Color(1, 1, 0.5))
+			Shapes.disc(self, Vector2(cos(angle) * 18.0, -radius * 1.6 + sin(angle) * 5.0), 4.0, Color(1, 1, 0.5))
 
 	# Vita residua sopra la testa.
 	if health < max_health and _state != State.DEAD:
@@ -598,8 +674,8 @@ func _draw_staff() -> void:
 	var glow := 0.4
 	if _state == State.WINDUP:
 		glow = 0.4 + 0.6 * _state_time / _windup_time
-	draw_circle(top, radius * 0.35 * (1.0 + glow * 0.4), Color(_color.lightened(0.4), 0.35 * glow))
-	draw_circle(top, radius * 0.22, _color.lightened(0.3 + 0.4 * glow))
+	Shapes.disc(self, top, radius * 0.35 * (1.0 + glow * 0.4), Color(_color.lightened(0.4), 0.35 * glow))
+	Shapes.disc(self, top, radius * 0.22, _color.lightened(0.3 + 0.4 * glow))
 
 
 static func _closed(points: PackedVector2Array) -> PackedVector2Array:

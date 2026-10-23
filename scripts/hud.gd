@@ -1,9 +1,9 @@
 class_name Hud
 extends CanvasLayer
 ## Interfaccia del livello di test: pannello di stato in alto a sinistra
-## (HudStatus), barra delle azioni in basso a sinistra (HudActions), comandi, sfida del totem in corso, potenziamenti attivi (lista a destra),
-## scelta del potenziamento salendo di livello (griglia con icone) e
-## messaggio di fine partita.
+## (HudStatus), ciclo del giorno accanto alla minimappa (DayClock), barra delle azioni in basso a sinistra (HudActions), comandi, sfida del totem in corso, potenziamenti attivi (lista a destra),
+## scelta del potenziamento salendo di livello (tre schede con icone, prese
+## a caso) e messaggio di fine partita.
 
 ## Il giocatore ha scelto un potenziamento (vedi Player.apply_upgrade).
 signal upgrade_chosen(upgrade: String)
@@ -16,6 +16,8 @@ const CARD_ICON_SIZE := 64.0
 const COLOR_POWER_UPS_TITLE := Color(1, 1, 1, 0.7)
 ## Per quanto resta il messaggio di fine sfida.
 const CHALLENGE_FLASH_TIME := 3.5
+## A ogni livello si sceglie tra questi potenziamenti, presi a caso.
+const UPGRADE_CHOICES := 3
 
 ## Nome di ogni potenziamento (chiave di traduzione), nell'ordine della griglia.
 const UPGRADE_NAMES := {
@@ -40,6 +42,7 @@ var _status := HudStatus.new()
 var _actions := HudActions.new()
 var _boss_bar := BossBar.new()
 var _loading := LoadingOverlay.new()
+var _clock := DayClock.new()
 ## Menù di pausa: Game si collega ai suoi segnali (salva, esci).
 var pause_menu := PauseMenu.new()
 @onready var _message: Label = %Message
@@ -58,9 +61,16 @@ var pause_menu := PauseMenu.new()
 	"mana": %UpgradeMana as Button,
 	"spell": %UpgradeSpell as Button,
 }
+## Potenziamenti proposti in questo passaggio di livello.
+var _offered: Array[String] = []
 
 ## Giocatore di cui mostrare pozioni e scudo, che cambiano di continuo.
 var player: Player
+## Ciclo del giorno, per l'indicatore accanto alla minimappa.
+var day_night: DayNight:
+	set(value):
+		day_night = value
+		_clock.day_night = value
 ## Etichette dei valori nelle schede dei potenziamenti.
 var _card_values := {}
 ## Ultimo contenuto della lista dei potenziamenti attivi, per ricostruirla
@@ -80,6 +90,8 @@ func _ready() -> void:
 	add_child(_loading)
 	add_child(_boss_bar)
 	move_child(_boss_bar, 0)
+	add_child(_clock)
+	move_child(_clock, 0)
 	# Pannelli sotto tutto il resto (potenziamenti, inventario, messaggi).
 	add_child(_status)
 	move_child(_status, 0)
@@ -87,6 +99,7 @@ func _ready() -> void:
 	move_child(_actions, 1)
 	_actions.visible = not Platform.use_touch_controls()
 	_level_up.visible = false
+	(_upgrade_buttons["combo"].get_parent() as GridContainer).columns = UPGRADE_CHOICES
 	for upgrade: String in _upgrade_buttons:
 		var button: Button = _upgrade_buttons[upgrade]
 		button.pressed.connect(_on_upgrade_pressed.bind(upgrade))
@@ -229,7 +242,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_inventory_panel.open()
 		get_viewport().set_input_as_handled()
 		return
-	if _level_up.visible and UiNav.handle(event, get_viewport(), _upgrade_buttons["combo"]) and is_inside_tree():
+	if _level_up.visible and not _offered.is_empty() and UiNav.handle(event, get_viewport(), _upgrade_buttons[_offered[0]]) and is_inside_tree():
 		get_viewport().set_input_as_handled()
 
 
@@ -312,6 +325,15 @@ func show_level_up(level: int, damage_before: int, damage_after: int) -> void:
 	_card_values["mana"].text = tr("UPGRADE_VALUE") % [roundi(player.max_mana), roundi(player.max_mana + Player.MANA_UPGRADE)]
 	var spell_bonus := player.spell_bonus + player.inventory.bonus("spell")
 	_card_values["spell"].text = tr("UPGRADE_VALUE") % [player.spell_damage(), roundi(player.spell_damage() * (1.0 + spell_bonus + Player.SPELL_UPGRADE) / (1.0 + spell_bonus))]
+	# Solo alcuni potenziamenti, presi a caso, nell'ordine della griglia.
+	var picks: Array = _upgrade_buttons.keys()
+	picks.shuffle()
+	picks = picks.slice(0, UPGRADE_CHOICES)
+	_offered.clear()
+	for upgrade: String in _upgrade_buttons:
+		_upgrade_buttons[upgrade].visible = upgrade in picks
+		if upgrade in picks:
+			_offered.append(upgrade)
 	_level_up.visible = true
 	for button: Button in _upgrade_buttons.values():
 		button.disabled = true
@@ -320,7 +342,7 @@ func show_level_up(level: int, damage_before: int, damage_after: int) -> void:
 		return
 	for button: Button in _upgrade_buttons.values():
 		button.disabled = false
-	_upgrade_buttons["combo"].grab_focus()
+	_upgrade_buttons[_offered[0]].grab_focus()
 
 
 func _on_upgrade_pressed(upgrade: String) -> void:

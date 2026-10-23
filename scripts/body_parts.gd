@@ -19,7 +19,7 @@ static func draw_legs(canvas: CanvasItem, hip_y: float, foot_y: float, spacing: 
 		var hip := Vector2(side * spacing, hip_y)
 		var foot := Vector2(side * spacing, foot_y) + Vector2(swing.x, swing.y * 0.5)
 		canvas.draw_line(hip, foot, color, width)
-		canvas.draw_circle(foot, width * 0.6, color.darkened(0.25))
+		Shapes.disc(canvas, foot, width * 0.6, color.darkened(0.25))
 
 
 ## Spada che parte da origin con l'angolo dato: impugnatura, guardia e lama
@@ -31,11 +31,13 @@ static func draw_sword(canvas: CanvasItem, origin: Vector2, angle: float, length
 	var tip := origin + direction * length
 	canvas.draw_line(origin, grip_end, COLOR_GRIP, width * 0.8)
 	canvas.draw_line(grip_end - side * width * 1.4, grip_end + side * width * 1.4, COLOR_GUARD, width * 0.7)
-	var blade := PackedVector2Array([
-		grip_end + side * width * 0.55, tip - direction * width * 1.2 + side * width * 0.4,
-		tip, tip - direction * width * 1.2 - side * width * 0.4, grip_end - side * width * 0.55,
-	])
-	canvas.draw_colored_polygon(blade, COLOR_BLADE * tint)
+	# Lama: un quadrilatero che si assottiglia e la punta (primitive, che
+	# costano meno dei poligoni da ridisegnare a ogni frame).
+	var shoulder := tip - direction * width * 1.2
+	var colors := PackedColorArray([COLOR_BLADE * tint])
+	canvas.draw_primitive(PackedVector2Array([grip_end + side * width * 0.55, shoulder + side * width * 0.4,
+			shoulder - side * width * 0.4, grip_end - side * width * 0.55]), colors, PackedVector2Array())
+	canvas.draw_primitive(PackedVector2Array([shoulder + side * width * 0.4, tip, shoulder - side * width * 0.4]), colors, PackedVector2Array())
 	canvas.draw_line(grip_end, tip - direction * width, COLOR_EDGE * tint, maxf(width * 0.25, 1.0))
 
 
@@ -51,4 +53,4 @@ static func draw_trail(canvas: CanvasItem, center: Vector2, from_angle: float, t
 			center + Vector2.from_angle(a) * inner, center + Vector2.from_angle(a) * outer,
 			center + Vector2.from_angle(b) * outer, center + Vector2.from_angle(b) * inner,
 		])
-		canvas.draw_colored_polygon(piece, Color(color, color.a * float(i + 1) / steps))
+		canvas.draw_primitive(piece, PackedColorArray([Color(color, color.a * float(i + 1) / steps)]), PackedVector2Array())

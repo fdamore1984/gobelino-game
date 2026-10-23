@@ -131,7 +131,7 @@ MENU_CONTROLS,Controls
 CONTROLS_TITLE,Controls
 CONTROLS_HEADER,Action | Keyboard | Controller
 CONTROLS_MOVE,Move | WASD | Left stick
-CONTROLS_ATTACK,Attack (combo) | J | R1
+CONTROLS_ATTACK,"Attack (combo, hold to keep attacking) | J | R1"
 CONTROLS_HEAVY,Power strike (hold to charge) | L | L2
 CONTROLS_PARRY,Parry | K | L1
 CONTROLS_DODGE,"Dodge (roll, air dash while jumping) | Space | B"
@@ -146,8 +146,9 @@ CONTROLS_INVENTORY,Inventory | I / Tab | D-pad up
 CONTROLS_MENU,"Pause menu (save, controls, quit) | Esc | Start"
 CONTROLS_SPECIAL_TITLE,Special attacks
 CONTROLS_SPECIAL_LEAP,"Power strike right after a combo: leap and slam the ground, hitting every enemy around"
-CONTROLS_SPECIAL_PLUNGE,"Attack in mid-air: plunge onto the ground, hitting the enemies where you land"
-CONTROLS_SPECIAL_DASH,Attack during an air dash: dash strike that smashes a wide area
+CONTROLS_SPECIAL_AIR,"Attack in mid-air: wide aerial slashes that also reach the enemies below you"
+CONTROLS_SPECIAL_PLUNGE,"Power strike in mid-air: plunge onto the ground, hitting the enemies where you land"
+CONTROLS_SPECIAL_DASH,Power strike during an air dash: dash strike that smashes a wide area
 CONTROLS_TOUCH,On touch screens use the on-screen buttons
 CONTROLS_BACK,Back
 FX_SLAM,Slam!

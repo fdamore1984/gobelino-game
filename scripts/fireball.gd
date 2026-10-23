@@ -127,14 +127,14 @@ func _draw() -> void:
 	var lift := Vector2(0, -altitude - FLIGHT_HEIGHT)
 	if _exploding > 0.0:
 		var t := _exploding / EXPLOSION_TIME
-		draw_circle(lift, RADIUS + 40.0 * t, Color(COLOR_FLAME, 0.6 * (1.0 - t)))
+		Shapes.disc(self, lift, RADIUS + 40.0 * t, Color(COLOR_FLAME, 0.6 * (1.0 - t)))
 		draw_arc(lift, RADIUS + 55.0 * t, 0.0, TAU, 24, Color(COLOR_CORE, 1.0 - t), 3.0)
 		return
 	# Ombra a terra, scia di fiamme e nucleo luminoso che pulsa.
-	draw_circle(Vector2(0, -altitude + 6.0), RADIUS * 0.8, Color(0, 0, 0, 0.2))
+	Shapes.disc(self, Vector2(0, -altitude + 6.0), RADIUS * 0.8, Color(0, 0, 0, 0.2))
 	for i in _trail.size():
 		var fade := 1.0 - float(i) / _trail.size()
-		draw_circle(_trail[i] - position + lift, RADIUS * fade, Color(COLOR_FLAME, 0.5 * fade))
+		Shapes.disc(self, _trail[i] - position + lift, RADIUS * fade, Color(COLOR_FLAME, 0.5 * fade))
 	var pulse := 1.0 + 0.15 * sin(_age * 40.0)
-	draw_circle(lift, RADIUS * 1.4 * pulse, Color(COLOR_FLAME, 0.8))
-	draw_circle(lift, RADIUS * 0.7, COLOR_CORE)
+	Shapes.disc(self, lift, RADIUS * 1.4 * pulse, Color(COLOR_FLAME, 0.8))
+	Shapes.disc(self, lift, RADIUS * 0.7, COLOR_CORE)

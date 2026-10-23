@@ -38,7 +38,7 @@ func _draw() -> void:
 	var t := _age / LIFETIME
 	var center := Vector2(0, -lift)
 	# Lampo al centro che si spegne subito, raggi che si allungano.
-	draw_circle(center, size * 0.6 * (1.0 - t), Color(1, 1, 1, 0.9 * (1.0 - t)))
+	Shapes.disc(self, center, size * 0.6 * (1.0 - t), Color(1, 1, 1, 0.9 * (1.0 - t)))
 	for i in RAYS:
 		var direction := Vector2.from_angle(TAU * i / RAYS + 0.3)
 		var inner := size * (0.3 + 0.6 * t)
