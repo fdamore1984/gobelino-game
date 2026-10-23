@@ -2,8 +2,9 @@ class_name Dungeon
 extends RefCounted
 ## Sotterraneo sotto una caverna delle montagne: caverne collegate da
 ## gallerie, generate a caso ma sempre uguali per la stessa caverna e lo
-## stesso piano, in una griglia piccola di rombi. Si arriva su una scala
-## che riporta in superficie e si cerca la scala che scende al piano sotto;
+## stesso piano, in una griglia piccola di rombi. Si arriva davanti a un
+## passaggio nella parete che riporta in superficie e si cerca quello che
+## scende al piano sotto (i passaggi sono sempre in una parete, mai a terra);
 ## all'ultimo piano, nella caverna più lontana, c'è l'arena del boss.
 ## Parametri in data/world.json ("dungeon").
 ##
@@ -15,6 +16,8 @@ const DATA := preload("res://data/world.json")
 const ROOM_SPACING := 9
 ## Ostacoli e nemici stanno ad almeno questa distanza (in rombi) da scale e arena.
 const KEEP_CLEAR := 3
+## Due passaggi nelle pareti non stanno mai più vicini di così (in rombi).
+const PASSAGE_SPACING := 8
 
 ## Piano (1 = il primo sotto la superficie) e quanti piani ha il sotterraneo.
 var depth := 1
@@ -26,9 +29,15 @@ var wall_level := 4
 ## Caverne: {"center": Vector2i, "radius": int}; la prima è quella d'arrivo.
 var rooms: Array[Dictionary] = []
 var arrival := Vector2i.ZERO
+## Lato del rombo in cui si apre il passaggio nella parete (vedi _wall_spot).
+var arrival_side := Vector2i(-1, 0)
 ## Scala per scendere (solo se non è l'ultimo piano) e arena del boss (solo all'ultimo).
 var stairs := Vector2i(-1, -1)
+var stairs_side := Vector2i(-1, 0)
 var arena := Vector2i(-1, -1)
+## Dove si apre l'uscita dopo il boss, nella parete dell'arena.
+var arena_exit := Vector2i(-1, -1)
+var arena_exit_side := Vector2i(-1, 0)
 var arena_radius := 0
 var chests: Array[Vector2i] = []
 ## Casse già aperte in questo piano (posizione -> true).
@@ -143,7 +152,9 @@ func _generate() -> void:
 		_carve_tunnel(rooms[best]["center"], rooms[i]["center"], rng)
 	for k in floori(rooms.size() / 3.0):
 		_carve_tunnel(rooms[rng.randi() % rooms.size()]["center"], rooms[rng.randi() % rooms.size()]["center"], rng)
-	arrival = rooms[0]["center"]
+	var arrival_spot := _wall_spot(rooms[0]["center"], int(rooms[0]["radius"]) + 2)
+	arrival = arrival_spot[0]
+	arrival_side = arrival_spot[1]
 	# La caverna più lontana a piedi dall'arrivo ha la scala, o l'arena del boss.
 	var distances := _distances_from(arrival)
 	var far_room := 1
@@ -154,8 +165,13 @@ func _generate() -> void:
 		arena = rooms[far_room]["center"]
 		rooms[far_room]["radius"] = arena_radius
 		_carve_room(arena, arena_radius, rng, false)
+		var exit_spot := _wall_spot(arena, arena_radius + 2, [arrival])
+		arena_exit = exit_spot[0]
+		arena_exit_side = exit_spot[1]
 	else:
-		stairs = rooms[far_room]["center"]
+		var stairs_spot := _wall_spot(rooms[far_room]["center"], int(rooms[far_room]["radius"]) + 2, [arrival])
+		stairs = stairs_spot[0]
+		stairs_side = stairs_spot[1]
 	# Casse nelle altre caverne.
 	var chest_range: Array = data["chests"]
 	var candidates: Array[int] = []
@@ -167,6 +183,44 @@ func _generate() -> void:
 		var spot: Vector2i = room["center"] + Vector2i(rng.randi_range(-1, 1), rng.randi_range(-1, 1))
 		if is_floor(spot):
 			chests.append(spot)
+
+
+## Passaggio in una parete vicino al punto: un rombo di pavimento con
+## dietro (lato in alto a sinistra o in alto a destra sullo schermo) un
+## tratto dritto di roccia e attorno pavimento libero, così l'arco si vede
+## bene, lontano dai passaggi in avoid. Restituisce [rombo, lato]; se non
+## c'è si accontenta di un rombo con la roccia dietro, poi cerca ovunque.
+func _wall_spot(near: Vector2i, max_distance: int, avoid: Array[Vector2i] = []) -> Array:
+	for reach: int in [max_distance, maxi(width, height)]:
+		for strict: bool in [true, false]:
+			var spot := _find_wall_spot(near, reach, avoid, strict)
+			if not spot.is_empty():
+				return spot
+	return [near, Vector2i(-1, 0)]
+
+
+func _find_wall_spot(near: Vector2i, max_distance: int, avoid: Array[Vector2i], strict: bool) -> Array:
+	var best: Array = []
+	var best_distance := INF
+	for i in range(-max_distance, max_distance + 1):
+		for j in range(-max_distance, max_distance + 1):
+			var cell := near + Vector2i(i, j)
+			if not is_floor(cell) or (strict and not is_floor(cell + Vector2i(1, 1))):
+				continue
+			if avoid.any(func(other: Vector2i) -> bool: return other.distance_to(cell) < PASSAGE_SPACING):
+				continue
+			for side: Vector2i in [Vector2i(-1, 0), Vector2i(0, -1)]:
+				var along := Vector2i(side.y, side.x)
+				if is_floor(cell + side) or not is_floor(cell - side):
+					continue
+				if strict and (is_floor(cell + side + along) or is_floor(cell + side - along) \
+						or not is_floor(cell + along) or not is_floor(cell - along)):
+					continue
+				var distance := Vector2(i, j).length()
+				if distance < best_distance:
+					best = [cell, side]
+					best_distance = distance
+	return best
 
 
 func _room_distance(a: int, b: int) -> float:

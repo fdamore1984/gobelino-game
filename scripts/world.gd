@@ -19,8 +19,10 @@ extends Node2D
 ## Le posizioni di personaggi e oggetti sono a terra (il piano x, y);
 ## l'altezza del terreno sotto di loro (elevation_at) li disegna più in
 ## alto. Il terreno viene generato e disegnato a blocchi di rombi attorno
-## alla telecamera; i blocchi più alti di quelli dietro vengono ridisegnati
-## tra i personaggi, così coprono chi ci passa dietro.
+## alla telecamera; i blocchi più alti di quelli dietro vengono disegnati
+## tra i personaggi (non col resto del terreno), così coprono chi ci passa
+## dietro; quelli che coprono il giocatore, e tutti quelli attorno,
+## diventano trasparenti finché resta lì dietro.
 ##
 ## Prestazioni: i dati del terreno (livelli, rampe, ostacoli) di una regione
 ## grande attorno al giocatore sono generati in anticipo (begin_region,
@@ -41,6 +43,16 @@ const PREFETCH_MARGIN := 380.0
 const KEEP_MARGIN := 320.0
 ## I dati fuori dalla regione si dimenticano solo oltre questi rombi in memoria.
 const FORGET_THRESHOLD := 110000
+## Blocchi davanti al giocatore: del tutto trasparenti entro OCCLUSION_INNER
+## pixel dal suo corpo sullo schermo, di nuovo pieni oltre OCCLUSION_OUTER.
+const OCCLUSION_INNER := 150.0
+const OCCLUSION_OUTER := 240.0
+## Altezza del corpo del giocatore sopra i piedi, dove si misura la distanza.
+const OCCLUSION_BODY := 30.0
+const OCCLUSION_FADE_SPEED := 5.0
+## Solo i blocchi più alti dei piedi di almeno tanto coprono davvero il corpo
+## (i gradini bassi restano pieni).
+const OCCLUSION_MIN_HEIGHT := 40.0
 ## Gli ostacoli vengono messi solo in questa parte del rombo, lontano dai bordi.
 const PLACE_MIN := 14.0
 const PLACE_MAX := 44.0
@@ -135,6 +147,8 @@ var _maintain_timer := 0.0
 var _blocking_cell := Vector2i.ZERO
 var _has_blocking_cell := false
 var _wall_glow := WallGlow.new()
+## Blocchi resi trasparenti perché coprono il giocatore.
+var _faded_blocks := {}
 
 
 func _ready() -> void:
@@ -239,6 +253,63 @@ func _process(delta: float) -> void:
 		var chunk: Vector2i = _view_queue.pop_back()
 		if not _chunk_views.has(chunk):
 			_show_chunk(chunk)
+	_update_occlusion(delta)
+
+
+## I blocchi davanti al giocatore che lo coprirebbero diventano
+## trasparenti in tutta la zona attorno a lui: si vede cosa succede dietro
+## pareti, muri del sotterraneo e montagne.
+func _update_occlusion(delta: float) -> void:
+	var hero := player as Player
+	if hero == null:
+		return
+	var feet := hero.position
+	var altitude := hero.altitude()
+	var body := feet - Vector2(0, altitude + OCCLUSION_BODY)
+	var wanted := {}
+	var center := _chunk_of(cell_at(feet))
+	for i in range(-1, 3):
+		for j in range(-1, 3):
+			var entry: Variant = _chunk_views.get(center + Vector2i(i, j))
+			if entry == null:
+				continue
+			for node: Node in entry["nodes"]:
+				var block := node as TerrainBlock
+				if block and _covers(block, feet, altitude, body):
+					wanted[block] = true
+	for block: TerrainBlock in wanted:
+		_faded_blocks[block] = true
+	for key: Variant in _faded_blocks.keys():
+		# I blocchi dei pezzi tolti nel frattempo non esistono più.
+		if not is_instance_valid(key):
+			_faded_blocks.erase(key)
+			continue
+		var block := key as TerrainBlock
+		var target := 0.0
+		if not wanted.has(block):
+			target = 1.0
+		elif OCCLUSION_OUTER > OCCLUSION_INNER:
+			target = smoothstep(OCCLUSION_INNER, OCCLUSION_OUTER, _block_distance(block, body))
+		block.modulate.a = move_toward(block.modulate.a, target, OCCLUSION_FADE_SPEED * delta)
+		if target >= 1.0 and block.modulate.a >= 1.0:
+			_faded_blocks.erase(block)
+
+
+## Il blocco è disegnato dopo il giocatore (gli sta davanti), è più alto
+## dei suoi piedi ed è vicino al suo corpo sullo schermo.
+func _covers(block: TerrainBlock, feet: Vector2, altitude: float, body: Vector2) -> bool:
+	if block.position.y <= feet.y or _top_height(block.cell) < altitude + OCCLUSION_MIN_HEIGHT:
+		return false
+	return _block_distance(block, body) < OCCLUSION_OUTER
+
+
+## Distanza sullo schermo tra il punto e la parete del blocco (dalla cima
+## alla base, al centro del rombo).
+func _block_distance(block: TerrainBlock, point: Vector2) -> float:
+	var ground := cell_center(block.cell)
+	var top := ground - Vector2(0, _top_height(block.cell))
+	var y := clampf(point.y, top.y, ground.y)
+	return point.distance_to(Vector2(ground.x, y))
 
 
 # --- Coordinate --------------------------------------------------------
@@ -740,6 +811,17 @@ func free_position_near(point: Vector2, radius: float) -> Vector2:
 	return point
 
 
+## Il punto più vicino (cercando a spirale) in cui si può stare: per
+## esempio quando un salvataggio cade dentro una montagna.
+func safe_position_near(point: Vector2) -> Vector2:
+	for ring in range(1, 40):
+		for k in ring * 6:
+			var candidate := point + Vector2.from_angle(TAU * k / (ring * 6)) * ring * CELL * 0.5
+			if not is_barrier(cell_at(candidate)) and ground_obstacle_at(candidate, 20.0).is_empty():
+				return free_position_near(candidate, 22.0)
+	return point
+
+
 # --- Generazione degli ostacoli ---------------------------------------
 
 func _obstacles_of(chunk: Vector2i) -> Array:
@@ -1025,10 +1107,13 @@ func _covers_behind(cell: Vector2i) -> bool:
 # --- Disegno dei blocchi ----------------------------------------------
 
 func draw_chunk(canvas: CanvasItem, chunk: Vector2i, offset: Vector2) -> void:
-	# Da dietro in avanti: prima i rombi con u + v più piccolo.
+	# Da dietro in avanti: prima i rombi con u + v più piccolo. I blocchi che
+	# coprono chi sta dietro li disegna il loro TerrainBlock, tra i personaggi.
 	for depth in 2 * CHUNK_CELLS - 1:
 		for i in range(maxi(0, depth - CHUNK_CELLS + 1), mini(depth, CHUNK_CELLS - 1) + 1):
-			draw_cell(canvas, chunk * CHUNK_CELLS + Vector2i(i, depth - i), offset)
+			var cell := chunk * CHUNK_CELLS + Vector2i(i, depth - i)
+			if entities == null or not _covers_behind(cell):
+				draw_cell(canvas, cell, offset)
 
 
 ## Un blocco: pareti davanti (dove il vicino è più basso) e faccia
@@ -1195,6 +1280,7 @@ func set_dungeon(value: Dungeon) -> void:
 	for chunk: Vector2i in _chunk_views.keys():
 		_hide_chunk(chunk)
 	_view_queue.clear()
+	_faded_blocks.clear()
 	_chunk_obstacles.clear()
 	for cache: Dictionary in [_level_cache, _ramp_cache, _path_cache, _kind_cache]:
 		cache.clear()
@@ -1230,15 +1316,40 @@ func _dungeon_obstacles(chunk: Vector2i) -> Array:
 				"collision": radius * float(rock["collision"]), "solid": true, "slow": 1.0, "damage": 0,
 				"damage_interval": 0.0, "variant": rng.randi(),
 			})
-	# Scala d'arrivo (riporta in superficie), scala per scendere e casse.
-	var specials := [["exit", dungeon.arrival], ["stairs", dungeon.stairs]]
-	for chest in dungeon.chests:
-		specials.append(["chest", chest])
-	for special: Array in specials:
+	# Passaggi nelle pareti: verso la superficie (all'arrivo) e verso il
+	# piano sotto; poi le casse.
+	for special: Array in [["exit", dungeon.arrival, dungeon.arrival_side], ["stairs", dungeon.stairs, dungeon.stairs_side]]:
 		var cell: Vector2i = special[1]
 		if cell.x >= 0 and _chunk_of(cell) == chunk:
-			result.append(make_obstacle(special[0], cell_center(cell)))
+			result.append(make_wall_obstacle(special[0], cell, special[2]))
+	for chest in dungeon.chests:
+		if _chunk_of(chest) == chunk:
+			result.append(make_obstacle("chest", cell_center(chest)))
 	return result
+
+
+## Passaggio in una parete (caverna, scale, uscita): sul lato side del
+## rombo (verso la roccia), poco davanti alla parete, con la sua direzione.
+func make_wall_obstacle(type_id: String, cell: Vector2i, side: Vector2i) -> Dictionary:
+	var corners := cell_corners(cell)
+	var a := corners[0]
+	var b := corners[3] if side == Vector2i(-1, 0) else corners[1]
+	var data := make_obstacle(type_id, _wall_mouth(cell, side))
+	data["edge"] = (b - a).normalized()
+	return data
+
+
+func _wall_mouth(cell: Vector2i, side: Vector2i) -> Vector2:
+	var corners := cell_corners(cell)
+	var b := corners[3] if side == Vector2i(-1, 0) else corners[1]
+	return ((corners[0] + b) / 2.0).lerp(cell_center(cell), 0.25)
+
+
+## Punto davanti a un passaggio nella parete, a quella distanza dal centro
+## del rombo: è lì che si arriva.
+func in_front_of_wall(cell: Vector2i, side: Vector2i, distance: float) -> Vector2:
+	var center := cell_center(cell)
+	return center + (center - _wall_mouth(cell, side)).normalized() * distance
 
 
 ## Ostacolo speciale (cassa, caverna, scale, uscita) al punto dato, con le
@@ -1319,13 +1430,7 @@ func _cave_in_chunk(chunk: Vector2i) -> Dictionary:
 						or _random_unit([seed_value, cell.x, cell.y, side.x, "cave"]) >= chance:
 					continue
 				# La parete della montagna è il lato del blocco che dà sulla montagna.
-				var corners := cell_corners(cell)
-				var a := corners[0]
-				var b := corners[3] if side == Vector2i(-1, 0) else corners[1]
-				var at := ((a + b) / 2.0).lerp(cell_center(cell), 0.25)
-				var cave := make_obstacle("cave", at)
-				cave["edge"] = (b - a).normalized()
-				return cave
+				return make_wall_obstacle("cave", cell, side)
 	return {}
 
 

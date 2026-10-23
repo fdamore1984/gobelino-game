@@ -18,6 +18,9 @@
   sintetizzati in `scripts/sfx.gd`, finché non arrivano gli asset definitivi.
 - **Verifica prima di pubblicare**: import e avvio senza errori né warning
   con Godot 4.4.1, test delle meccaniche toccate, screenshot di controllo.
+- **Salvataggi compatibili**: ogni modifica deve lasciare caricabili i
+  salvataggi delle versioni precedenti (campi nuovi letti con un valore
+  predefinito, niente campi rinominati o tolti senza conversione).
 - **Merge automatico**: ogni modifica passa da una Pull Request verso `main`;
   quando la CI della PR è verde (export Linux: per ora si pubblica solo per Linux / SteamOS) si fa il
   merge senza chiedere conferma, poi si verifica il caricamento su itch.io

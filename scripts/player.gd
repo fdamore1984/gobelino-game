@@ -17,6 +17,9 @@ extends Node2D
 ## combinano; schivando mentre si corre si fa una scivolata, durante la
 ## quale si può attaccare (anche in combo), schivare, saltare o parare.
 ## Una parata perfetta potenzia gli attacchi per qualche secondo.
+## Con R3 si aggancia il nemico più vicino: il personaggio lo guarda sempre,
+## gli attacchi e la palla di fuoco vanno verso di lui; premendo di nuovo si
+## passa al nemico vicino successivo.
 ## Attacchi a terra, che colpiscono tutti i nemici attorno: un colpo
 ## potente subito dopo una combo di colpi normali fa saltare e colpire il
 ## terreno (anche tutti i colpi potenti concatenati dopo); attaccando in
@@ -95,6 +98,13 @@ const SLAM_RADIUS := {"leap": 140.0, "plunge": 105.0, "dash": 165.0}
 const SLAM_LEAP_DAMAGE_FACTOR := 0.8
 const PLUNGE_DAMAGE_FACTOR := 1.6
 const DASH_SLAM_DAMAGE_FACTOR := 2.4
+## Aggancio del bersaglio: nemici entro LOCK_RANGE; oltre LOCK_BREAK_RANGE
+## si sgancia. La telecamera si sposta verso il bersaglio di questa parte
+## della distanza, fino a LOCK_CAMERA_MAX.
+const LOCK_RANGE := 650.0
+const LOCK_BREAK_RANGE := 900.0
+const LOCK_CAMERA_SHARE := 0.3
+const LOCK_CAMERA_MAX := 170.0
 ## All'impatto la telecamera trema, sempre meno.
 const CAMERA_SHAKE := 9.0
 const CAMERA_SHAKE_DECAY := 4.0
@@ -308,6 +318,9 @@ var _slam_kind := ""
 var _slam_landed := false
 ## Tremolio della telecamera (0-1).
 var _shake := 0.0
+## Nemico agganciato (null se nessuno) e il suo mirino.
+var lock_target: Enemy
+var _lock_marker := LockMarker.new()
 ## Carica del colpo potente (0-1) e se il tasto è ancora tenuto premuto.
 var _charge := 0.0
 var _charging := false
@@ -321,6 +334,8 @@ var ground_elevation := 0.0
 
 
 func _ready() -> void:
+	if not _lock_marker.is_inside_tree():
+		add_child(_lock_marker)
 	if not _torch.is_inside_tree():
 		_torch.texture = LightTexture.get_texture()
 		_torch.color = TORCH_COLOR
@@ -363,6 +378,10 @@ func _physics_process(delta: float) -> void:
 			_drink_mana_potion()
 		if Input.is_action_just_pressed("spell"):
 			_cast_fireball(input)
+	if _state != State.DEAD:
+		if Input.is_action_just_pressed("lock_on"):
+			_cycle_lock()
+		_update_lock()
 	if Input.is_action_just_pressed("torch") and _state != State.DEAD:
 		torch_on = not torch_on
 		_torch.enabled = torch_on
@@ -372,6 +391,7 @@ func _physics_process(delta: float) -> void:
 		State.NORMAL:
 			if input != Vector2.ZERO:
 				_target_facing = input.normalized()
+			_face_lock()
 			var running := Input.is_action_pressed("run") and input != Vector2.ZERO
 			_velocity = _accelerate(_velocity, input * (run_speed() if running else walk_speed()), delta)
 			if Input.is_action_just_pressed("jump"):
@@ -406,6 +426,7 @@ func _physics_process(delta: float) -> void:
 		State.PARRY:
 			if input != Vector2.ZERO:
 				_target_facing = input.normalized()
+			_face_lock()
 			_velocity = _accelerate(_velocity, input * walk_speed() * PARRY_SPEED_FACTOR, delta)
 			if Input.is_action_just_pressed("dodge") and _dodge_cooldown == 0.0:
 				_start_dodge(dodge_input)
@@ -501,6 +522,9 @@ func _physics_process(delta: float) -> void:
 	if _camera:
 		_camera_height = lerpf(_camera_height, -ground_elevation, minf(CAMERA_HEIGHT_FOLLOW * delta, 1.0))
 		var ahead := (_velocity * CAMERA_LOOK_AHEAD).limit_length(CAMERA_LOOK_AHEAD_MAX)
+		if lock_target:
+			# Agganciato: la telecamera tiene in vista anche il bersaglio.
+			ahead = ((lock_target.global_position - global_position) * LOCK_CAMERA_SHARE).limit_length(LOCK_CAMERA_MAX)
 		_look_ahead = _look_ahead.lerp(ahead, minf(CAMERA_LOOK_AHEAD_FOLLOW * delta, 1.0))
 		_camera.position = Vector2(0, _camera_height) + _look_ahead
 		# Il tremolio va sullo scostamento, che non viene ammorbidito.
@@ -733,6 +757,57 @@ func teleport(at: Vector2) -> void:
 		_camera.reset_smoothing()
 
 
+## Aggancia il nemico più vicino; se ce n'è già uno passa al successivo
+## per distanza, e se non ce ne sono altri sgancia.
+func _cycle_lock() -> void:
+	var candidates := _lock_candidates()
+	if candidates.is_empty():
+		lock_target = null
+	elif lock_target == null or not candidates.has(lock_target):
+		lock_target = candidates[0]
+	elif candidates.size() == 1:
+		lock_target = null
+	else:
+		lock_target = candidates[(candidates.find(lock_target) + 1) % candidates.size()]
+	_lock_marker.target = lock_target
+	Sfx.play_ui("ui_move" if lock_target else "ui_confirm")
+
+
+## Nemici vivi entro LOCK_RANGE, dal più vicino.
+func _lock_candidates() -> Array[Enemy]:
+	var result: Array[Enemy] = []
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as Enemy
+		if enemy and not enemy.is_dead() and enemy.global_position.distance_to(global_position) <= LOCK_RANGE:
+			result.append(enemy)
+	result.sort_custom(func(a: Enemy, b: Enemy) -> bool:
+		return a.global_position.distance_squared_to(global_position) < b.global_position.distance_squared_to(global_position))
+	return result
+
+
+## Se il bersaglio muore si passa al più vicino; se si allontana troppo si sgancia.
+func _update_lock() -> void:
+	if lock_target == null:
+		return
+	if not is_instance_valid(lock_target) or lock_target.is_dead():
+		var candidates := _lock_candidates()
+		lock_target = candidates[0] if not candidates.is_empty() else null
+	elif lock_target.global_position.distance_to(global_position) > LOCK_BREAK_RANGE:
+		lock_target = null
+	_lock_marker.target = lock_target
+
+
+## Con un bersaglio agganciato si guarda verso di lui. Restituisce true se
+## c'è un bersaglio.
+func _face_lock() -> bool:
+	if lock_target == null:
+		return false
+	var to_target := lock_target.global_position - global_position
+	if to_target.length() > 1.0:
+		_target_facing = to_target.normalized()
+	return true
+
+
 ## Stato da salvare: livello, caratteristiche, potenziamenti e inventario.
 func save_state() -> Dictionary:
 	return {
@@ -747,36 +822,48 @@ func save_state() -> Dictionary:
 
 
 ## Ripristina lo stato salvato (i numeri dal JSON arrivano come decimali).
+## I campi mancanti (salvataggi di versioni precedenti) restano come sono.
 func load_state(data: Dictionary) -> void:
-	level = int(data["level"])
-	experience = int(data["experience"])
-	_base_max_health = int(data["base_max_health"])
-	_base_max_mana = float(data["base_max_mana"])
-	potions = int(data["potions"])
-	max_potions = int(data["max_potions"])
-	mana_potions = int(data["mana_potions"])
-	max_mana_potions = int(data["max_mana_potions"])
-	spell_bonus = float(data["spell_bonus"])
-	max_combo_hits = int(data["max_combo_hits"])
-	max_heavy_chain = int(data["max_heavy_chain"])
-	max_chained_dodges = int(data["max_chained_dodges"])
-	max_jumps = int(data["max_jumps"])
-	run_speed_bonus = float(data["run_speed_bonus"])
-	shield_cooldown_max = float(data["shield_cooldown_max"])
-	torch_on = bool(data["torch_on"])
+	level = int(data.get("level", level))
+	experience = int(data.get("experience", experience))
+	_base_max_health = int(data.get("base_max_health", _base_max_health))
+	_base_max_mana = float(data.get("base_max_mana", _base_max_mana))
+	potions = int(data.get("potions", potions))
+	max_potions = int(data.get("max_potions", max_potions))
+	mana_potions = int(data.get("mana_potions", mana_potions))
+	max_mana_potions = int(data.get("max_mana_potions", max_mana_potions))
+	spell_bonus = float(data.get("spell_bonus", spell_bonus))
+	max_combo_hits = int(data.get("max_combo_hits", max_combo_hits))
+	max_heavy_chain = int(data.get("max_heavy_chain", max_heavy_chain))
+	max_chained_dodges = int(data.get("max_chained_dodges", max_chained_dodges))
+	max_jumps = int(data.get("max_jumps", max_jumps))
+	run_speed_bonus = float(data.get("run_speed_bonus", run_speed_bonus))
+	shield_cooldown_max = float(data.get("shield_cooldown_max", shield_cooldown_max))
+	torch_on = bool(data.get("torch_on", torch_on))
 	_torch.enabled = torch_on
 	upgrades_taken.clear()
-	for key: String in data["upgrades_taken"]:
-		upgrades_taken[key] = int(data["upgrades_taken"][key])
-	inventory.items.assign(data["items"])
+	var taken: Dictionary = data.get("upgrades_taken", {})
+	for key: String in taken:
+		upgrades_taken[key] = int(taken[key])
+	# Oggetti che questa versione non conosce più vengono scartati.
+	inventory.items.clear()
+	var known: Dictionary = Items.DATA.data["items"]
+	var kept := {}
+	var saved_items: Array = data.get("items", [])
+	for k in saved_items.size():
+		if known.has(saved_items[k]):
+			kept[k] = inventory.items.size()
+			inventory.items.append(saved_items[k])
 	inventory.equipped.clear()
-	for slot: String in data["equipped"]:
-		inventory.equipped[slot] = int(data["equipped"][slot])
-	inventory.gold = int(data["gold"])
-	inventory.learned = (data["learned"] as Dictionary).duplicate()
+	var equipped: Dictionary = data.get("equipped", {})
+	for slot: String in equipped:
+		if kept.has(int(equipped[slot])):
+			inventory.equipped[slot] = kept[int(equipped[slot])]
+	inventory.gold = int(data.get("gold", inventory.gold))
+	inventory.learned = (data.get("learned", {}) as Dictionary).duplicate()
 	_refresh_stats()
-	health = clampi(int(data["health"]), 1, max_health)
-	mana = clampf(float(data["mana"]), 0.0, max_mana)
+	health = clampi(int(data.get("health", max_health)), 1, max_health)
+	mana = clampf(float(data.get("mana", max_mana)), 0.0, max_mana)
 	health_changed.emit(health, max_health)
 	experience_changed.emit(experience, experience_needed(), level)
 
@@ -949,9 +1036,12 @@ func _begin_attack(input: Vector2) -> void:
 	_queued_attack = ""
 	_attack_resolved = false
 	_combo_timer = 0.0
-	# Si attacca subito nella direzione indicata, senza aspettare la rotazione.
+	# Si attacca subito nella direzione indicata (o verso il bersaglio
+	# agganciato), senza aspettare la rotazione.
 	if input != Vector2.ZERO:
 		_target_facing = input.normalized()
+		facing = _target_facing
+	if _face_lock():
 		facing = _target_facing
 	_change_state(State.ATTACK)
 
@@ -979,6 +1069,8 @@ func _start_slam(kind: String, input: Vector2) -> void:
 		_target_facing = _dodge_direction
 	elif input != Vector2.ZERO:
 		_target_facing = input.normalized()
+	if kind != "dash":
+		_face_lock()
 	facing = _target_facing
 	if kind == "leap":
 		_height_velocity = SLAM_LEAP_SPEED
@@ -1140,6 +1232,9 @@ func _cast_fireball(input: Vector2) -> void:
 	_spell_cooldown = SPELL_COOLDOWN
 	var fireball := Fireball.new()
 	fireball.direction = input.normalized() if input != Vector2.ZERO else facing
+	if lock_target:
+		fireball.target = lock_target
+		fireball.direction = (lock_target.global_position - global_position).normalized()
 	fireball.damage = spell_damage()
 	fireball.altitude = ground_elevation
 	fireball.position = position + fireball.direction * RADIUS

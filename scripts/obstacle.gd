@@ -317,9 +317,9 @@ func _draw_merchant() -> void:
 	draw_circle(board + Vector2(7, -7), 1.5 + pulse * 1.5, Color(1.0, 0.97, 0.7, 0.5 + 0.5 * pulse))
 
 
-## Ingresso della caverna: un arco buio nella parete della montagna, con
-## il bordo di pietre; chiuso da massi se il sotterraneo è già completato.
-func _draw_cave() -> void:
+## Arco nella parete (caverna, scale, uscita): bordo di pietre e interno
+## del colore dato. Restituisce i punti dell'interno.
+func _draw_arch(inside: Color) -> PackedVector2Array:
 	var width := radius * 1.1
 	var height := radius * 2.0
 	var arch := PackedVector2Array()
@@ -330,10 +330,25 @@ func _draw_cave() -> void:
 		rim.append(_edge * cos(angle) * (width + 7.0) + Vector2(0, -sin(angle) * (height + 7.0)))
 	var stone := _color(1)
 	draw_colored_polygon(rim, stone.darkened(0.2))
-	draw_colored_polygon(arch, _color(0))
+	draw_colored_polygon(arch, inside)
 	for k in 7:
 		var angle := PI * k / 6.0
 		draw_circle(_edge * cos(angle) * (width + 4.0) + Vector2(0, -sin(angle) * (height + 4.0)), 6.0, stone)
+	return arch
+
+
+## Direzione dalla parete verso chi guarda (sul pavimento davanti all'arco).
+func _out_of_wall() -> Vector2:
+	var normal := _edge.orthogonal()
+	return normal if normal.y > 0.0 else -normal
+
+
+## Ingresso della caverna: un arco buio nella parete della montagna;
+## chiuso da massi se il sotterraneo è già completato.
+func _draw_cave() -> void:
+	_draw_arch(_color(0))
+	var width := radius * 1.1
+	var height := radius * 2.0
 	if World.current and World.current.is_cave_cleared(position):
 		var rubble := _type_color("cleared")
 		for k in 6:
@@ -344,34 +359,33 @@ func _draw_cave() -> void:
 	draw_circle(Vector2(0, -height * 0.35), width * 0.35, Color(0.4, 0.5, 0.7, 0.08 + 0.06 * pulse))
 
 
-## Scala che scende al piano sotto: un buco nel pavimento con i gradini e
-## una luce fredda che pulsa dal fondo.
+## Passaggio che scende al piano sotto: un arco buio nella parete, con i
+## gradini che spariscono nel buio e una luce fredda che pulsa dal fondo.
 func _draw_stairs() -> void:
 	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 350.0)
-	draw_set_transform(Vector2(0, -_lift), 0.0, Vector2(1.0, 0.5))
-	draw_circle(Vector2.ZERO, radius * 1.35, _color(1))
+	_draw_arch(_color(0))
+	var width := radius * 1.1
+	var height := radius * 2.0
+	var stone := _color(1)
 	for k in 4:
-		draw_circle(Vector2(0, k * 4.0), radius * (1.15 - k * 0.22), _color(1).darkened(0.15 + k * 0.18))
-	draw_circle(Vector2(0, 16.0), radius * 0.35, _color(0))
-	draw_circle(Vector2(0, 16.0), radius * 0.45, Color(_type_color("glow"), 0.15 + 0.2 * pulse))
-	draw_set_transform(Vector2(0, -_lift))
+		var y := -3.0 - k * 7.0
+		var w := width * (0.9 - k * 0.18)
+		draw_line(_edge * -w + Vector2(0, y), _edge * w + Vector2(0, y), stone.darkened(0.25 + k * 0.15), 4.0)
+	draw_circle(Vector2(0, -height * 0.55), width * 0.4, Color(_type_color("glow"), 0.12 + 0.18 * pulse))
 
 
-## Uscita verso la superficie: gradini di pietra che salgono e un fascio di
-## luce calda che scende dall'alto.
+## Uscita verso la superficie: un arco nella parete pieno di luce calda,
+## che si allunga sul pavimento davanti.
 func _draw_exit() -> void:
 	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 400.0)
 	var light := _type_color("glow")
-	draw_set_transform(Vector2(0, -_lift), 0.0, Vector2(1.0, 0.5))
-	draw_circle(Vector2.ZERO, radius * 1.4, Color(light, 0.18 + 0.1 * pulse))
+	var out := _out_of_wall()
+	draw_set_transform(Vector2(0, -_lift) + out * radius * 0.8, 0.0, Vector2(1.0, 0.5))
+	draw_circle(Vector2.ZERO, radius * 1.2, Color(light, 0.12 + 0.08 * pulse))
 	draw_set_transform(Vector2(0, -_lift))
-	var stone := _color(1)
-	for k in 3:
-		var y := -k * 9.0
-		var w := radius * (1.0 - k * 0.22)
-		draw_rect(Rect2(-w, y - 9.0, w * 2.0, 9.0), stone.lightened(k * 0.08))
-	var beam := PackedVector2Array([Vector2(-radius * 0.7, -20), Vector2(radius * 0.7, -20), Vector2(radius * 0.4, -radius * 5.0), Vector2(-radius * 0.4, -radius * 5.0)])
-	draw_colored_polygon(beam, Color(light, 0.12 + 0.08 * pulse))
+	_draw_arch(Color(light, 0.85))
+	var height := radius * 2.0
+	draw_circle(Vector2(0, -height * 0.45), radius * 0.6, Color(1, 1, 1, 0.25 + 0.2 * pulse))
 
 
 ## Bagliore dietro l'ostacolo (front = false) e anello luminoso alla base
