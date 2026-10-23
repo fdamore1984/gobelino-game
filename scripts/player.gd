@@ -322,6 +322,8 @@ var _queued_attack := ""
 var _attack_resolved := false
 ## Velocità dell'attacco in corso: resta quella con cui è iniziato.
 var _attack_speed := 1.0
+## C'è un elemento con cui interagire qui vicino (lo decide Game).
+var can_interact := false
 ## Cresce a ogni attacco di spada (non gli attacchi a terra): i nemici lo
 ## guardano per decidere se alzare la guardia (vedi Enemy).
 var attack_serial := 0
@@ -440,7 +442,7 @@ func _physics_process(delta: float) -> void:
 			# In aria si avanza un po' più piano: il salto porta meno lontano.
 			var air := AIR_SPEED_FACTOR if is_airborne() else 1.0
 			_velocity = _accelerate(_velocity, input * (run_speed() if running else walk_speed()) * air, delta)
-			if Input.is_action_just_pressed("jump"):
+			if _jump_pressed():
 				_jump()
 			if Input.is_action_just_pressed("dodge"):
 				if running and not is_airborne():
@@ -496,7 +498,7 @@ func _physics_process(delta: float) -> void:
 			elif Input.is_action_just_pressed("dodge") and _dodges_used < max_chained_dodges \
 					and _state_time >= DODGE_CHAIN_MIN_TIME:
 				_chain_dodge(dodge_input)
-			elif Input.is_action_just_pressed("jump"):
+			elif _jump_pressed():
 				# Salto e schivata si combinano: la schivata continua in aria come scatto.
 				_jump()
 				_air_dash = true
@@ -529,7 +531,7 @@ func _physics_process(delta: float) -> void:
 				_start_heavy(input)
 			elif Input.is_action_just_pressed("dodge") and _dodge_cooldown == 0.0:
 				_start_dodge(dodge_input)
-			elif Input.is_action_just_pressed("jump"):
+			elif _jump_pressed():
 				_change_state(State.NORMAL)
 				_jump()
 			elif Input.is_action_just_pressed("parry"):
@@ -822,6 +824,12 @@ func is_dead() -> bool:
 ## Risatina da goblin, per esempio dopo aver sconfitto un boss.
 func laugh() -> void:
 	Sfx.play("giggle", global_position)
+
+
+## Salto richiesto: vicino a un elemento con cui interagire, il tasto che
+## salta e interagisce insieme (A) serve a interagire (vedi Game).
+func _jump_pressed() -> bool:
+	return Input.is_action_just_pressed("jump") and not (can_interact and Input.is_action_just_pressed("interact"))
 
 
 ## L'attacco è in corso (i nemici possono alzare la guardia).

@@ -8,13 +8,17 @@ extends CanvasLayer
 
 ## Il giocatore ha scelto un potenziamento (vedi Player.apply_upgrade).
 signal upgrade_chosen(upgrade: String)
+## Il suggerimento "Interact" è stato toccato (o cliccato).
+signal interact_pressed
 
 ## Appena compare il pannello i pulsanti restano disattivati per un
 ## attimo, così chi sta premendo i tasti di attacco non sceglie per sbaglio.
 const LEVEL_UP_INPUT_DELAY := 0.5
-const POWER_UP_ICON_SIZE := 28.0
+const POWER_UP_ICON_SIZE := 32.0
 const CARD_ICON_SIZE := 64.0
-const COLOR_POWER_UPS_TITLE := Color(1, 1, 1, 0.7)
+const COLOR_POWER_UPS_TITLE := Color(1, 1, 1, 0.85)
+const POWER_UPS_FONT_SIZE := 19
+const COLOR_POWER_UPS_PANEL := Color(0.05, 0.07, 0.05, 0.8)
 ## Per quanto resta il messaggio di fine sfida.
 const CHALLENGE_FLASH_TIME := 3.5
 ## A ogni livello si sceglie tra questi potenziamenti, presi a caso.
@@ -45,6 +49,7 @@ var _boss_bar := BossBar.new()
 var _loading := LoadingOverlay.new()
 var _clock := DayClock.new()
 var _vignette := LowHealthVignette.new()
+var _interact := InteractPrompt.new()
 ## Menù di pausa: Game si collega ai suoi segnali (salva, esci).
 var pause_menu := PauseMenu.new()
 @onready var _message: Label = %Message
@@ -78,6 +83,8 @@ var _card_values := {}
 ## Ultimo contenuto della lista dei potenziamenti attivi, per ricostruirla
 ## solo quando cambia.
 var _power_ups_shown := []
+## Pannello scuro dietro la lista dei potenziamenti, perché si legga su ogni terreno.
+var _power_ups_panel := PanelContainer.new()
 ## Tempo rimasto del messaggio di fine sfida: intanto gli altri testi della sfida aspettano.
 var _challenge_flash := 0.0
 
@@ -97,9 +104,14 @@ func _ready() -> void:
 	# Bordi rossi con poca vita, sotto tutto il resto dell'interfaccia.
 	add_child(_vignette)
 	move_child(_vignette, 0)
+	# Il suggerimento "Interact" sta sopra il gioco, sotto i pannelli.
+	add_child(_interact)
+	move_child(_interact, 1)
+	_interact.pressed.connect(interact_pressed.emit)
 	# Pannelli sotto tutto il resto (potenziamenti, inventario, messaggi).
 	add_child(_status)
 	move_child(_status, 0)
+	_build_power_ups_panel()
 	add_child(_actions)
 	move_child(_actions, 1)
 	_actions.visible = not Platform.use_touch_controls()
@@ -148,12 +160,13 @@ func _update_power_ups() -> void:
 	_power_ups_shown = rows
 	for child in _power_ups.get_children():
 		child.queue_free()
+	_power_ups_panel.visible = not rows.is_empty()
 	if rows.is_empty():
 		return
 	var title := Label.new()
 	title.text = tr("POWERUPS_TITLE")
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	title.add_theme_font_size_override("font_size", 16)
+	title.add_theme_font_size_override("font_size", POWER_UPS_FONT_SIZE - 2)
 	title.add_theme_color_override("font_color", COLOR_POWER_UPS_TITLE)
 	_power_ups.add_child(title)
 	for row: Array in rows:
@@ -161,16 +174,39 @@ func _update_power_ups() -> void:
 		line.alignment = BoxContainer.ALIGNMENT_END
 		var label := Label.new()
 		label.text = row[1]
-		label.add_theme_font_size_override("font_size", 17)
-		label.add_theme_color_override("font_color", UpgradeIcon.color_of(row[0]).lerp(Color.WHITE, 0.5))
-		label.add_theme_constant_override("outline_size", 4)
-		label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+		label.add_theme_font_size_override("font_size", POWER_UPS_FONT_SIZE)
+		label.add_theme_color_override("font_color", UpgradeIcon.color_of(row[0]).lerp(Color.WHITE, 0.65))
+		label.add_theme_constant_override("outline_size", 5)
+		label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
 		line.add_child(label)
 		var icon := UpgradeIcon.new()
 		icon.kind = row[0]
 		icon.custom_minimum_size = Vector2(POWER_UP_ICON_SIZE, POWER_UP_ICON_SIZE)
 		line.add_child(icon)
 		_power_ups.add_child(line)
+
+
+## Mette la lista dei potenziamenti attivi su un pannello scuro, allineato
+## a destra sotto la minimappa, che si allarga verso sinistra con il testo.
+func _build_power_ups_panel() -> void:
+	var style := StyleBoxFlat.new()
+	style.bg_color = COLOR_POWER_UPS_PANEL
+	style.border_color = Color(1, 1, 1, 0.14)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(10)
+	style.set_content_margin_all(10)
+	_power_ups_panel.add_theme_stylebox_override("panel", style)
+	_power_ups_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_power_ups_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_power_ups_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_power_ups_panel.offset_right = _power_ups.offset_right
+	_power_ups_panel.offset_left = _power_ups.offset_right
+	_power_ups_panel.offset_top = _power_ups.offset_top
+	_power_ups_panel.offset_bottom = _power_ups.offset_top
+	_power_ups_panel.visible = false
+	add_child(_power_ups_panel)
+	move_child(_power_ups_panel, _power_ups.get_index())
+	_power_ups.reparent(_power_ups_panel, false)
 
 
 ## Valore attuale dell'abilità migliorata da un potenziamento.
@@ -273,6 +309,15 @@ func show_loading(text: String, progress: float) -> void:
 
 func hide_loading() -> void:
 	_loading.visible = false
+
+
+## Suggerimento "Interact" sopra il punto del mondo dato.
+func show_interact(world_point: Vector2) -> void:
+	_interact.show_at(world_point)
+
+
+func hide_interact() -> void:
+	_interact.visible = false
 
 
 ## Barra della vita del boss (null per toglierla).

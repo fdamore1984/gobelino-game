@@ -4,13 +4,13 @@ extends Control
 ## cielo con il sole che lo attraversa di giorno e la luna di notte (vedi
 ## DayNight). Nel sotterraneo mostra ancora l'ora di fuori, più spento.
 
-const PANEL_SIZE := Vector2(84, 52)
+const PANEL_SIZE := Vector2(98, 60)
 ## Distanza dal bordo destro dello schermo: la minimappa più uno spazio.
-const RIGHT_MARGIN := 196.0 + 10.0
+const RIGHT_MARGIN := 216.0 + 10.0
 const TOP_MARGIN := 16.0
 ## Il sole si muove piano: basta ridisegnare ogni tanto.
 const REDRAW_INTERVAL := 0.25
-const ARC_RADIUS := 30.0
+const ARC_RADIUS := 35.0
 const COLOR_PANEL := Color(0.05, 0.07, 0.05, 0.72)
 const COLOR_BORDER := Color(1, 1, 1, 0.14)
 const COLOR_SKY_DAY := Color(0.38, 0.62, 0.92)

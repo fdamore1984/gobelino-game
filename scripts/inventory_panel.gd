@@ -3,10 +3,12 @@ extends Control
 ## Pannello dell'inventario (freccia su / I): monete, equipaggiamento
 ## indossato e oggetti raccolti, in una griglia in cui ogni oggetto occupa
 ## una casella; quando non ci stanno tutti la griglia scorre (levetta,
-## croce, rotellina o trascinando col dito). Il pulsante sopra la griglia
-## cambia l'ordine: come sono stati trovati, per potenza o per valore. Con
-## A (o clic) si indossa o toglie l'equipaggiamento, si legge un libro o si
-## beve una pozione; B, Esc o di nuovo I chiudono. Mentre è aperto il gioco
+## croce, rotellina o trascinando col dito). R3 (o C, o toccando il
+## pulsante sopra la griglia) cambia l'ordine: come sono stati trovati, per
+## potenza o per valore. Con A (o clic) si indossa o toglie
+## l'equipaggiamento, si legge un libro o si beve una pozione; per
+## l'equipaggiamento non indossato si vede il confronto con quello indossato
+## dello stesso tipo. B, Esc o di nuovo I chiudono. Mentre è aperto il gioco
 ## è in pausa.
 
 ## Casella del negozio (vedi ShopPanel), con il prezzo sotto l'icona.
@@ -66,10 +68,11 @@ func _ready() -> void:
 	_equipped.add_theme_constant_override("separation", 12)
 	box.add_child(_equipped)
 	_sort_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	# Non si seleziona con il controller (A lo cambierebbe due volte): si usa R3.
+	_sort_button.focus_mode = Control.FOCUS_NONE
 	_sort_button.custom_minimum_size = Vector2(260, 0)
 	_sort_button.add_theme_font_size_override("font_size", 17)
 	_sort_button.pressed.connect(_on_sort_pressed)
-	_sort_button.focus_entered.connect(Sfx.play_ui.bind("ui_move"))
 	box.add_child(_sort_button)
 	_grid.columns = COLUMNS
 	_grid.add_theme_constant_override("h_separation", CELL_GAP)
@@ -129,13 +132,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		close()
 		get_viewport().set_input_as_handled()
 		return
-	var first: Control = _buttons[0] if not _buttons.is_empty() else _sort_button
-	if UiNav.handle(event, get_viewport(), first) and is_inside_tree():
+	if event.is_action_pressed("lock_on"):
+		_on_sort_pressed()
+		get_viewport().set_input_as_handled()
+		return
+	if not _buttons.is_empty() and UiNav.handle(event, get_viewport(), _buttons[0]) and is_inside_tree():
 		get_viewport().set_input_as_handled()
 
 
-## Ricostruisce la griglia e rimette il fuoco sulla casella in quella
-## posizione (-1: sul pulsante dell'ordine).
+## Ricostruisce la griglia e rimette il fuoco sulla casella in quella posizione.
 func _rebuild(focus_index: int) -> void:
 	var inventory := player.inventory
 	_gold.text = tr("INVENTORY_GOLD") % inventory.gold
@@ -158,9 +163,8 @@ func _rebuild(focus_index: int) -> void:
 		_buttons.append(_slot_button(_order[place], place))
 	_empty.visible = _buttons.is_empty()
 	_scroll.visible = not _buttons.is_empty()
-	if _buttons.is_empty() or focus_index < 0:
+	if _buttons.is_empty():
 		_details.text = ""
-		_sort_button.grab_focus.call_deferred()
 		return
 	var target := _buttons[clampi(focus_index, 0, _buttons.size() - 1)]
 	target.grab_focus.call_deferred()
@@ -264,7 +268,7 @@ func _on_slot_pressed(index: int, place: int) -> void:
 func _on_sort_pressed() -> void:
 	_sort = SORTS[(SORTS.find(_sort) + 1) % SORTS.size()]
 	Sfx.play_ui("ui_confirm")
-	_rebuild(-1)
+	_rebuild(0)
 
 
 ## Nome, effetti e cosa fa A sull'oggetto selezionato.
@@ -279,7 +283,28 @@ func _show_details(index: int) -> void:
 		_:
 			if player.inventory.is_equipped(index):
 				action = "INVENTORY_USE_UNEQUIP"
-	_details.text = "%s\n%s" % [describe(id), tr(action)]
+	if Items.is_equipment(id) and not player.inventory.is_equipped(index):
+		_details.text = "%s\n%s\n%s" % [describe(id), _comparison(id), tr(action)]
+	else:
+		_details.text = "%s\n%s" % [describe(id), tr(action)]
+
+
+## Differenze rispetto all'oggetto dello stesso tipo indossato.
+func _comparison(id: String) -> String:
+	var slot := Items.category(id)
+	if not player.inventory.equipped.has(slot):
+		return tr("INVENTORY_COMPARE_NONE")
+	var worn := player.inventory.items[player.inventory.equipped[slot]]
+	var changes: Array[String] = []
+	for key: String in ["damage", "health", "speed", "mana", "spell"]:
+		var delta := Items.stat(id, key) - Items.stat(worn, key)
+		if is_zero_approx(delta):
+			continue
+		var shown := roundi(delta * 100.0) if key in ["damage", "speed", "spell"] else roundi(delta)
+		changes.append(tr("DELTA_" + key.to_upper()) % ("%+d" % shown))
+	if changes.is_empty():
+		changes.append(tr("INVENTORY_COMPARE_SAME"))
+	return tr("INVENTORY_COMPARE") % [tr(Items.name_key(worn)), ", ".join(changes)]
 
 
 ## Nome ed effetti dell'oggetto, tradotti.
