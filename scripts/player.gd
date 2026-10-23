@@ -832,6 +832,11 @@ func _jump_pressed() -> bool:
 	return Input.is_action_just_pressed("jump") and not (can_interact and Input.is_action_just_pressed("interact"))
 
 
+## Sta precipitando in un burrone.
+func is_falling() -> bool:
+	return _state == State.FALL
+
+
 ## L'attacco è in corso (i nemici possono alzare la guardia).
 func is_attacking() -> bool:
 	return _state == State.ATTACK

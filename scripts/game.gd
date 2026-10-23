@@ -43,8 +43,6 @@ const TOTEM_HINT_DISTANCE := 220.0
 ## Distanza dal mercante entro cui l'HUD suggerisce di toccarlo.
 const MERCHANT_HINT_DISTANCE := 260.0
 const AUTOSAVE_INTERVAL := 300.0
-## Se adesso non si può salvare (sfida in corso), si riprova dopo un po'.
-const AUTOSAVE_RETRY := 15.0
 const SAVE_VERSION := 1
 ## Tempo per frame dedicato a generare il territorio, in microsecondi.
 const REGION_STEP_USEC := 12000
@@ -81,6 +79,8 @@ var _challenge_enemies: Array[Enemy] = []
 var _interactable := {}
 var _dungeon_data: Dictionary = World.DATA.data["dungeon"]
 var _autosave_timer := AUTOSAVE_INTERVAL
+## Il salvataggio automatico è dovuto e aspetta il momento giusto.
+var _autosave_pending := false
 ## Caverna da cui si è scesi (Vector2.INF in superficie), quanti piani ha
 ## il suo sotterraneo e dove si torna in superficie.
 var _cave := Vector2.INF
@@ -317,7 +317,7 @@ func _enter_cave(at: Vector2) -> void:
 	Sfx.play("summon", _player.global_position, 0.7)
 	await _go_to_depth(1, Vector2.INF)
 	# Autosalvataggio entrando nella caverna.
-	_save(tr("SAVE_AUTO"))
+	_autosave_pending = true
 
 
 ## Seme del sotterraneo della caverna: sempre lo stesso per la stessa caverna.
@@ -439,18 +439,26 @@ func _drop_loot(at: Vector2, drops: Array[Array]) -> void:
 
 # --- Salvataggi --------------------------------------------------------
 
+## Salvataggio automatico ogni AUTOSAVE_INTERVAL secondi ed entrando in una
+## caverna: con le stesse regole del salvataggio dal menù per i nemici
+## vicini (si aspetta che non ce ne siano più), mai durante una sfida, da
+## morti, in aria o cadendo in un burrone. Intanto resta in attesa.
 func _update_autosave(delta: float) -> void:
 	_autosave_timer -= delta
-	if _autosave_timer > 0.0:
-		return
-	if _player.is_dead() or _challenge_arena != Vector2.INF:
-		_autosave_timer = AUTOSAVE_RETRY
-		return
-	_save(tr("SAVE_AUTO"))
+	if _autosave_timer <= 0.0:
+		_autosave_pending = true
+		_autosave_timer = AUTOSAVE_INTERVAL
+	if _autosave_pending and _can_autosave():
+		_save(tr("SAVE_AUTO"))
+
+
+func _can_autosave() -> bool:
+	return _save_block_reason() in ["", "SAVE_BLOCKED_MOVING"] and not _player.is_airborne() and not _player.is_falling()
 
 
 func _save(message: String) -> void:
 	_autosave_timer = AUTOSAVE_INTERVAL
+	_autosave_pending = false
 	if SaveGame.write(_save_data()):
 		_hud.flash_challenge(message)
 
