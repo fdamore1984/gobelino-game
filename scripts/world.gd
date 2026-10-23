@@ -64,6 +64,8 @@ const STEP_TOLERANCE := 8.0
 const CLOSE_SQUARE := 64.0
 const CLOSE_REACH := 48.0
 const CLOSE_COLLISION_MAX := 48.0
+## La luce dell'urto è all'altezza del corpo, sopra il punto toccato.
+const CONTACT_LIFT := 14.0
 ## Coordinate (u, v) dei vertici dentro il rombo: alto, destra, basso, sinistra.
 const CORNERS := [Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)]
 ## Direzioni in cui può salire una rampa (verso il rombo vicino più alto).
@@ -156,7 +158,7 @@ var _maintain_timer := 0.0
 ## Ultimo rombo troppo alto che ha fermato un movimento (vedi move).
 var _blocking_cell := Vector2i.ZERO
 var _has_blocking_cell := false
-var _wall_glow := WallGlow.new()
+var _contact_glow := ContactGlow.new()
 ## Blocchi resi trasparenti perché coprono il giocatore.
 var _faded_blocks := {}
 
@@ -192,8 +194,8 @@ func _ready() -> void:
 func _exit_tree() -> void:
 	if current == self:
 		current = null
-	if not _wall_glow.is_inside_tree():
-		_wall_glow.free()
+	if not _contact_glow.is_inside_tree():
+		_contact_glow.free()
 
 
 ## Cambia il seme (caricando una partita): rumori nuovi e dati da rifare.
@@ -761,20 +763,37 @@ func _push_out(point: Vector2, radius: float) -> Vector2:
 	return point
 
 
-## Evidenzia ciò che ha appena fermato chi si muove in point: gli ostacoli
-## solidi che tocca e il blocco di terreno troppo alto incontrato
-## dall'ultima chiamata a move. Da chiamare subito dopo move.
-func highlight_contacts(point: Vector2, radius: float) -> void:
+## Illumina con una luce bianca il punto in cui chi si muove in point
+## (all'altezza altitude) tocca gli ostacoli solidi e il blocco di terreno
+## troppo alto incontrato dall'ultima chiamata a move: solo lì, non tutto
+## l'oggetto. Da chiamare subito dopo move.
+func highlight_contacts(point: Vector2, radius: float, altitude: float) -> void:
+	var lift := Vector2(0, altitude + CONTACT_LIFT)
 	for obstacle: Dictionary in obstacles_close(point):
-		if obstacle["solid"] and point.distance_to(obstacle["position"]) <= radius + obstacle["collision"] + 1.5:
-			var node: Obstacle = obstacle.get("node")
-			if is_instance_valid(node):
-				node.flash_contact()
-	if _has_blocking_cell and entities:
-		if not _wall_glow.is_inside_tree():
-			_wall_glow.world = self
-			entities.add_child(_wall_glow)
-		_wall_glow.flash(_blocking_cell)
+		var center: Vector2 = obstacle["position"]
+		if obstacle["solid"] and point.distance_to(center) <= radius + obstacle["collision"] + 1.5:
+			_flash_contact(center + (point - center).normalized() * float(obstacle["collision"]) - lift)
+	if _has_blocking_cell:
+		_flash_contact(_closest_on_cell(_blocking_cell, point) - lift)
+
+
+func _flash_contact(at: Vector2) -> void:
+	if entities == null:
+		return
+	if not _contact_glow.is_inside_tree():
+		entities.add_child(_contact_glow)
+	_contact_glow.flash(at)
+
+
+## Punto del bordo del rombo più vicino a point (sul terreno, sullo schermo).
+func _closest_on_cell(cell: Vector2i, point: Vector2) -> Vector2:
+	var corners := cell_corners(cell)
+	var best := corners[0]
+	for k in 4:
+		var candidate := Geometry2D.get_closest_point_to_segment(point, corners[k], corners[(k + 1) % 4])
+		if candidate.distance_to(point) < best.distance_to(point):
+			best = candidate
+	return best
 
 
 ## Ostacoli dei pezzi di mondo attorno al punto (entro 60 pixel), da non
@@ -1518,59 +1537,54 @@ class TerrainBlock:
 		world.draw_cell(self, cell, -position)
 
 
-## Contorno luminoso del blocco di terreno che ferma il giocatore (troppo
-## alto da salire): faccia superiore e pareti davanti, finché dura il
-## contatto e poi per un attimo.
-class WallGlow:
+## Luce bianca nei punti in cui il giocatore sbatte contro ostacoli e
+## pareti (vedi highlight_contacts): svanisce in un attimo.
+class ContactGlow:
 	extends Node2D
 
-	const HOLD := 0.15
-	const COLOR := Color(1.0, 0.9, 0.45)
+	const HOLD := 0.25
+	const SIZE := Vector2(30, 24)
+	## Punti vicini si uniscono in uno solo.
+	const MERGE_DISTANCE := 10.0
 
-	var world: World
-	var cell := Vector2i.ZERO
-	var _time := 0.0
+	## Punto illuminato (sullo schermo) -> tempo rimasto.
+	var _spots := {}
+	var _texture := GradientTexture2D.new()
 
 	func _ready() -> void:
-		z_index = 1
+		z_index = 10
 		physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+		# Si somma ai colori sotto, come una luce.
+		var additive := CanvasItemMaterial.new()
+		additive.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+		material = additive
+		var gradient := Gradient.new()
+		gradient.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0)])
+		_texture.gradient = gradient
+		_texture.fill = GradientTexture2D.FILL_RADIAL
+		_texture.fill_from = Vector2(0.5, 0.5)
+		_texture.fill_to = Vector2(1.0, 0.5)
+		set_process(false)
 
-	func flash(blocking: Vector2i) -> void:
-		if blocking != cell:
-			cell = blocking
-		_time = HOLD
-		visible = true
+	func flash(at: Vector2) -> void:
+		for spot: Vector2 in _spots.keys():
+			if spot.distance_to(at) < MERGE_DISTANCE:
+				_spots.erase(spot)
+		_spots[at] = HOLD
+		set_process(true)
 		queue_redraw()
 
 	func _process(delta: float) -> void:
-		if _time <= 0.0:
-			visible = false
-			return
-		_time -= delta
+		for spot: Vector2 in _spots.keys():
+			_spots[spot] -= delta
+			if _spots[spot] <= 0.0:
+				_spots.erase(spot)
 		queue_redraw()
+		if _spots.is_empty():
+			set_process(false)
 
 	func _draw() -> void:
-		var corners := World.cell_corners(cell)
-		var top := PackedVector2Array()
-		var bottom := PackedVector2Array()
-		# Vertici della faccia superiore e, sotto, il terreno dei vicini davanti.
-		var below := [
-			world.corner_height(cell + Vector2i(-1, 0), 1), world.corner_height(cell + Vector2i(1, 0), 0),
-			world.corner_height(cell + Vector2i(1, 0), 3), world.corner_height(cell + Vector2i(0, 1), 0),
-		]
-		for k in 4:
-			var height := world.corner_height(cell, k)
-			top.append(corners[k] - Vector2(0, height))
-			bottom.append(corners[k] - Vector2(0, minf(below[k], height)))
-		var pulse := 0.6 + 0.4 * sin(Time.get_ticks_msec() / 70.0)
-		var alpha := clampf(_time / HOLD, 0.0, 1.0) * pulse
-		var outline := top.duplicate()
-		outline.append(top[0])
-		draw_colored_polygon(top, Color(COLOR, 0.18 * alpha))
-		draw_polyline(outline, Color(COLOR, 0.35 * alpha), 8.0)
-		draw_polyline(outline, Color(COLOR, alpha), 3.0)
-		# Spigoli verticali delle pareti davanti (destra, basso, sinistra).
-		for k in [1, 2, 3]:
-			if top[k].y < bottom[k].y - 1.0:
-				draw_line(top[k], bottom[k], Color(COLOR, alpha), 3.0)
-		draw_polyline(PackedVector2Array([bottom[1], bottom[2], bottom[3]]), Color(COLOR, 0.6 * alpha), 2.0)
+		for spot: Vector2 in _spots:
+			var alpha := clampf(_spots[spot] / HOLD, 0.0, 1.0)
+			draw_texture_rect(_texture, Rect2(spot - SIZE, SIZE * 2.0), false, Color(1, 1, 1, 0.7 * alpha))
+			draw_texture_rect(_texture, Rect2(spot - SIZE * 0.35, SIZE * 0.7), false, Color(1, 1, 1, alpha))

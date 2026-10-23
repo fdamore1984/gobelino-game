@@ -16,10 +16,6 @@ var _type: Dictionary
 var _variant := 0
 var _canopy_alpha := 1.0
 var _opened := false
-## Contatto con il giocatore: per questo tempo l'ostacolo si illumina.
-var _contact := 0.0
-const CONTACT_HOLD := 0.15
-const COLOR_CONTACT := Color(1.0, 0.9, 0.45)
 ## Altezza del terreno sotto l'ostacolo.
 var _lift := 0.0
 ## Ingresso della caverna: direzione della parete in cui si apre.
@@ -40,19 +36,7 @@ func setup(data: Dictionary, type: Dictionary) -> void:
 	set_process(type_id in ["tree", "totem", "chest", "merchant", "stairs", "exit"])
 
 
-## Il giocatore ci sta sbattendo contro: si illumina finché dura il contatto.
-func flash_contact() -> void:
-	_contact = CONTACT_HOLD
-	set_process(true)
-	queue_redraw()
-
-
-func _process(delta: float) -> void:
-	if _contact > 0.0:
-		_contact -= delta
-		queue_redraw()
-		if _contact <= 0.0 and type_id not in ["tree", "totem", "chest", "merchant", "stairs", "exit"]:
-			set_process(false)
+func _process(_delta: float) -> void:
 	if type_id in ["totem", "merchant", "stairs", "exit"]:
 		queue_redraw()
 		return
@@ -90,8 +74,6 @@ func _draw() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _variant
 	draw_set_transform(Vector2(0, -_lift))
-	if _contact > 0.0:
-		_draw_contact_glow(false)
 	match type_id:
 		"tree":
 			_draw_tree(rng)
@@ -113,8 +95,6 @@ func _draw() -> void:
 			_draw_stairs()
 		"exit":
 			_draw_exit()
-	if _contact > 0.0:
-		_draw_contact_glow(true)
 
 
 func _draw_shadow(width: float) -> void:
@@ -386,18 +366,3 @@ func _draw_exit() -> void:
 	_draw_arch(Color(light, 0.85))
 	var height := radius * 2.0
 	draw_circle(Vector2(0, -height * 0.45), radius * 0.6, Color(1, 1, 1, 0.25 + 0.2 * pulse))
-
-
-## Bagliore dietro l'ostacolo (front = false) e anello luminoso alla base
-## (front = true) mentre il giocatore ci sbatte contro.
-func _draw_contact_glow(front: bool) -> void:
-	var pulse := 0.6 + 0.4 * sin(Time.get_ticks_msec() / 70.0)
-	var alpha := clampf(_contact / CONTACT_HOLD, 0.0, 1.0) * pulse
-	var height := radius * (2.4 if type_id == "tree" else 1.0)
-	if front:
-		draw_set_transform(Vector2(0, -_lift), 0.0, Vector2(1.0, 0.5))
-		draw_arc(Vector2.ZERO, radius * 1.1 + 6.0, 0.0, TAU, 32, Color(COLOR_CONTACT, alpha), 4.0)
-		draw_set_transform(Vector2(0, -_lift))
-		return
-	for k in 3:
-		draw_circle(Vector2(0, -height * 0.5), radius * (1.0 + 0.25 * k) + 6.0, Color(COLOR_CONTACT, 0.2 * alpha))

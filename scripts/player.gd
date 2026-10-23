@@ -56,14 +56,19 @@ const COMBO_DAMAGE_STEP := 0.5
 const START_COMBO_HITS := 3
 ## Dopo un attacco c'è questo tempo per continuare la combo.
 const COMBO_WINDOW := 0.35
-const ATTACK_WINDUP := 0.09
-const ATTACK_ACTIVE := 0.12
-const ATTACK_RECOVERY := 0.24
+const ATTACK_WINDUP := 0.13
+const ATTACK_ACTIVE := 0.15
+const ATTACK_RECOVERY := 0.28
 ## Il colpo finale della combo ha un recupero più lungo.
-const FINISHER_RECOVERY := 0.38
-const ATTACK_RANGE := 80.0
-const ATTACK_RANGE_PER_STEP := 10.0
-const ATTACK_ARC := deg_to_rad(110.0)
+const FINISHER_RECOVERY := 0.42
+## I colpi normali colpiscono sempre la stessa area davanti al personaggio.
+const ATTACK_RANGE := 85.0
+const ATTACK_ARC := deg_to_rad(115.0)
+## Movimenti dei colpi normali a terra, a turno (ogni colpo è diverso dal
+## precedente): fendente, rovescio, colpo dall'alto, affondo.
+const ATTACK_STYLES := ["slash", "backhand", "chop", "thrust"]
+## Rotazione del corpo che accompagna fendente e rovescio.
+const ATTACK_TWIST := 0.18
 const ATTACK_LUNGE_SPEED := 140.0
 ## Durante un attacco ci si muove a questa frazione della velocità normale.
 const ATTACK_MOVE_FACTOR := 0.55
@@ -221,6 +226,12 @@ const SHIELD_COOLDOWN_UPGRADE := 0.98
 const THORNS_FIRST_DELAY := 1.0
 const THORNS_INVULNERABLE_TIME := 0.4
 
+## Rimbalzo contro ostacoli e pareti: solo sopra BOUNCE_MIN_SPEED verso
+## l'ostacolo, con una parte della velocità d'urto (al massimo BOUNCE_MAX_SPEED).
+const BOUNCE_MIN_SPEED := 200.0
+const BOUNCE_FACTOR := 0.45
+const BOUNCE_MAX_SPEED := 180.0
+
 const HURT_TIME := 0.25
 const HURT_KNOCKBACK := 420.0
 const HURT_INVULNERABLE_TIME := 0.8
@@ -304,6 +315,8 @@ var _attack_resolved := false
 var _attack_speed := 1.0
 ## L'attacco in corso è partito in aria (attacco aereo).
 var _air_attack := false
+## Movimento del colpo normale in corso (indice in ATTACK_STYLES).
+var _attack_style := 0
 var _empowered_time := 0.0
 var _block_flash := 0.0
 ## Altezza da terra durante i salti e velocità verticale.
@@ -424,8 +437,9 @@ func _physics_process(delta: float) -> void:
 					_start_dodge(dodge_input)
 			elif Input.is_action_just_pressed("heavy_attack"):
 				_start_heavy(input)
-			elif Input.is_action_pressed("attack"):
-				# Tenendo premuto si continua ad attaccare; in aria è un attacco aereo.
+			elif Input.is_action_just_pressed("attack") or Input.is_action_pressed("attack"):
+				# Tenendo premuto si continua ad attaccare (anche un tocco rapidissimo
+				# conta); in aria è un attacco aereo.
 				_start_attack(_next_combo_step(), input)
 			elif Input.is_action_pressed("parry"):
 				_change_state(State.PARRY)
@@ -573,11 +587,14 @@ func _move(delta: float) -> void:
 	if grounded and _state != State.DODGE and _state != State.SLIDE:
 		motion *= world.slow_at(position, RADIUS)
 	var altitude := world.elevation_at(position) + _height
+	var start := position
 	position = world.move(position, motion, RADIUS * 0.8, _height, true)
 	ground_elevation = world.elevation_at(position)
-	# Si illumina quello che blocca il movimento: ostacoli toccati e blocchi
-	# di terreno troppo alti da salire.
-	world.highlight_contacts(position, RADIUS * 0.8)
+	# Una luce bianca nel punto in cui si tocca quello che blocca il
+	# movimento (ostacoli, blocchi di terreno troppo alti da salire) e,
+	# sbattendoci contro, un piccolo rimbalzo.
+	world.highlight_contacts(position, RADIUS * 0.8, altitude)
+	_bounce(motion - (position - start), delta)
 	# L'altezza dal terreno cambia con il terreno sotto: scendendo da un
 	# gradino si cade, salendo su un blocco si atterra sopra.
 	_height = altitude - ground_elevation
@@ -602,6 +619,19 @@ func _move(delta: float) -> void:
 	else:
 		# Appena entrati nei rovi la prima puntura arriva dopo un attimo.
 		_thorns_time = THORNS_FIRST_DELAY
+
+
+## Urto: la parte del movimento fermata da un ostacolo o da una parete fa
+## rimbalzare indietro di poco, se ci si andava contro abbastanza veloci
+## (così spingendo contro un muro non si rimbalza di continuo).
+func _bounce(blocked: Vector2, delta: float) -> void:
+	if _state != State.NORMAL or delta <= 0.0:
+		return
+	var impact := blocked.length() / delta
+	if impact < BOUNCE_MIN_SPEED:
+		return
+	var away := -blocked / blocked.length()
+	_velocity += away * (maxf(_velocity.dot(-away), 0.0) + minf(impact * BOUNCE_FACTOR, BOUNCE_MAX_SPEED))
 
 
 ## Spinta senza passare attraverso dirupi e ostacoli.
@@ -1109,8 +1139,11 @@ func _begin_attack(input: Vector2) -> void:
 		# In aria lo slancio del salto (o dello scatto) continua e si esaurisce piano.
 		if _air_attack:
 			_carry_velocity = _velocity - _walk_velocity
-	# I fendenti si alternano: una volta da sinistra, una da destra.
+	# I fendenti si alternano: una volta da sinistra, una da destra; i colpi
+	# normali a terra cambiano movimento a ogni colpo.
 	_swing_sign = -_swing_sign
+	if not _attack_heavy and not _air_attack:
+		_attack_style = (_attack_style + 1) % ATTACK_STYLES.size()
 	_queued_attack = ""
 	_attack_resolved = false
 	_combo_timer = 0.0
@@ -1396,7 +1429,7 @@ func _raise_shield() -> void:
 func _attack_range() -> float:
 	if _attack_heavy:
 		return HEAVY_RANGE
-	return ATTACK_RANGE + ATTACK_RANGE_PER_STEP * (_combo_step - 1)
+	return ATTACK_RANGE
 
 
 func _attack_arc() -> float:
@@ -1404,7 +1437,7 @@ func _attack_arc() -> float:
 		return HEAVY_ARC
 	if _air_attack:
 		return AIR_ATTACK_ARC
-	return ATTACK_ARC + 0.15 * (_combo_step - 1)
+	return ATTACK_ARC
 
 
 func _attack_damage() -> int:
@@ -1504,6 +1537,9 @@ func _draw() -> void:
 		squash = Vector2(1.05, 0.92)
 	elif dashing:
 		squash = Vector2(1.15, 0.88)
+	var pose := _attack_body_pose()
+	rotation_angle += pose[0]
+	squash *= pose[1]
 	draw_set_transform(Vector2(0, body_lift), rotation_angle, body_scale * squash)
 
 	# Aura del potenziamento, corpo e "naso" che indica la direzione.
@@ -1550,6 +1586,9 @@ func _draw_sword() -> void:
 		var rest := facing.angle() + 0.6
 		BodyParts.draw_sword(self, facing.orthogonal() * RADIUS * 0.8, rest, SWORD_LENGTH, SWORD_WIDTH, tint)
 		return
+	if not _attack_heavy and not _air_attack:
+		_draw_attack_sword(tint)
+		return
 	var windup := (HEAVY_WINDUP if _attack_heavy else ATTACK_WINDUP) / _attack_speed
 	var active := (HEAVY_ACTIVE if _attack_heavy else ATTACK_ACTIVE) / _attack_speed
 	var arc := _attack_arc()
@@ -1575,6 +1614,126 @@ func _draw_sword() -> void:
 		BodyParts.draw_trail(self, Vector2.ZERO, start, angle, RADIUS + 6.0, _attack_range() + RADIUS, Color(slash, minf(alpha, 0.9)))
 	var length := HEAVY_SWORD_LENGTH if _attack_heavy else SWORD_LENGTH
 	BodyParts.draw_sword(self, Vector2.from_angle(angle) * RADIUS * 0.8, angle, length, SWORD_WIDTH * (1.3 if _attack_heavy else 1.0), tint)
+
+
+## Colpo normale a terra: carica (la spada si porta indietro e la punta
+## luccica), colpo con la scia e accompagnamento che si spegne tornando in
+## guardia. Il movimento cambia a ogni colpo (ATTACK_STYLES), l'area colpita
+## è sempre la stessa, mostrata da un velo chiaro mentre si colpisce.
+func _draw_attack_sword(tint: Color) -> void:
+	var windup := ATTACK_WINDUP / _attack_speed
+	var active := ATTACK_ACTIVE / _attack_speed
+	var recovery := _attack_recovery() / _attack_speed
+	var phase := 0
+	var t := clampf(_state_time / windup, 0.0, 1.0)
+	if _state_time >= windup + active:
+		phase = 2
+		t = clampf((_state_time - windup - active) / recovery, 0.0, 1.0)
+	elif _state_time >= windup:
+		phase = 1
+		t = (_state_time - windup) / active
+	var forward := facing.angle()
+	var half := ATTACK_ARC / 2.0
+	var reach := _attack_range() + RADIUS
+	var slash := COLOR_EMPOWERED if _attack_speed > 1.0 else COLOR_SLASH
+	var trail_alpha := minf(0.55 + 0.12 * (_combo_step - 1), 0.9)
+	var rest := forward + 0.6
+	var angle := forward
+	var hand := Vector2.ZERO
+	var length := SWORD_LENGTH
+	match ATTACK_STYLES[_attack_style]:
+		"slash", "backhand":
+			# Fendente da un lato all'altro (il rovescio nel verso opposto).
+			var side := 1.0 if ATTACK_STYLES[_attack_style] == "slash" else -1.0
+			var from := forward - side * half
+			var to := forward + side * half
+			match phase:
+				0:
+					angle = lerp_angle(rest, from - side * 0.6, ease(t, 0.5))
+				1:
+					angle = lerpf(from - side * 0.6, to, ease(t, 0.45))
+					BodyParts.draw_trail(self, Vector2.ZERO, from, clampf(angle, minf(from, to), maxf(from, to)), RADIUS + 6.0, reach, Color(slash, trail_alpha))
+				2:
+					# Accompagnamento oltre la fine dell'arco, poi in guardia.
+					angle = lerpf(to, to + side * 0.4, ease(minf(t / 0.35, 1.0), 0.5)) if t < 0.35 \
+							else lerp_angle(to + side * 0.4, rest, ease((t - 0.35) / 0.65, 2.0))
+					BodyParts.draw_trail(self, Vector2.ZERO, from, to, RADIUS + 6.0, reach, Color(slash, trail_alpha * 0.5 * (1.0 - t)))
+			hand = Vector2.from_angle(angle) * RADIUS * 0.8
+		"chop":
+			# Dall'alto: la spada si alza sopra la testa e cala in avanti.
+			var up := -PI / 2.0
+			var down := up + wrapf(forward - up, -PI, PI)
+			match phase:
+				0:
+					angle = lerp_angle(rest, up - 0.25, ease(t, 0.5))
+					hand = Vector2(0, -RADIUS * 0.9 * ease(t, 0.5))
+				1:
+					angle = lerpf(up - 0.25, down, ease(t, 0.35))
+					hand = Vector2(0, -RADIUS * 0.9 * (1.0 - t)) + facing * RADIUS * 0.6 * t
+					length = SWORD_LENGTH * (1.0 + 0.15 * t)
+					BodyParts.draw_trail(self, Vector2.ZERO, up, angle, RADIUS * 0.5, reach, Color(slash, trail_alpha * 0.8))
+				2:
+					angle = down if t < 0.4 else lerp_angle(down, rest, ease((t - 0.4) / 0.6, 2.0))
+					hand = facing * RADIUS * 0.6 * (1.0 - t)
+					length = SWORD_LENGTH * 1.15
+			if hand == Vector2.ZERO:
+				hand = Vector2.from_angle(angle) * RADIUS * 0.8
+		"thrust":
+			# Affondo: la spada si ritrae, poi scatta dritta in avanti.
+			var side_offset := facing.orthogonal() * RADIUS * 0.5
+			match phase:
+				0:
+					angle = lerp_angle(rest, forward, ease(t, 0.5))
+					hand = side_offset - facing * RADIUS * 0.5 * ease(t, 0.5)
+				1:
+					angle = forward
+					hand = side_offset.lerp(Vector2.ZERO, t) + facing * lerpf(-RADIUS * 0.5, RADIUS * 0.9, ease(t, 0.3))
+					length = SWORD_LENGTH * (1.0 + 0.3 * t)
+					# Scia dritta lungo la lama.
+					var tip := hand + facing * length
+					var width := facing.orthogonal() * 7.0 * (1.0 - t * 0.5)
+					draw_primitive(PackedVector2Array([facing * RADIUS * 0.5 + width, tip + width * 0.3, tip - width * 0.3, facing * RADIUS * 0.5 - width]),
+							PackedColorArray([Color(slash, trail_alpha)]), PackedVector2Array())
+				2:
+					angle = forward if t < 0.3 else lerp_angle(forward, rest, ease((t - 0.3) / 0.7, 2.0))
+					hand = facing * RADIUS * 0.9 * (1.0 - t)
+					length = SWORD_LENGTH * (1.3 - 0.3 * t)
+	# Area colpita: un velo chiaro su tutto l'arco, uguale per ogni movimento.
+	if phase == 1:
+		BodyParts.draw_trail(self, Vector2.ZERO, forward - half, forward + half, RADIUS + 6.0, reach, Color(slash, 0.16 * (1.0 - t)))
+	BodyParts.draw_sword(self, hand, angle, length, SWORD_WIDTH, tint)
+	# Alla fine della carica la punta della spada luccica.
+	if phase == 0 and t > 0.6:
+		var tip := hand + Vector2.from_angle(angle) * length
+		var glint := (t - 0.6) / 0.4
+		draw_line(tip - Vector2(7, 0) * glint, tip + Vector2(7, 0) * glint, Color(1, 1, 1, glint), 2.0)
+		draw_line(tip - Vector2(0, 7) * glint, tip + Vector2(0, 7) * glint, Color(1, 1, 1, glint), 2.0)
+
+
+## Il corpo accompagna i colpi normali a terra: ruota con fendente e
+## rovescio, si allunga caricando il colpo dall'alto e si schiaccia
+## calandolo. Restituisce la rotazione in più e la scala.
+func _attack_body_pose() -> Array:
+	if _state != State.ATTACK or _attack_heavy or _air_attack:
+		return [0.0, Vector2.ONE]
+	var windup := ATTACK_WINDUP / _attack_speed
+	var active := ATTACK_ACTIVE / _attack_speed
+	var style: String = ATTACK_STYLES[_attack_style]
+	var side := 1.0 if style == "slash" else -1.0
+	var screen_side := side * (1.0 if facing.x >= 0.0 else -1.0)
+	if _state_time < windup:
+		var t := ease(_state_time / windup, 0.5)
+		if style == "chop":
+			return [0.0, Vector2(1.0 - 0.06 * t, 1.0 + 0.08 * t)]
+		if style == "thrust":
+			return [0.0, Vector2(1.0 + 0.05 * t, 1.0 - 0.04 * t)]
+		return [-screen_side * ATTACK_TWIST * t, Vector2.ONE]
+	var t := clampf((_state_time - windup) / (active * 2.0), 0.0, 1.0)
+	if style == "chop":
+		return [0.0, Vector2(1.0 + 0.1 * (1.0 - t), 1.0 - 0.1 * (1.0 - t))]
+	if style == "thrust":
+		return [0.0, Vector2.ONE]
+	return [screen_side * ATTACK_TWIST * (1.0 - t), Vector2.ONE]
 
 
 ## Attacco a terra: spada alzata sopra la testa in salita, che cala con una

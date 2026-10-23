@@ -80,6 +80,10 @@ INVENTORY_EQUIPPED,"Equipment: weapon, armor, boots, amulet, ring"
 INVENTORY_EMPTY,Nothing yet: open chests to find items
 INVENTORY_HINT,A / Enter: use · B / Esc / I: close
 INVENTORY_GOLD,Gold: %d
+INVENTORY_SORT,Sort: %s
+INVENTORY_SORT_FOUND,order found
+INVENTORY_SORT_POWER,power
+INVENTORY_SORT_VALUE,value
 INVENTORY_USE_EQUIP,A: equip
 INVENTORY_USE_UNEQUIP,A: unequip
 INVENTORY_USE_READ,A: read (permanent bonus)

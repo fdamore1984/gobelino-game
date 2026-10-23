@@ -47,6 +47,16 @@ static func value(id: String) -> int:
 	return int(get_item(id).get("value", 0))
 
 
+## Potenza dell'oggetto, per ordinare l'inventario: somma dei suoi bonus
+## pesati con "power_weights" di data/items.json.
+static func power(id: String) -> float:
+	var total := 0.0
+	var weights: Dictionary = DATA.data["power_weights"]
+	for key: String in weights:
+		total += stat(id, key) * float(weights[key])
+	return total
+
+
 ## Oggetti rari che vendono solo i mercanti: nelle casse non ci sono.
 static func shop_items() -> Array[String]:
 	return _flagged("shop_only")
