@@ -51,7 +51,12 @@ func _process(delta: float) -> void:
 		_next_center = _player.position
 		_next_row = 0
 	if _next_center != Vector2.INF:
-		_sample_rows()
+		# La prima volta (e dopo un salto lontano) non c'è niente da mostrare
+		# nel frattempo: si campiona tutto subito.
+		while _next_center != Vector2.INF and _center == Vector2.INF:
+			_sample_rows()
+		if _next_center != Vector2.INF:
+			_sample_rows()
 	queue_redraw()
 
 

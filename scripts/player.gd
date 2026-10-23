@@ -1,7 +1,9 @@
 class_name Player
 extends Node2D
-## Personaggio giocabile. Per ora è disegnato con forme geometriche:
-## verrà sostituito dagli sprite definitivi.
+## Personaggio giocabile: un goblin disegnato in codice nello stile del
+## bozzetto a china (vedi GoblinArt), con l'espressione che cambia: di solito
+## arrabbiato e arrogante, urla attaccando, fa una smorfia se colpito e
+## ride sconfiggendo un boss.
 ##
 ## Azioni: movimento in tutte le direzioni con accelerazione e frenata,
 ## attacchi consecutivi in combo sempre più potenti (R1), attacco potente
@@ -33,7 +35,7 @@ signal experience_changed(current: int, needed: int, level: int)
 signal leveled_up(level: int)
 signal died
 
-enum State { NORMAL, ATTACK, PARRY, DODGE, SLIDE, HURT, DEAD, SLAM }
+enum State { NORMAL, ATTACK, PARRY, DODGE, SLIDE, HURT, DEAD, SLAM, FALL }
 
 const RADIUS := 22.0
 const START_HEALTH := 5
@@ -227,7 +229,19 @@ const SWORD_LENGTH := 46.0
 const HEAVY_SWORD_LENGTH := 58.0
 const SWORD_WIDTH := 5.0
 
-const COLOR_BODY := Color(0.35, 0.75, 0.4)
+const COLOR_BODY := GoblinArt.SKIN
+## Burroni: cadendoci si precipita per FALL_TIME secondi, poi si riappare
+## sul bordo (l'ultimo punto sicuro) perdendo vita (data/world.json). Si
+## cade quando si scende sotto il bordo di FALL_DEPTH pixel.
+const FALL_TIME := 0.8
+const FALL_DEPTH := 48.0
+## Dopo un colpo la smorfia di dolore resta per questo tempo.
+const HURT_FACE_TIME := 0.6
+## La risatina dopo il boss dura questo tempo.
+const LAUGH_TIME := 2.2
+## Testa: raggio e altezza sopra il centro del corpo.
+const HEAD_RADIUS := 21.0
+const HEAD_RISE := 22.0
 const COLOR_HURT := Color(0.95, 0.35, 0.3)
 const COLOR_DEAD := Color(0.4, 0.4, 0.4)
 const COLOR_SHIELD := Color(0.45, 0.7, 1.0)
@@ -318,6 +332,12 @@ var _slam_kind := ""
 var _slam_landed := false
 ## Tremolio della telecamera (0-1).
 var _shake := 0.0
+## Ultimo punto a terra fuori dai burroni e la sua altezza: si riappare lì.
+var _safe_position := Vector2.ZERO
+var _safe_altitude := 0.0
+## Tempo rimasto per la smorfia di dolore e per la risatina.
+var _hurt_face := 0.0
+var _laugh_time := 0.0
 ## Nemico agganciato (null se nessuno) e il suo mirino.
 var lock_target: Enemy
 var _lock_marker := LockMarker.new()
@@ -345,6 +365,8 @@ func _ready() -> void:
 		add_child(_torch)
 	if World.current:
 		ground_elevation = World.current.elevation_at(position)
+	_safe_position = position
+	_safe_altitude = ground_elevation
 	if _camera:
 		_camera_height = -ground_elevation
 		_camera.position = Vector2(0, _camera_height)
@@ -362,6 +384,8 @@ func _physics_process(delta: float) -> void:
 	_block_flash = maxf(_block_flash - delta, 0.0)
 	_combo_timer = maxf(_combo_timer - delta, 0.0)
 	shield_cooldown = maxf(shield_cooldown - delta, 0.0)
+	_hurt_face = maxf(_hurt_face - delta, 0.0)
+	_laugh_time = maxf(_laugh_time - delta, 0.0)
 	_spell_cooldown = maxf(_spell_cooldown - delta, 0.0)
 	if _state != State.DEAD:
 		mana = minf(mana + MANA_REGEN * delta, max_mana)
@@ -496,6 +520,11 @@ func _physics_process(delta: float) -> void:
 		State.SLAM:
 			_update_slam(input, delta)
 
+		State.FALL:
+			_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * delta)
+			if _state_time >= FALL_TIME:
+				_climb_out_of_ravine()
+
 		State.HURT:
 			_velocity = _velocity.move_toward(Vector2.ZERO, HURT_KNOCKBACK * 4.0 * delta)
 			if _state_time >= HURT_TIME:
@@ -520,7 +549,9 @@ func _physics_process(delta: float) -> void:
 		_torch.energy = TORCH_ENERGY * randf_range(0.92, 1.05)
 	_squash = move_toward(_squash, 0.0, SQUASH_RECOVERY * delta)
 	if _camera:
-		_camera_height = lerpf(_camera_height, -ground_elevation, minf(CAMERA_HEIGHT_FOLLOW * delta, 1.0))
+		# Mentre si precipita nel burrone la telecamera resta al bordo.
+		if _state != State.FALL:
+			_camera_height = lerpf(_camera_height, -ground_elevation, minf(CAMERA_HEIGHT_FOLLOW * delta, 1.0))
 		var ahead := (_velocity * CAMERA_LOOK_AHEAD).limit_length(CAMERA_LOOK_AHEAD_MAX)
 		if lock_target:
 			# Agganciato: la telecamera tiene in vista anche il bersaglio.
@@ -559,6 +590,14 @@ func _move(delta: float) -> void:
 		_height = 0.0
 		if _height_velocity <= 0.0:
 			_land()
+	# Burroni: chi scende sotto il bordo precipita; a terra altrove si
+	# ricorda il punto sicuro per riapparire.
+	if world.kind_of(World.cell_at(position)) == World.Kind.RAVINE:
+		if _state not in [State.FALL, State.DEAD] and altitude() < _safe_altitude - FALL_DEPTH:
+			_fall_into_ravine()
+	elif not is_airborne():
+		_safe_position = position
+		_safe_altitude = ground_elevation
 	var thorns := world.ground_obstacle_at(position, RADIUS) if grounded else {}
 	if not thorns.is_empty() and thorns["damage"] > 0:
 		_thorns_time += delta
@@ -581,6 +620,7 @@ func _scratch(damage: int) -> void:
 		return
 	health = maxi(health - damage, 0)
 	health_changed.emit(health, max_health)
+	_hurt_face = HURT_FACE_TIME
 	FloatingText.spawn(get_parent(), global_position, tr("FX_THORNS"), COLOR_HURT)
 	if health == 0:
 		_change_state(State.DEAD)
@@ -675,7 +715,7 @@ func _end_combo() -> void:
 ## Un nemico colpisce il giocatore. Restituisce l'esito, così il nemico
 ## può reagire (per esempio restare stordito dopo una parata perfetta).
 func receive_hit(from: Vector2, damage: int) -> String:
-	if _state == State.DEAD or _invulnerable_time > 0.0:
+	if _state in [State.DEAD, State.FALL] or _invulnerable_time > 0.0:
 		return "ignored"
 	if (_state == State.DODGE and _state_time <= DODGE_INVULNERABLE_TIME) \
 			or (_state == State.SLIDE and _state_time <= SLIDE_INVULNERABLE_TIME):
@@ -722,6 +762,7 @@ func receive_hit(from: Vector2, damage: int) -> String:
 		died.emit()
 	else:
 		_change_state(State.HURT)
+		_hurt_face = HURT_FACE_TIME
 		_velocity = -to_attacker * HURT_KNOCKBACK
 		_invulnerable_time = HURT_INVULNERABLE_TIME
 		Sfx.play("hurt", global_position)
@@ -732,9 +773,53 @@ func is_dead() -> bool:
 	return _state == State.DEAD
 
 
+## Espressione del volto in questo momento (vedi GoblinArt).
+func expression() -> String:
+	if _state == State.DEAD:
+		return "dead"
+	if _laugh_time > 0.0:
+		return "laugh"
+	if _hurt_face > 0.0 or _state == State.HURT:
+		return "hurt"
+	if _state in [State.ATTACK, State.SLAM] or _charging:
+		return "attack"
+	return "smug"
+
+
+## Risatina da goblin, per esempio dopo aver sconfitto un boss.
+func laugh() -> void:
+	_laugh_time = LAUGH_TIME
+	Sfx.play("giggle", global_position)
+	FloatingText.spawn(get_parent(), global_position, tr("FX_GIGGLE"), COLOR_EMPOWERED, 30.0)
+
+
 ## Completamente fermo, a terra e senza fare niente: si può salvare.
 func is_still() -> bool:
 	return _state == State.NORMAL and not is_airborne() and _velocity.length() < 5.0
+
+
+func _fall_into_ravine() -> void:
+	_end_combo()
+	lock_target = null
+	_change_state(State.FALL)
+	Sfx.play("jump", global_position, 0.5, -4.0)
+
+
+## Dopo la caduta si riappare sul bordo, perdendo un po' di vita.
+func _climb_out_of_ravine() -> void:
+	teleport(_safe_position)
+	var data: Dictionary = World.DATA.data["terrain"]
+	health = maxi(health - int(data["ravine_damage"]), 0)
+	health_changed.emit(health, max_health)
+	_hurt_face = HURT_FACE_TIME
+	FloatingText.spawn(get_parent(), global_position, tr("FX_FELL"), COLOR_HURT)
+	if health == 0:
+		_change_state(State.DEAD)
+		Sfx.play("death", global_position)
+		died.emit()
+	else:
+		_invulnerable_time = HURT_INVULNERABLE_TIME
+		Sfx.play("hurt", global_position)
 
 
 ## Spostamento istantaneo (entrando o uscendo da una caverna, caricando una
@@ -748,6 +833,8 @@ func teleport(at: Vector2) -> void:
 	_height_velocity = 0.0
 	_change_state(State.NORMAL)
 	ground_elevation = World.current.elevation_at(at) if World.current else 0.0
+	_safe_position = at
+	_safe_altitude = ground_elevation
 	reset_physics_interpolation()
 	if _camera:
 		_camera_height = -ground_elevation
@@ -1376,10 +1463,11 @@ func _draw() -> void:
 	if _state == State.DEAD:
 		body = COLOR_DEAD
 	elif _state == State.HURT:
-		body = COLOR_HURT
-	# Lampeggia mentre è invulnerabile dopo un colpo.
-	if _invulnerable_time > 0.0 and int(_invulnerable_time * 12.0) % 2 == 0:
-		body.a = 0.35
+		body = COLOR_BODY.lerp(COLOR_HURT, 0.45)
+	# Lampeggia mentre è invulnerabile dopo un colpo; precipitando svanisce nel buio.
+	self_modulate.a = 0.35 if _invulnerable_time > 0.0 and int(_invulnerable_time * 12.0) % 2 == 0 else 1.0
+	if _state == State.FALL:
+		self_modulate.a = 1.0 - clampf(_state_time / FALL_TIME, 0.0, 1.0)
 
 	# L'ombra resta a terra e si rimpicciolisce durante il salto; tutto il
 	# resto sale con il personaggio. In scivolata il corpo si schiaccia.
@@ -1424,15 +1512,21 @@ func _draw() -> void:
 		var pulse := 0.5 + 0.5 * sin(_empowered_time * 10.0)
 		draw_circle(Vector2.ZERO, RADIUS + 8.0 + pulse * 4.0, Color(COLOR_EMPOWERED, 0.25))
 		draw_arc(Vector2.ZERO, RADIUS + 8.0 + pulse * 4.0, 0.0, TAU, 32, Color(COLOR_EMPOWERED, 0.8), 2.0)
-	draw_circle(Vector2.ZERO, RADIUS, body)
-	var tip := facing * (RADIUS + 12.0)
-	var side := facing.orthogonal() * 9.0
-	draw_colored_polygon(PackedVector2Array([tip, facing * RADIUS * 0.6 + side, facing * RADIUS * 0.6 - side]), body.darkened(0.3))
-
+	# Goblin: busto, spada e torcia, testa. Di spalle la spada sta davanti
+	# alla testa (più lontana da chi guarda), di fronte la testa sta sopra.
+	var from_behind := facing.y < -0.3
+	var head := Vector2(0, -HEAD_RISE) + Vector2(facing.x, facing.y * 0.5) * RADIUS * 0.3
+	if _laugh_time > 0.0:
+		head.y -= absf(sin(_laugh_time * 14.0)) * 3.0
+	if from_behind:
+		GoblinArt.draw_head(self, head, HEAD_RADIUS, facing, expression(), body)
+	GoblinArt.draw_torso(self, RADIUS, facing, body)
 	if _state != State.DEAD:
 		_draw_sword()
 		if torch_on:
 			_draw_torch()
+	if not from_behind:
+		GoblinArt.draw_head(self, head, HEAD_RADIUS, facing, expression(), body)
 
 	if _state == State.PARRY:
 		var shield := COLOR_SHIELD
@@ -1461,6 +1555,7 @@ func _draw_sword() -> void:
 		return
 	if _state != State.ATTACK:
 		var rest := facing.angle() + 0.6
+		GoblinArt.draw_arm(self, _shoulder(1.0), facing.orthogonal() * RADIUS * 0.8, COLOR_BODY)
 		BodyParts.draw_sword(self, facing.orthogonal() * RADIUS * 0.8, rest, SWORD_LENGTH, SWORD_WIDTH, tint)
 		return
 	var windup := (HEAVY_WINDUP if _attack_heavy else ATTACK_WINDUP) / _attack_speed
@@ -1487,6 +1582,7 @@ func _draw_sword() -> void:
 		var alpha := 0.85 if _attack_heavy else 0.5 + 0.15 * (_combo_step - 1)
 		BodyParts.draw_trail(self, Vector2.ZERO, start, angle, RADIUS + 6.0, _attack_range() + RADIUS, Color(slash, minf(alpha, 0.9)))
 	var length := HEAVY_SWORD_LENGTH if _attack_heavy else SWORD_LENGTH
+	GoblinArt.draw_arm(self, _shoulder(1.0), Vector2.from_angle(angle) * RADIUS * 0.8, COLOR_BODY)
 	BodyParts.draw_sword(self, Vector2.from_angle(angle) * RADIUS * 0.8, angle, length, SWORD_WIDTH * (1.3 if _attack_heavy else 1.0), tint)
 
 
@@ -1507,12 +1603,19 @@ func _draw_slam_sword(tint: Color) -> void:
 		BodyParts.draw_trail(self, Vector2.ZERO, start, end, RADIUS + 6.0, HEAVY_SWORD_LENGTH + RADIUS, Color(COLOR_HEAVY, 0.7))
 	if mirror:
 		angle = PI - angle
+	GoblinArt.draw_arm(self, _shoulder(1.0), Vector2.from_angle(angle) * RADIUS * 0.8, COLOR_BODY)
 	BodyParts.draw_sword(self, Vector2.from_angle(angle) * RADIUS * 0.8, angle, HEAVY_SWORD_LENGTH, SWORD_WIDTH * 1.3, tint)
+
+
+## Spalla dal lato della spada (side = 1) o della torcia (-1).
+func _shoulder(side: float) -> Vector2:
+	return facing.orthogonal() * RADIUS * 0.55 * side + Vector2(0, -RADIUS * 0.35)
 
 
 ## Torcia nell'altra mano: bastone e fiamma che tremola.
 func _draw_torch() -> void:
 	var hand := -facing.orthogonal() * RADIUS * 0.9
+	GoblinArt.draw_arm(self, _shoulder(-1.0), hand, COLOR_BODY)
 	var top := hand + Vector2(0, -18)
 	draw_line(hand + Vector2(0, 6), top, Color(0.4, 0.26, 0.14), 4.0)
 	var flicker := randf_range(0.85, 1.15)

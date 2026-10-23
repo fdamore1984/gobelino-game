@@ -2,6 +2,9 @@ class_name Fireball
 extends Node2D
 ## Palla di fuoco lanciata dal giocatore: cerca il nemico più vicino, lo
 ## insegue curvando e lo colpisce. Senza nemici vola dritta e si spegne.
+## Non attraversa niente: si schianta contro alberi, sassi, casse e gli altri
+## ostacoli solidi, contro le pareti più alte del suo volo, le montagne e la
+## roccia del sotterraneo.
 ## Illumina attorno a sé (utile di notte).
 
 const SPEED := 470.0
@@ -70,9 +73,31 @@ func _physics_process(delta: float) -> void:
 		if global_position.distance_to(enemy.global_position) < RADIUS + enemy.radius:
 			_explode(enemy)
 			return
+	if _hits_scenery():
+		_explode(null, true)
+		return
 	if _age >= LIFETIME:
 		_explode(null)
 	queue_redraw()
+
+
+## Contro un ostacolo solido, una parete più alta della quota di volo, una
+## montagna o la roccia: lì la palla si schianta.
+func _hits_scenery() -> bool:
+	var world := World.current
+	if world == null:
+		return false
+	var cell := World.cell_at(global_position)
+	var kind := world.kind_of(cell)
+	if kind == World.Kind.MOUNTAIN or kind == World.Kind.ROCK:
+		return true
+	if world.elevation_at(global_position) > altitude + FLIGHT_HEIGHT:
+		return true
+	for obstacle: Dictionary in world.obstacles_near(global_position):
+		if obstacle["solid"] and global_position.distance_to(obstacle["position"]) < RADIUS + obstacle["collision"] \
+				and absf(obstacle["elevation"] - altitude) < HIT_HEIGHT_REACH:
+			return true
+	return false
 
 
 func _find_target() -> Enemy:
@@ -89,12 +114,13 @@ func _find_target() -> Enemy:
 	return best
 
 
-func _explode(enemy: Enemy) -> void:
+## crashed: si è schiantata contro un ostacolo o una parete (si sente forte).
+func _explode(enemy: Enemy, crashed := false) -> void:
 	_exploding = 0.001
 	if enemy:
 		enemy.take_damage(damage, direction, true)
 		HitFeedback.hit(get_tree(), 0.05)
-	Sfx.play("fireball_hit", global_position, 1.0, -2.0 if enemy else -8.0)
+	Sfx.play("fireball_hit", global_position, 1.0, -2.0 if enemy or crashed else -8.0)
 
 
 func _draw() -> void:

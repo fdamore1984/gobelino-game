@@ -87,15 +87,13 @@ func _draw() -> void:
 	_text(font, str(kills), sword + Vector2(12, 6), FONT_SIZE, COLOR_TEXT)
 
 
-## Ritratto del goblin (forma geometrica) con il livello in un distintivo.
+## Ritratto del goblin, con la stessa espressione del personaggio, e il
+## livello in un distintivo.
 func _draw_portrait(font: Font) -> void:
 	var center := Vector2(52, 50)
 	draw_circle(center, 34.0, Color(0, 0, 0, 0.35))
 	draw_arc(center, 34.0, 0.0, TAU, 40, Color(1, 1, 1, 0.25), 2.0)
-	draw_circle(center + Vector2(0, 4), 24.0, Player.COLOR_BODY)
-	draw_colored_polygon(PackedVector2Array([center + Vector2(26, 4), center + Vector2(12, -4), center + Vector2(12, 12)]), Player.COLOR_BODY.darkened(0.3))
-	draw_circle(center + Vector2(-6, -2), 3.5, Color(0.1, 0.1, 0.1))
-	draw_circle(center + Vector2(8, -2), 3.5, Color(0.1, 0.1, 0.1))
+	GoblinArt.draw_head(self, center + Vector2(0, 6), 17.0, Vector2(0.35, 1).normalized(), player.expression(), GoblinArt.SKIN)
 	var badge := center + Vector2(26, 28)
 	draw_circle(badge, 15.0, Color(0.2, 0.15, 0.05))
 	draw_circle(badge, 13.0, COLOR_XP)

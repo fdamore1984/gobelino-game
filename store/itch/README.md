@@ -60,7 +60,7 @@ Gobelino is a 2D medieval fantasy action RPG with an isometric view.
 
 You are a lone goblin with no past, living in a den like a wild animal. Starting from the woods around your den, you will explore the world beyond, grow stronger and meet those who will open new paths for you.
 
-⚠️ This is a prototype build: characters and enemies are placeholder geometric shapes and the sounds are synthesized placeholders. It's here to test the combat.
+⚠️ This is a prototype build: the goblin is drawn in code in an ink-sketch style, enemies are placeholder geometric shapes and the sounds are synthesized placeholders. It's here to test the combat.
 
 IN THIS PROTOTYPE
 - A boundless, randomly generated 3D isometric world made of blocks: grassy platforms stacked in steps at different heights, sloping ramps and dirt paths. Jump to climb onto higher blocks (multiple jumps reach the tallest ones) and drop down to lower ground. Here and there trees, rocks, bushes and thorny brambles (bushes and brambles slow you down, brambles prick)
@@ -74,12 +74,14 @@ IN THIS PROTOTYPE
 - Enemies circle around you with quick sidesteps; their sword slashes are slow and wide but unpredictable: watch them wind up (they light up and pull back their weapon), beware of feints and follow-up strikes
 - Ground attacks that hit every enemy around: a power strike right after a combo makes you leap and slam the ground (every chained power strike after the combo does it too), attacking in mid-air plunges you onto the ground, and attacking during an air dash smashes a wide area
 - Hold the power strike to charge it up to double damage; every hit you land freezes the action for an instant, throws sparks, knocks the enemy back and spills blood that stays on the ground; fallen enemies lie on the ground for a while. Whatever blocks your way (rocks, trees, chests, walls too high to climb) lights up while you bump into it
-- Cast fireballs that seek out and chase the nearest enemy (they cost mana: drink mana potions to refill)
+- Cast fireballs that seek out and chase the nearest enemy (they cost mana: drink mana potions to refill); they crash into trees, rocks and walls
+- Defeated enemies sometimes drop gold or items, and once in a while a rare one
 - Day turns to night: light your torch to see a wide area in the dark. A minimap shows the area around you, enemies as red dots, chests, totems and merchants
 - Open chests to find gold, weapons, armor, boots, amulets, rings, spell books and potions; equip them, read the books and drink the potions from your inventory
 - Travelling merchants are scattered around the world: touch their stall to sell the items you don't use and to buy potions and rare gear you won't find in chests (dragon sword, plate armor, wind boots, archmage amulet, inferno ring, meteor and vigor tomes, elixirs)
-- Long mountain ranges and deep ravines cut across the land: you can't cross them, but now and then a cave opens in a mountain wall
-- Walk into a cave to explore a dark underground of tunnels and caverns: find the passage down in the cave walls on each level (2 to 5 levels) and face the Cave Guardian, a tough boss that grows with your level, in its arena on the last one. Beat it for gold and rare items
+- Play as an angry, arrogant goblin whose face changes with the action: he snarls when he attacks, winces when hit and lets out a goblin giggle when he beats a boss
+- Long mountain ranges and deep ravines cut across the land: mountains can't be crossed, ravines can swallow you, but a running jump and a couple of air dashes can carry you over the narrow ones. Now and then a cave opens in a mountain wall
+- Walk into a cave to explore a dark underground of tunnels and caverns: find the passage down in the cave walls on each level (2 to 5 levels) and face the Cave Guardian, a tough boss that grows with your level, in its arena on the last one. Beat it for gold and special items you can't find anywhere else
 - The game saves automatically every 5 minutes and whenever you enter a cave; you can also save from the pause menu, as long as no enemies are nearby and you are standing still. Continue your game from the title screen
 - Lock on to the nearest enemy with R3 and press again to switch target: you always face it, your strikes and fireballs go its way and the camera keeps it in view
 - Tall walls, mountains and cliffs that hide your character turn fully transparent around you, so you always see what is happening
