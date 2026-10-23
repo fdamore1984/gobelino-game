@@ -22,7 +22,6 @@ HUD_SHIELD_READY,Shield: ready
 HUD_SHIELD_ACTIVE,Shield: active
 HUD_SHIELD_COOLDOWN,Shield: %d s
 UPGRADE_HEAVY,Chained power strikes +1
-UPGRADE_POTION,Potions +1
 UPGRADE_SHIELD,Shield recharge -2%
 TOUCH_HEAVY,Power
 TOUCH_POTION,Potion
@@ -43,12 +42,11 @@ POWERUP_HEAVY,Power strikes
 POWERUP_DODGE,Dodges
 POWERUP_JUMP,Jumps
 POWERUP_HEALTH,Max health
-POWERUP_POTION,Potions
 POWERUP_SHIELD,Shield recharge
 POWERUP_RUN,Run speed
 POWERUP_EMPOWERED,Perfect parry: empowered attacks %d s
 POWERUP_SHIELD_ACTIVE,Shield active
-CHALLENGE_HINT,Touch the totem to start a survival challenge
+CHALLENGE_HINT,Interact with the totem to start a survival challenge
 CHALLENGE_STATUS,Survive! %d s · Enemies: %d
 CHALLENGE_WON,Challenge complete! +%d XP and a potion
 HUD_MANA,Mana %d/%d · Mana potions %d/%d
@@ -61,9 +59,17 @@ UPGRADE_SPELL,Spell power +20%
 INVENTORY_TITLE,Inventory
 INVENTORY_EQUIPPED,"Equipment: weapon, armor, boots, amulet, ring"
 INVENTORY_EMPTY,Nothing yet: open chests to find items
-INVENTORY_HINT,A / Enter: use · B / Esc / I: close
+INVENTORY_HINT,A / Enter: use · R3 / C: sort · B / Esc / I: close
 INVENTORY_GOLD,Gold: %d
-INVENTORY_SORT,Sort: %s
+INVENTORY_SORT,Sort: %s · R3 / C
+INVENTORY_COMPARE,Compared to your %s: %s
+INVENTORY_COMPARE_NONE,You have nothing of this kind equipped
+INVENTORY_COMPARE_SAME,same stats
+DELTA_DAMAGE,%s%% damage
+DELTA_HEALTH,%s max health
+DELTA_SPEED,%s%% speed
+DELTA_MANA,%s max mana
+DELTA_SPELL,%s%% spell power
 INVENTORY_SORT_FOUND,order found
 INVENTORY_SORT_POWER,power
 INVENTORY_SORT_VALUE,value
@@ -96,7 +102,7 @@ TOUCH_MANA,Mana
 TOUCH_TORCH,Torch
 TOUCH_INVENTORY,Bag
 MERCHANT_TITLE,Travelling merchant
-MERCHANT_HINT,Touch the stall to buy and sell
+MERCHANT_HINT,A travelling merchant: interact with the stall to buy and sell
 SHOP_BUY,For sale: rare items you won't find in chests
 SHOP_SELL,Sell your items (not the ones you wear)
 SHOP_PRICE,%d gold
@@ -122,14 +128,14 @@ CONTROLS_ATTACK,"Attack (combo, hold to keep attacking) | J | R1"
 CONTROLS_HEAVY,Power strike (hold to charge) | L | L2
 CONTROLS_PARRY,Parry | K | L1
 CONTROLS_DODGE,"Dodge (roll, air dash while jumping) | Space | B"
-CONTROLS_JUMP,Jump | F | A
+CONTROLS_JUMP,"Jump (near chests, merchants, caves: interact) | F / E | A"
 CONTROLS_RUN,Run (dodge while running to slide) | Shift | R2
 CONTROLS_SPELL,Fireball | U | X
 CONTROLS_SHIELD,Shield | R | Y
 CONTROLS_POTION,Health potion | Q | D-pad left
 CONTROLS_MANA,Mana potion | T | D-pad right
 CONTROLS_TORCH,Torch | G | D-pad down
-CONTROLS_INVENTORY,Inventory | I / Tab | D-pad up
+CONTROLS_INVENTORY,Inventory (R3 / C to sort) | I / Tab | D-pad up
 CONTROLS_MENU,"Pause menu (save, controls, quit) | Esc | Start"
 CONTROLS_SPECIAL_TITLE,Special attacks
 CONTROLS_SPECIAL_LEAP,"Power strike right after a combo: leap and slam the ground, hitting every enemy around"
@@ -151,7 +157,11 @@ SAVE_BLOCKED_MOVING,Can't save: stand completely still first
 SAVE_BLOCKED_CHALLENGE,Can't save during a challenge
 SAVE_BLOCKED_DEAD,Can't save now
 LOADING_LANDS,Exploring new lands…
-CAVE_HINT,A cave: walk in to explore the depths
+LOADING_DEPTHS,Descending into the cave: level %d of %d
+LOADING_SURFACE,Back to the surface
+LOADING_GAME,Loading your game
+CAVE_HINT,A cave: interact to explore the depths
+INTERACT,Interact
 CAVE_CLEARED,This cave has been cleared
 STAIRS_HINT,Stairs going down
 EXIT_HINT,The way back to the surface

@@ -43,14 +43,11 @@ const TOTEM_HINT_DISTANCE := 220.0
 ## Distanza dal mercante entro cui l'HUD suggerisce di toccarlo.
 const MERCHANT_HINT_DISTANCE := 260.0
 const AUTOSAVE_INTERVAL := 300.0
-## Se adesso non si può salvare (sfida in corso), si riprova dopo un po'.
-const AUTOSAVE_RETRY := 15.0
 const SAVE_VERSION := 1
 ## Tempo per frame dedicato a generare il territorio, in microsecondi.
 const REGION_STEP_USEC := 12000
-## Dopo un passaggio (caverna, scale) gli ingressi contano solo dopo
-## essersi allontanati di tanto dal punto d'arrivo.
-const TRIGGER_REARM_DISTANCE := 110.0
+## Si interagisce con gli elementi entro questa distanza dal bordo del personaggio.
+const INTERACT_REACH := 34.0
 ## Distanza dagli ingressi entro cui l'HUD suggerisce cosa fare.
 const PASSAGE_HINT_DISTANCE := 200.0
 ## Nemici più vicini di così impediscono di salvare.
@@ -78,20 +75,20 @@ var _challenge_arena := Vector2.INF
 var _challenge_time := 0.0
 var _challenge_waves: Array = []
 var _challenge_enemies: Array[Enemy] = []
-## Mercante di cui è appena stato aperto il negozio (Vector2.INF se nessuno).
-var _last_merchant := Vector2.INF
+## Elemento con cui si può interagire ora (vuoto se nessuno, vedi _update_interaction).
+var _interactable := {}
 var _dungeon_data: Dictionary = World.DATA.data["dungeon"]
 var _autosave_timer := AUTOSAVE_INTERVAL
+## Il salvataggio automatico è dovuto e aspetta il momento giusto.
+var _autosave_pending := false
 ## Caverna da cui si è scesi (Vector2.INF in superficie), quanti piani ha
 ## il suo sotterraneo e dove si torna in superficie.
 var _cave := Vector2.INF
 var _cave_levels := 0
 var _surface_return := Vector2.ZERO
-## Punto d'arrivo dell'ultimo passaggio (Vector2.INF = nessuno).
-var _rest_point := Vector2.INF
 var _boss: Enemy
-## La generazione del territorio è partita (dopo che si vede la schermata d'attesa).
-var _region_started := false
+## Si sta preparando il territorio dietro la schermata d'attesa.
+var loading := false
 
 
 func _ready() -> void:
@@ -106,6 +103,7 @@ func _ready() -> void:
 	_player.leveled_up.connect(_on_player_leveled_up)
 	_player.died.connect(_on_player_died)
 	_hud.upgrade_chosen.connect(_on_upgrade_chosen)
+	_hud.interact_pressed.connect(_interact)
 	_hud.player = _player
 	_hud.day_night = _day_night
 	_hud.set_health(_player.health, _player.max_health)
@@ -118,7 +116,7 @@ func _ready() -> void:
 	if not save.is_empty():
 		_load(save)
 		return
-	_prepare_region()
+	await _prepare_region(tr("LOADING_LANDS"))
 	for i in ENEMY_COUNT:
 		_spawn_enemy(EnemyTypes.pick_random(_player.level), _random_position(START_SPAWN_RANGE))
 
@@ -128,12 +126,10 @@ func _process(delta: float) -> void:
 		_hud.pause_menu.open(_save_block_reason())
 		return
 	if not get_tree().paused and _world.near_region_edge(_player.position):
-		_regenerate_region()
+		_prepare_region(tr("LOADING_LANDS"))
 		return
 	_update_challenge(delta)
-	_check_chests()
-	_check_merchant()
-	_check_passages()
+	_update_interaction()
 	_update_autosave(delta)
 	# Nel sotterraneo i nemici sono quelli del piano: non ne arrivano altri.
 	_maintain_timer -= delta
@@ -163,10 +159,7 @@ func _update_challenge(delta: float) -> void:
 		if _player.is_dead() or get_tree().paused:
 			return
 		var arena := _world.arena_near(_player.position)
-		var touched := _world.totem_touched(_player.position, Player.RADIUS + 12.0)
-		if touched != Vector2.INF and _world.totem_state(touched) == "ready":
-			_start_challenge(touched)
-		elif arena != Vector2.INF and _world.totem_state(arena) == "ready" \
+		if arena != Vector2.INF and _world.totem_state(arena) == "ready" \
 				and _player.position.distance_to(arena) < TOTEM_HINT_DISTANCE:
 			_hud.show_challenge(tr("CHALLENGE_HINT"))
 		elif _player.position.distance_to(_world.merchant_near(_player.position)) < MERCHANT_HINT_DISTANCE:
@@ -194,13 +187,70 @@ func _update_challenge(delta: float) -> void:
 		_finish_challenge()
 
 
-func _check_chests() -> void:
-	if _player.is_dead():
+## Elemento con cui si può interagire qui vicino (cassa chiusa, mercante,
+## totem pronto, ingresso di una caverna, scala, uscita): sopra compare il
+## tasto con "Interact" e solo premendolo (A / E, o toccando il
+## suggerimento) succede qualcosa. Il tasto A serve anche a saltare: vicino
+## a un elemento interagisce invece di saltare (vedi Player.can_interact).
+func _update_interaction() -> void:
+	_interactable = _find_interactable()
+	_player.can_interact = not _interactable.is_empty()
+	if _interactable.is_empty():
+		_hud.hide_interact()
 		return
-	var chest := _world.chest_touched(_player.position, Player.RADIUS + 10.0)
-	if chest.is_empty():
+	var at: Vector2 = _interactable["position"]
+	_hud.show_interact(at - Vector2(0, _world.elevation_at(at) + float(_interactable["height"])))
+	if Input.is_action_just_pressed("interact"):
+		_interact()
+
+
+func _find_interactable() -> Dictionary:
+	if _player.is_dead() or _challenge_arena != Vector2.INF:
+		return {}
+	var at := _player.position
+	var reach := Player.RADIUS + INTERACT_REACH
+	var chest := _world.chest_touched(at, reach)
+	if not chest.is_empty():
+		return {"type": "chest", "position": chest["position"], "height": 44.0}
+	var merchant := _world.merchant_touched(at, reach)
+	if merchant != Vector2.INF:
+		return {"type": "merchant", "position": merchant, "height": 120.0}
+	var totem := _world.totem_touched(at, reach)
+	if totem != Vector2.INF and _world.totem_state(totem) == "ready":
+		return {"type": "totem", "position": totem, "height": 100.0}
+	for type_id: String in (["cave"] if _cave == Vector2.INF else ["stairs", "exit"]):
+		var passage := _world.touched(type_id, at, reach)
+		if not passage.is_empty() and not (type_id == "cave" and _world.is_cave_cleared(passage["position"])):
+			return {"type": type_id, "position": passage["position"], "height": 96.0}
+	return {}
+
+
+## Interagisce con l'elemento vicino (premendo il tasto o toccando il suggerimento).
+func _interact() -> void:
+	if _interactable.is_empty() or get_tree().paused:
 		return
-	var at: Vector2 = chest["position"]
+	var target := _interactable
+	_interactable = {}
+	_hud.hide_interact()
+	var at: Vector2 = target["position"]
+	match target["type"]:
+		"chest":
+			_open_chest(at)
+		"merchant":
+			_hud.open_shop(at)
+		"totem":
+			_start_challenge(at)
+		"cave":
+			_enter_cave(at)
+		"stairs":
+			Sfx.play("summon", _player.global_position, 0.8)
+			_go_to_depth(_world.dungeon.depth + 1, Vector2.INF)
+		"exit":
+			Sfx.play("level_up", _player.global_position, 0.8)
+			_leave_dungeon()
+
+
+func _open_chest(at: Vector2) -> void:
 	_world.open_chest(at)
 	Sfx.play("chest_open", at)
 	var data := Items.chest_data()
@@ -217,74 +267,36 @@ func _check_chests() -> void:
 	_drop_loot(at, drops)
 
 
-## Toccando il banco del mercante si apre il negozio; si riapre solo dopo
-## essersi allontanati, così non ricompare appena chiuso.
-func _check_merchant() -> void:
-	if _player.is_dead():
-		return
-	if _last_merchant != Vector2.INF:
-		if _player.position.distance_to(_last_merchant) > float(World.DATA.data["merchant"]["reopen_distance"]):
-			_last_merchant = Vector2.INF
-		return
-	var merchant := _world.merchant_touched(_player.position, Player.RADIUS + 10.0)
-	if merchant != Vector2.INF:
-		_last_merchant = merchant
-		_hud.open_shop(merchant)
-
-
 # --- Territorio, caverne e sotterraneo ----------------------------------
 
-## Genera subito la regione attorno al giocatore e mostra i pezzi visibili
-## (all'avvio e dopo un passaggio tra superficie e sotterraneo).
-func _prepare_region() -> void:
-	_world.begin_region(_player.position)
-	_world.generate_region(1 << 30)
-	_world.refresh_now()
-
-
-## Vicino al bordo della zona già generata: si mette in pausa e si genera
-## il territorio attorno, mostrando l'avanzamento.
-func _regenerate_region() -> void:
+## Genera la regione attorno al giocatore e mostra i pezzi visibili, con il
+## gioco in pausa e la schermata d'attesa con l'avanzamento (text): all'avvio,
+## caricando una partita, passando tra superficie e sotterraneo e vicino al
+## bordo della zona già generata. Il lavoro è diviso su più frame, così la
+## schermata resta viva; chi deve aspettare la fine usa await.
+func _prepare_region(text: String, setup := Callable()) -> void:
+	loading = true
 	get_tree().paused = true
-	_hud.show_loading(tr("LOADING_LANDS"), 0.0)
-	_region_started = false
-	get_tree().process_frame.connect(_on_region_step)
-
-
-func _on_region_step() -> void:
-	# Al primo passo si vede appena la schermata d'attesa: si prepara la regione.
-	if not _region_started:
-		_region_started = true
-		_world.begin_region(_player.position)
-		return
-	var progress := _world.generate_region(REGION_STEP_USEC)
-	_hud.show_loading(tr("LOADING_LANDS"), progress)
-	if _world.is_region_ready():
-		get_tree().process_frame.disconnect(_on_region_step)
-		_hud.hide_loading()
-		get_tree().paused = false
-
-
-## Ingressi delle caverne, scale per scendere e uscite del sotterraneo.
-## Dopo un passaggio gli ingressi contano solo dopo essersi allontanati.
-func _check_passages() -> void:
-	if _player.is_dead() or _challenge_arena != Vector2.INF:
-		return
-	if _rest_point != Vector2.INF:
-		if _player.position.distance_to(_rest_point) < TRIGGER_REARM_DISTANCE:
-			return
-		_rest_point = Vector2.INF
-	var reach := Player.RADIUS + 6.0
-	if _cave == Vector2.INF:
-		var cave := _world.touched("cave", _player.position, reach)
-		if not cave.is_empty() and not _world.is_cave_cleared(cave["position"]):
-			_enter_cave(cave["position"])
-	elif not _world.touched("stairs", _player.position, reach).is_empty():
-		Sfx.play("summon", _player.global_position, 0.8)
-		_go_to_depth(_world.dungeon.depth + 1, Vector2.INF)
-	elif not _world.touched("exit", _player.position, reach).is_empty():
-		Sfx.play("level_up", _player.global_position, 0.8)
-		_leave_dungeon()
+	_hud.show_loading(text, 0.0)
+	# Prima si lascia disegnare la schermata d'attesa, poi si prepara il
+	# posto (setup: per esempio il piano del sotterraneo) e il territorio.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if setup.is_valid():
+		setup.call()
+		await get_tree().process_frame
+	_world.begin_region(_player.position)
+	while not _world.is_region_ready():
+		_hud.show_loading(text, _world.generate_region(REGION_STEP_USEC))
+		await get_tree().process_frame
+	_hud.show_loading(text, 1.0)
+	await get_tree().process_frame
+	_world.refresh_now()
+	_minimap.call("reset")
+	await get_tree().process_frame
+	_hud.hide_loading()
+	get_tree().paused = false
+	loading = false
 
 
 ## Suggerimento vicino a un ingresso (chiave del testo, "" se nessuno).
@@ -303,9 +315,9 @@ func _enter_cave(at: Vector2) -> void:
 	_cave_levels = Dungeon.levels_for(_cave_seed())
 	_surface_return = _player.position
 	Sfx.play("summon", _player.global_position, 0.7)
-	_go_to_depth(1, Vector2.INF)
+	await _go_to_depth(1, Vector2.INF)
 	# Autosalvataggio entrando nella caverna.
-	_save(tr("SAVE_AUTO"))
+	_autosave_pending = true
 
 
 ## Seme del sotterraneo della caverna: sempre lo stesso per la stessa caverna.
@@ -317,6 +329,17 @@ func _cave_seed() -> int:
 ## d'arrivo, o in at se viene da un salvataggio), con i suoi nemici e,
 ## all'ultimo piano, il boss.
 func _go_to_depth(depth: int, at: Vector2) -> void:
+	await _prepare_region(tr("LOADING_DEPTHS") % [depth, _cave_levels], _enter_depth.bind(depth, at))
+	var dungeon := _world.dungeon
+	_spawn_dungeon_enemies(dungeon)
+	if dungeon.is_last() and not _world.is_cave_cleared(_cave):
+		_spawn_boss(dungeon)
+	_hud.flash_challenge(tr("DUNGEON_LEVEL") % [depth, dungeon.levels])
+
+
+## Prepara il piano (dietro la schermata d'attesa): sotterraneo nuovo e
+## giocatore davanti al passaggio d'arrivo (o in at).
+func _enter_depth(depth: int, at: Vector2) -> void:
 	_clear_level()
 	var dungeon := Dungeon.new(hash([_cave_seed(), depth]), depth, _cave_levels)
 	_world.set_dungeon(dungeon)
@@ -324,27 +347,21 @@ func _go_to_depth(depth: int, at: Vector2) -> void:
 		# All'arrivo, o se il salvataggio è di una versione in cui il piano era diverso.
 		at = _world.in_front_of_wall(dungeon.arrival, dungeon.arrival_side, ARRIVAL_DISTANCE)
 	_player.teleport(at)
-	_prepare_region()
-	_rest_point = _player.position
 	_day_night.set_override(World._color(_dungeon_data["darkness"]))
-	_minimap.call("reset")
-	_spawn_dungeon_enemies(dungeon)
-	if dungeon.is_last() and not _world.is_cave_cleared(_cave):
-		_spawn_boss(dungeon)
-	_hud.flash_challenge(tr("DUNGEON_LEVEL") % [depth, dungeon.levels])
 
 
 func _leave_dungeon() -> void:
+	await _prepare_region(tr("LOADING_SURFACE"), _return_to_surface)
+	for i in ENEMY_COUNT:
+		_spawn_enemy(EnemyTypes.pick_random(_player.level), _random_position(SPAWN_RANGE))
+
+
+func _return_to_surface() -> void:
 	_clear_level()
 	_world.set_dungeon(null)
 	_day_night.clear_override()
 	_player.teleport(_surface_return)
 	_cave = Vector2.INF
-	_prepare_region()
-	_rest_point = _player.position
-	_minimap.call("reset")
-	for i in ENEMY_COUNT:
-		_spawn_enemy(EnemyTypes.pick_random(_player.level), _random_position(SPAWN_RANGE))
 
 
 ## Toglie nemici, bottino a terra, sangue e corpi del posto che si lascia.
@@ -402,7 +419,6 @@ func _on_boss_died(boss: Enemy) -> void:
 	_drop_loot(boss.global_position, drops)
 	var dungeon := _world.dungeon
 	_world.add_obstacle(_world.make_wall_obstacle("exit", dungeon.arena_exit, dungeon.arena_exit_side))
-	_rest_point = _player.position
 	_player.laugh()
 	_hud.flash_challenge(tr("BOSS_DEFEATED"))
 	Sfx.play("level_up", boss.global_position)
@@ -423,18 +439,26 @@ func _drop_loot(at: Vector2, drops: Array[Array]) -> void:
 
 # --- Salvataggi --------------------------------------------------------
 
+## Salvataggio automatico ogni AUTOSAVE_INTERVAL secondi ed entrando in una
+## caverna: con le stesse regole del salvataggio dal menù per i nemici
+## vicini (si aspetta che non ce ne siano più), mai durante una sfida, da
+## morti, in aria o cadendo in un burrone. Intanto resta in attesa.
 func _update_autosave(delta: float) -> void:
 	_autosave_timer -= delta
-	if _autosave_timer > 0.0:
-		return
-	if _player.is_dead() or _challenge_arena != Vector2.INF:
-		_autosave_timer = AUTOSAVE_RETRY
-		return
-	_save(tr("SAVE_AUTO"))
+	if _autosave_timer <= 0.0:
+		_autosave_pending = true
+		_autosave_timer = AUTOSAVE_INTERVAL
+	if _autosave_pending and _can_autosave():
+		_save(tr("SAVE_AUTO"))
+
+
+func _can_autosave() -> bool:
+	return _save_block_reason() in ["", "SAVE_BLOCKED_MOVING"] and not _player.is_airborne() and not _player.is_falling()
 
 
 func _save(message: String) -> void:
 	_autosave_timer = AUTOSAVE_INTERVAL
+	_autosave_pending = false
 	if SaveGame.write(_save_data()):
 		_hud.flash_challenge(message)
 
@@ -490,16 +514,14 @@ func _load(save: Dictionary) -> void:
 		if _world.is_barrier(World.cell_at(position_saved)):
 			position_saved = _world.safe_position_near(position_saved)
 		_player.teleport(position_saved)
-		# Salvando davanti a una caverna non ci si rientra appena caricato.
-		_rest_point = position_saved
-		_prepare_region()
+		await _prepare_region(tr("LOADING_GAME"))
 		for i in ENEMY_COUNT:
 			_spawn_enemy(EnemyTypes.pick_random(_player.level), _random_position(START_SPAWN_RANGE))
 	else:
 		_cave = SaveGame.vector(dungeon_state["cave"])
 		_cave_levels = int(dungeon_state["levels"])
 		_surface_return = SaveGame.vector(dungeon_state["return"])
-		_go_to_depth(int(dungeon_state["depth"]), position_saved)
+		await _go_to_depth(int(dungeon_state["depth"]), position_saved)
 
 
 # --- Sfide dei totem ---------------------------------------------------
@@ -535,7 +557,7 @@ func _finish_challenge() -> void:
 	var xp := int(data["xp_per_level"]) * _player.level
 	_world.set_totem_state(_challenge_arena, "used")
 	_challenge_arena = Vector2.INF
-	_player.potions = mini(_player.potions + int(data["potion_reward"]), _player.max_potions)
+	_player.potions += int(data["potion_reward"])
 	_hud.flash_challenge(tr("CHALLENGE_WON") % xp)
 	Sfx.play("level_up", _player.global_position)
 	_player.add_experience(xp)
@@ -614,8 +636,6 @@ func _on_player_died() -> void:
 
 func _exit_tree() -> void:
 	HitFeedback.reset()
-	if get_tree().process_frame.is_connected(_on_region_step):
-		get_tree().process_frame.disconnect(_on_region_step)
 
 
 func _back_to_menu() -> void:

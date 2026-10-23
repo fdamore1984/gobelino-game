@@ -11,6 +11,8 @@ const REFRESH_TIME := 0.4
 const REFRESH_DISTANCE := 40.0
 const COLOR_FRAME := Color(0, 0, 0, 0.55)
 const COLOR_BORDER := Color(1, 1, 1, 0.5)
+## Bordo scuro attorno ai segni, perché si leggano su ogni terreno.
+const COLOR_OUTLINE := Color(0, 0, 0, 0.75)
 const COLOR_ENEMY := Color(1.0, 0.2, 0.15)
 const COLOR_CHEST := Color(1.0, 0.82, 0.25)
 const COLOR_OPENED := Color(0.55, 0.5, 0.4)
@@ -93,7 +95,7 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size).grow(3.0), COLOR_FRAME)
 	if _player == null or _center == Vector2.INF:
 		return
-	draw_texture_rect(_texture, Rect2(_to_map(_center - Vector2(RANGE, RANGE)), size), false, Color(1, 1, 1, 0.85))
+	draw_texture_rect(_texture, Rect2(_to_map(_center - Vector2(RANGE, RANGE)), size), false)
 	var world := World.current
 	if world:
 		for point: Dictionary in world.points_of_interest(_player.position, RANGE):
@@ -103,7 +105,8 @@ func _draw() -> void:
 			match point["type"]:
 				"chest":
 					var opened: bool = world.is_chest_opened(point["position"])
-					draw_rect(Rect2(at - Vector2(3, 3), Vector2(6, 6)), COLOR_OPENED if opened else COLOR_CHEST)
+					draw_rect(Rect2(at - Vector2(5, 5), Vector2(10, 10)), COLOR_OUTLINE)
+					draw_rect(Rect2(at - Vector2(4, 4), Vector2(8, 8)), COLOR_OPENED if opened else COLOR_CHEST)
 				"totem":
 					var state := world.totem_state(point["position"])
 					var color := COLOR_TOTEM
@@ -111,24 +114,31 @@ func _draw() -> void:
 						color = COLOR_TOTEM_ACTIVE
 					elif state == "used":
 						color = COLOR_USED
-					draw_colored_polygon(PackedVector2Array([at + Vector2(0, -6), at + Vector2(5, 0), at + Vector2(0, 6), at + Vector2(-5, 0)]), color)
+					draw_colored_polygon(PackedVector2Array([at + Vector2(0, -9), at + Vector2(7, 0), at + Vector2(0, 9), at + Vector2(-7, 0)]), COLOR_OUTLINE)
+					draw_colored_polygon(PackedVector2Array([at + Vector2(0, -7), at + Vector2(5.5, 0), at + Vector2(0, 7), at + Vector2(-5.5, 0)]), color)
 				"merchant":
 					# Una tenda: tetto a triangolo sopra il banco.
-					draw_colored_polygon(PackedVector2Array([at + Vector2(-6, -1), at + Vector2(6, -1), at + Vector2(0, -7)]), COLOR_MERCHANT)
-					draw_rect(Rect2(at + Vector2(-4, -1), Vector2(8, 5)), COLOR_MERCHANT.darkened(0.3))
+					draw_rect(Rect2(at + Vector2(-8, -10), Vector2(16, 17)), COLOR_OUTLINE)
+					draw_colored_polygon(PackedVector2Array([at + Vector2(-7, -1), at + Vector2(7, -1), at + Vector2(0, -9)]), COLOR_MERCHANT)
+					draw_rect(Rect2(at + Vector2(-5, -1), Vector2(10, 6)), COLOR_MERCHANT.darkened(0.3))
 	for node in get_tree().get_nodes_in_group("loot"):
 		var at := _to_map((node as Node2D).global_position)
 		if _inside(at):
-			draw_circle(at, 2.0, COLOR_LOOT)
+			draw_circle(at, 3.5, COLOR_OUTLINE)
+			draw_circle(at, 2.5, COLOR_LOOT)
 	for node in get_tree().get_nodes_in_group("enemies"):
 		var at := _to_map((node as Node2D).global_position)
 		if _inside(at):
-			draw_circle(at, 3.0, COLOR_ENEMY)
+			draw_circle(at, 5.0, COLOR_OUTLINE)
+			draw_circle(at, 3.8, COLOR_ENEMY)
 	# Giocatore: freccia nella direzione in cui guarda.
 	var center := _to_map(_player.position)
 	var facing := _player.facing
 	draw_colored_polygon(PackedVector2Array([
-		center + facing * 7.0, center - facing * 4.0 + facing.orthogonal() * 4.5, center - facing * 4.0 - facing.orthogonal() * 4.5,
+		center + facing * 11.0, center - facing * 6.5 + facing.orthogonal() * 7.5, center - facing * 6.5 - facing.orthogonal() * 7.5,
+	]), COLOR_OUTLINE)
+	draw_colored_polygon(PackedVector2Array([
+		center + facing * 9.0, center - facing * 5.0 + facing.orthogonal() * 5.5, center - facing * 5.0 - facing.orthogonal() * 5.5,
 	]), Color.WHITE)
 	draw_rect(Rect2(Vector2.ZERO, size), COLOR_BORDER, false, 2.0)
 

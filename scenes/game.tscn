@@ -36,10 +36,10 @@ unique_name_in_owner = true
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -196.0
+offset_left = -216.0
 offset_top = 16.0
 offset_right = -16.0
-offset_bottom = 196.0
+offset_bottom = 216.0
 grow_horizontal = 0
 mouse_filter = 2
 script = ExtResource("7_minimap")
@@ -50,9 +50,9 @@ anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
 offset_left = -330.0
-offset_top = 212.0
+offset_top = 234.0
 offset_right = -16.0
-offset_bottom = 252.0
+offset_bottom = 274.0
 grow_horizontal = 0
 theme_override_constants/separation = 4
 
@@ -189,11 +189,6 @@ custom_minimum_size = Vector2(222, 176)
 layout_mode = 2
 
 [node name="UpgradeHealth" type="Button" parent="HUD/LevelUp/Center/VBox/Upgrades"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(222, 176)
-layout_mode = 2
-
-[node name="UpgradePotion" type="Button" parent="HUD/LevelUp/Center/VBox/Upgrades"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(222, 176)
 layout_mode = 2

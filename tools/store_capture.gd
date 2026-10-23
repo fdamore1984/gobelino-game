@@ -59,7 +59,7 @@ func _capture_menu(language: String) -> void:
 ## Colpo potente in fondo alla combo, un bruto che carica, un evocatore
 ## che evoca, nemici attorno; scudo attivo.
 func _capture_combat(language: String) -> void:
-	_start_game(Vector2(0, 20), 1.15)
+	await _start_game(Vector2(0, 20), 1.15)
 	_player.level = 3
 	_player.experience = 170
 	_player.facing = Vector2(1, -0.2).normalized()
@@ -90,7 +90,7 @@ func _capture_combat(language: String) -> void:
 
 ## Parata perfetta: aura del potenziamento e nemico stordito.
 func _capture_parry(language: String) -> void:
-	_start_game(Vector2(0, 0), 1.3)
+	await _start_game(Vector2(0, 0), 1.3)
 	_player.level = 2
 	_player.experience = 60
 	_player.facing = Vector2.RIGHT
@@ -107,7 +107,7 @@ func _capture_parry(language: String) -> void:
 
 
 func _capture_level_up(language: String) -> void:
-	_start_game(Vector2(0, 0), 1.0)
+	await _start_game(Vector2(0, 0), 1.0)
 	_player.level = 3
 	_hud_stats()
 	_enemy("warrior", Vector2(200, 60), Enemy.State.CHASE, 0.0)
@@ -122,7 +122,7 @@ func _capture_level_up(language: String) -> void:
 
 ## Sfida del totem: il giocatore al centro dell'arena, l'ondata in arrivo.
 func _capture_challenge(language: String) -> void:
-	_start_game(Vector2(0, 30), 1.0)
+	await _start_game(Vector2(0, 30), 1.0)
 	var world: World = _game.get_node("World")
 	# L'arena più vicina alla partenza, cercata regione per regione.
 	var arena := Vector2.INF
@@ -181,7 +181,7 @@ func _capture_challenge(language: String) -> void:
 
 ## Inventario con qualche oggetto trovato nelle casse.
 func _capture_inventory(language: String) -> void:
-	_start_game(Vector2(0, 0), 1.0)
+	await _start_game(Vector2(0, 0), 1.0)
 	_player.level = 4
 	_hud_stats()
 	for id in ["sword_steel", "armor_leather", "boots_swift", "amulet_mana", "ring_fire", "book_fire", "potion_health", "potion_mana", "sword_iron"]:
@@ -200,7 +200,7 @@ func _capture_inventory(language: String) -> void:
 
 ## Il banco di un mercante nel mondo e il suo negozio aperto.
 func _capture_merchant(language: String) -> void:
-	_start_game(Vector2(0, -40), 1.25)
+	await _start_game(Vector2(0, -40), 1.25)
 	_player.level = 5
 	_hud_stats()
 	var site := _nearest_merchant()
@@ -235,7 +235,7 @@ func _capture_merchant(language: String) -> void:
 ## Colpo a terra dopo la combo: onda d'urto, nemici colpiti che perdono
 ## sangue e nemici abbattuti stesi a terra.
 func _capture_slam(language: String) -> void:
-	_start_game(Vector2(0, -10), 1.2)
+	await _start_game(Vector2(0, -10), 1.2)
 	_player.level = 6
 	_hud_stats()
 	var origin := _player.position
@@ -279,7 +279,7 @@ func _capture_slam(language: String) -> void:
 
 ## Ingresso di una caverna nella parete di una montagna.
 func _capture_cave(language: String) -> void:
-	_start_game(Vector2(0, -60), 1.0)
+	await _start_game(Vector2(0, -60), 1.0)
 	_player.level = 5
 	_hud_stats()
 	var cave := _nearest("cave")
@@ -288,20 +288,24 @@ func _capture_cave(language: String) -> void:
 	_player.facing = -into.normalized()
 	var hud: Hud = _game.get_node("HUD")
 	hud.show_challenge(tr("CAVE_HINT"))
+	var world: World = _game.get_node("World")
 	await _frames(20)
+	# Il suggerimento "Interact" sopra l'ingresso (il gioco qui è fermo).
+	hud.show_interact(cave["position"] - Vector2(0, world.elevation_at(cave["position"]) + 96.0))
+	await _frames(2)
 	await _save("%s_11_cave.png" % language)
 	_end_game()
 
 
 ## Ultimo piano del sotterraneo: al buio con la torcia, davanti al boss.
 func _capture_dungeon(language: String) -> void:
-	_start_game(Vector2(0, -40), 1.0)
+	await _start_game(Vector2(0, -40), 1.0)
 	_player.level = 6
 	_hud_stats()
 	var cave := _nearest("cave")
 	_game._cave = cave["position"]
 	_game._cave_levels = 3
-	_game._go_to_depth(3, Vector2.INF)
+	await _game._go_to_depth(3, Vector2.INF)
 	var world: World = _game.get_node("World")
 	var arena := World.cell_center(world.dungeon.arena)
 	await _place_player(arena + Vector2(-150, 140))
@@ -360,7 +364,7 @@ func _nearest_merchant() -> Vector2:
 
 
 func _capture_cover(language: String) -> void:
-	_start_game(Vector2(0, -60), 1.7)
+	await _start_game(Vector2(0, -60), 1.7)
 	_game.get_node("HUD").visible = false
 	_player.facing = Vector2(1, 0.15).normalized()
 	_player._state = Player.State.PARRY
@@ -395,6 +399,10 @@ func _start_game(camera_offset: Vector2, zoom: float) -> void:
 	_game = (load("res://scenes/game.tscn") as PackedScene).instantiate()
 	(_game.get_node("World") as World).seed_value = WORLD_SEED
 	add_child(_game)
+	# Si aspetta che il territorio sia pronto (schermata d'attesa chiusa).
+	await get_tree().process_frame
+	while _game.loading:
+		await get_tree().process_frame
 	_game.set_process(false)
 	for enemy in get_tree().get_nodes_in_group("enemies"):
 		enemy.queue_free()

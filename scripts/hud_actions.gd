@@ -82,9 +82,9 @@ func _is_ready(kind: String) -> bool:
 func _count(kind: String) -> String:
 	match kind:
 		"potion":
-			return "%d/%d" % [player.potions, player.max_potions]
+			return str(player.potions)
 		"mana":
-			return "%d/%d" % [player.mana_potions, player.max_mana_potions]
+			return str(player.mana_potions)
 		"spell":
 			return str(roundi(Player.SPELL_COST))
 		"bag":
