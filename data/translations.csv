@@ -5,19 +5,12 @@ MENU_VERSION,Version %s
 HUD_HEALTH,Health  %d / %d
 HUD_KILLS,Enemies defeated  %d
 HUD_DEFEAT,Defeated!
-FX_DODGED,Dodged!
-FX_BLOCKED,Blocked
-FX_PERFECT_PARRY,Perfect parry!
-FX_EMPOWERED,Empowered!
 TOUCH_ATTACK,Attack
 TOUCH_PARRY,Parry
 TOUCH_DODGE,Dodge
 TOUCH_MENU,Menu
 HUD_LEVEL,Level %d
 HUD_XP,XP %d / %d
-FX_XP,+%d XP
-FX_COMBO,Combo x%d
-FX_LEVEL_UP,Level up!
 LEVELUP_TITLE,Level %d!
 LEVELUP_DAMAGE,Base damage: %d → %d
 LEVELUP_CHOOSE,Choose an upgrade
@@ -28,10 +21,6 @@ HUD_POTIONS,Potions  %d / %d
 HUD_SHIELD_READY,Shield: ready
 HUD_SHIELD_ACTIVE,Shield: active
 HUD_SHIELD_COOLDOWN,Shield: %d s
-FX_HEAVY,Power strike!
-FX_POTION,+%d HP
-FX_SHIELD_UP,Shield!
-FX_SHIELD_BLOCK,Absorbed!
 UPGRADE_HEAVY,Chained power strikes +1
 UPGRADE_POTION,Potions +1
 UPGRADE_SHIELD,Shield recharge -2%
@@ -39,7 +28,6 @@ TOUCH_HEAVY,Power
 TOUCH_POTION,Potion
 TOUCH_SHIELD,Shield
 HUD_STATS,Combo %d · Power strikes %d · Dodges %d · Jumps %d · Run %d%%
-FX_JUMPED,Jumped!
 UPGRADE_JUMP,Chained jumps +1
 UPGRADE_RUN,Run speed +2%
 TOUCH_JUMP,Jump
@@ -60,11 +48,9 @@ POWERUP_SHIELD,Shield recharge
 POWERUP_RUN,Run speed
 POWERUP_EMPOWERED,Perfect parry: empowered attacks %d s
 POWERUP_SHIELD_ACTIVE,Shield active
-FX_THORNS,Thorns!
 CHALLENGE_HINT,Touch the totem to start a survival challenge
 CHALLENGE_STATUS,Survive! %d s · Enemies: %d
 CHALLENGE_WON,Challenge complete! +%d XP and a potion
-FX_CHALLENGE,Challenge!
 HUD_MANA,Mana %d/%d · Mana potions %d/%d
 HUD_GOLD,Gold %d
 POWERUP_TORCH,Torch lit
@@ -72,9 +58,6 @@ POWERUP_MANA,Max mana
 POWERUP_SPELL,Fireball
 UPGRADE_MANA,Max mana +20
 UPGRADE_SPELL,Spell power +20%
-FX_MANA_POTION,+Mana
-FX_NO_MANA,Not enough mana
-FX_GOLD,+%d gold
 INVENTORY_TITLE,Inventory
 INVENTORY_EQUIPPED,"Equipment: weapon, armor, boots, amulet, ring"
 INVENTORY_EMPTY,Nothing yet: open chests to find items
@@ -155,7 +138,6 @@ CONTROLS_SPECIAL_PLUNGE,"Power strike in mid-air: plunge onto the ground, hittin
 CONTROLS_SPECIAL_DASH,Power strike during an air dash: dash strike that smashes a wide area
 CONTROLS_TOUCH,On touch screens use the on-screen buttons
 CONTROLS_BACK,Back
-FX_SLAM,Slam!
 MENU_CONTINUE,Continue
 PAUSE_TITLE,Paused
 PAUSE_RESUME,Resume
@@ -179,8 +161,6 @@ BOSS_DEFEATED,Guardian defeated! The way out is open
 MENU_CREDITS,Created by fdamore1984 with Claude Code
 CONTROLS_LOCK,Lock on the nearest enemy (press again to switch) | C | R3
 TOUCH_LOCK,Lock
-FX_GIGGLE,Hehehe!
-FX_FELL,Fell!
 ITEM_BLADE_GUARDIAN,Guardian's blade
 ITEM_ARMOR_GUARDIAN,Guardian's armor
 ITEM_BOOTS_GUARDIAN,Guardian's boots

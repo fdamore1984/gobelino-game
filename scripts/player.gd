@@ -34,7 +34,7 @@ signal experience_changed(current: int, needed: int, level: int)
 signal leveled_up(level: int)
 signal died
 
-enum State { NORMAL, ATTACK, PARRY, DODGE, SLIDE, HURT, DEAD, SLAM, FALL }
+enum State { NORMAL, ATTACK, PARRY, DODGE, SLIDE, HURT, DEAD, SLAM, FALL, RECOIL }
 
 const RADIUS := 22.0
 const START_HEALTH := 5
@@ -134,12 +134,12 @@ const EMPOWER_TIME := 4.0
 const EMPOWER_DAMAGE_FACTOR := 2.0
 const EMPOWER_ATTACK_SPEED := 1.7
 
-const DODGE_SPEED := 760.0
+const DODGE_SPEED := 620.0
 const DODGE_TIME := 0.28
 const DODGE_INVULNERABLE_TIME := 0.24
 ## Premendo di nuovo durante una schivata (o subito dopo) se ne concatena
 ## un'altra, fino al numero massimo di schivate.
-const START_CHAINED_DODGES := 2
+const START_CHAINED_DODGES := 1
 const DODGE_CHAIN_MIN_TIME := 0.04
 const DODGE_CHAIN_GRACE := 0.15
 ## All'inizio di ogni schivata la direzione segue ancora la levetta, così
@@ -164,7 +164,9 @@ const SLIDE_INVULNERABLE_TIME := 0.25
 ## Salto: serve per salire sui blocchi più alti del terreno (vedi World)
 ## e in aria gli attacchi dei nemici passano sotto. Si parte con un salto;
 ## i potenziamenti permettono salti consecutivi in aria.
-const JUMP_SPEED := 520.0
+const JUMP_SPEED := 480.0
+## In aria la velocità orizzontale scende a questa parte.
+const AIR_SPEED_FACTOR := 0.85
 const GRAVITY := 1800.0
 ## A terra la schivata è una capriola; in aria è uno scatto nella direzione
 ## di movimento, durante il quale si scende più piano.
@@ -231,6 +233,13 @@ const THORNS_INVULNERABLE_TIME := 0.4
 const BOUNCE_MIN_SPEED := 200.0
 const BOUNCE_FACTOR := 0.45
 const BOUNCE_MAX_SPEED := 180.0
+
+## Colpo parato dalla guardia di un nemico: la combo si interrompe e si
+## viene respinti indietro per REPEL_TIME secondi (schivata e parata restano
+## possibili).
+const REPEL_SPEED := 420.0
+const REPEL_TIME := 0.35
+const COLOR_GUARD_SPARK := Color(0.8, 0.9, 1.0)
 
 const HURT_TIME := 0.25
 const HURT_KNOCKBACK := 420.0
@@ -313,6 +322,9 @@ var _queued_attack := ""
 var _attack_resolved := false
 ## Velocità dell'attacco in corso: resta quella con cui è iniziato.
 var _attack_speed := 1.0
+## Cresce a ogni attacco di spada (non gli attacchi a terra): i nemici lo
+## guardano per decidere se alzare la guardia (vedi Enemy).
+var attack_serial := 0
 ## L'attacco in corso è partito in aria (attacco aereo).
 var _air_attack := false
 ## Movimento del colpo normale in corso (indice in ATTACK_STYLES).
@@ -425,7 +437,9 @@ func _physics_process(delta: float) -> void:
 				_target_facing = input.normalized()
 			_face_lock()
 			var running := Input.is_action_pressed("run") and input != Vector2.ZERO
-			_velocity = _accelerate(_velocity, input * (run_speed() if running else walk_speed()), delta)
+			# In aria si avanza un po' più piano: il salto porta meno lontano.
+			var air := AIR_SPEED_FACTOR if is_airborne() else 1.0
+			_velocity = _accelerate(_velocity, input * (run_speed() if running else walk_speed()) * air, delta)
 			if Input.is_action_just_pressed("jump"):
 				_jump()
 			if Input.is_action_just_pressed("dodge"):
@@ -528,6 +542,15 @@ func _physics_process(delta: float) -> void:
 
 		State.SLAM:
 			_update_slam(input, delta)
+
+		State.RECOIL:
+			_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * 1.5 * delta)
+			if Input.is_action_just_pressed("dodge") and _dodge_cooldown == 0.0:
+				_start_dodge(dodge_input)
+			elif Input.is_action_just_pressed("parry"):
+				_change_state(State.PARRY)
+			elif _state_time >= REPEL_TIME:
+				_change_state(State.NORMAL)
 
 		State.FALL:
 			_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * delta)
@@ -645,7 +668,6 @@ func _scratch(damage: int) -> void:
 		return
 	health = maxi(health - damage, 0)
 	health_changed.emit(health, max_health)
-	FloatingText.spawn(get_parent(), global_position, tr("FX_THORNS"), COLOR_HURT)
 	if health == 0:
 		_change_state(State.DEAD)
 		Sfx.play("death", global_position)
@@ -718,6 +740,9 @@ func _update_attack(input: Vector2, delta: float) -> void:
 	if not _attack_resolved and _state_time >= windup:
 		_attack_resolved = true
 		_resolve_attack()
+		# Parato dalla guardia di un nemico: si è stati respinti.
+		if _state != State.ATTACK:
+			return
 	if _queued_attack != "" and _state_time >= windup + active:
 		if _queued_attack == "heavy":
 			_start_heavy(input)
@@ -747,7 +772,6 @@ func receive_hit(from: Vector2, damage: int) -> String:
 		return "ignored"
 	if (_state == State.DODGE and _state_time <= DODGE_INVULNERABLE_TIME) \
 			or (_state == State.SLIDE and _state_time <= SLIDE_INVULNERABLE_TIME):
-		FloatingText.spawn(get_parent(), global_position, tr("FX_DODGED"), COLOR_BODY)
 		return "dodged"
 	# Sopra il nemico (saltando o su un gradino più alto) il colpo passa sotto.
 	var attacker_height := World.current.elevation_at(from) if World.current else 0.0
@@ -755,7 +779,6 @@ func receive_hit(from: Vector2, damage: int) -> String:
 	if above > JUMP_EVADE_HEIGHT:
 		if not is_airborne():
 			return "ignored"
-		FloatingText.spawn(get_parent(), global_position, tr("FX_JUMPED"), COLOR_BODY)
 		return "dodged"
 	if above < -HIT_HEIGHT_REACH:
 		return "ignored"
@@ -765,12 +788,9 @@ func receive_hit(from: Vector2, damage: int) -> String:
 		_block_flash = 0.2
 		if _state_time <= PERFECT_PARRY_WINDOW:
 			_empowered_time = EMPOWER_TIME
-			FloatingText.spawn(get_parent(), global_position, tr("FX_PERFECT_PARRY"), COLOR_SHIELD)
-			FloatingText.spawn(get_parent(), global_position, tr("FX_EMPOWERED"), COLOR_EMPOWERED, 28.0)
 			Sfx.play("perfect", global_position)
 			return "parried"
 		_push(-to_attacker * 12.0)
-		FloatingText.spawn(get_parent(), global_position, tr("FX_BLOCKED"), COLOR_SHIELD)
 		Sfx.play("block", global_position)
 		return "blocked"
 
@@ -778,7 +798,6 @@ func receive_hit(from: Vector2, damage: int) -> String:
 		# Lo scudo assorbe un colpo da qualsiasi direzione e poi si rompe.
 		shield_active = false
 		_invulnerable_time = 0.3
-		FloatingText.spawn(get_parent(), global_position, tr("FX_SHIELD_BLOCK"), COLOR_BUBBLE)
 		Sfx.play("shield_break", global_position)
 		return "shielded"
 
@@ -803,7 +822,24 @@ func is_dead() -> bool:
 ## Risatina da goblin, per esempio dopo aver sconfitto un boss.
 func laugh() -> void:
 	Sfx.play("giggle", global_position)
-	FloatingText.spawn(get_parent(), global_position, tr("FX_GIGGLE"), COLOR_EMPOWERED, 30.0)
+
+
+## L'attacco è in corso (i nemici possono alzare la guardia).
+func is_attacking() -> bool:
+	return _state == State.ATTACK
+
+
+## Un nemico in guardia (in from) ha parato il colpo: la combo si
+## interrompe e si viene respinti indietro, con un lampo e un suono di metallo.
+func _repel(from: Vector2) -> void:
+	_end_combo()
+	_charging = false
+	_carry_velocity = Vector2.ZERO
+	_velocity = (global_position - from).normalized() * REPEL_SPEED
+	_shake = maxf(_shake, 0.35)
+	_change_state(State.RECOIL)
+	Sfx.play("block", global_position)
+	HitFeedback.hit(get_tree(), 0.07)
 
 
 ## Completamente fermo, a terra e senza fare niente: si può salvare.
@@ -824,7 +860,6 @@ func _climb_out_of_ravine() -> void:
 	var data: Dictionary = World.DATA.data["terrain"]
 	health = maxi(health - int(data["ravine_damage"]), 0)
 	health_changed.emit(health, max_health)
-	FloatingText.spawn(get_parent(), global_position, tr("FX_FELL"), COLOR_HURT)
 	if health == 0:
 		_change_state(State.DEAD)
 		Sfx.play("death", global_position)
@@ -944,6 +979,10 @@ func load_state(data: Dictionary) -> void:
 	var taken: Dictionary = data.get("upgrades_taken", {})
 	for key: String in taken:
 		upgrades_taken[key] = int(taken[key])
+	# Le schivate di partenza sono cambiate (da 2 a 1): si ricalcolano dai
+	# potenziamenti scelti, se il salvataggio li ha.
+	if data.has("upgrades_taken"):
+		max_chained_dodges = START_CHAINED_DODGES + int(upgrades_taken.get("dodge", 0))
 	# Oggetti che questa versione non conosce più vengono scartati.
 	inventory.items.clear()
 	var known: Dictionary = Items.DATA.data["items"]
@@ -1099,8 +1138,6 @@ func _start_attack(step: int, input: Vector2) -> void:
 	_attack_heavy = false
 	_begin_attack(input)
 	Sfx.play("swing", global_position, 1.0 + 0.12 * (_combo_step - 1))
-	if _combo_step > 1:
-		FloatingText.spawn(get_parent(), global_position, tr("FX_COMBO") % _combo_step, COLOR_SLASH, 12.0)
 
 
 func _start_heavy(input: Vector2) -> void:
@@ -1125,8 +1162,6 @@ func _start_heavy(input: Vector2) -> void:
 	_begin_attack(input)
 	_charging = true
 	Sfx.play("heavy_swing", global_position, 1.0 + 0.08 * (_heavy_step - 1))
-	if _combo_step > 0 or _heavy_step > 1:
-		FloatingText.spawn(get_parent(), global_position, tr("FX_HEAVY"), COLOR_HEAVY, 12.0)
 
 
 func _begin_attack(input: Vector2) -> void:
@@ -1134,6 +1169,7 @@ func _begin_attack(input: Vector2) -> void:
 	_charge = 0.0
 	_charging = false
 	_air_attack = is_airborne()
+	attack_serial += 1
 	if _state != State.ATTACK:
 		_walk_velocity = _velocity.limit_length(walk_speed() * ATTACK_MOVE_FACTOR)
 		# In aria lo slancio del salto (o dello scatto) continua e si esaurisce piano.
@@ -1246,7 +1282,6 @@ func _slam_impact() -> void:
 		HitSpark.spawn(get_parent(), enemy.global_position - direction * enemy.radius * 0.8, enemy.ground_elevation + enemy.radius * 0.5, 40.0, COLOR_HEAVY)
 		landed = true
 	GroundFx.shockwave(global_position, ground_elevation, radius)
-	FloatingText.spawn(get_parent(), global_position, tr("FX_SLAM"), COLOR_HEAVY, 12.0)
 	Sfx.play("fireball_hit", global_position, 0.6)
 	if landed:
 		Sfx.play("hit", global_position, 0.7)
@@ -1317,7 +1352,6 @@ func _drink_potion() -> void:
 	potions -= 1
 	health += healed
 	health_changed.emit(health, max_health)
-	FloatingText.spawn(get_parent(), global_position, tr("FX_POTION") % healed, COLOR_HEAL)
 	Sfx.play("potion", global_position)
 
 
@@ -1326,7 +1360,6 @@ func _drink_mana_potion() -> void:
 		return
 	mana_potions -= 1
 	mana = minf(mana + MANA_POTION_RESTORE, max_mana)
-	FloatingText.spawn(get_parent(), global_position, tr("FX_MANA_POTION"), COLOR_MANA)
 	Sfx.play("mana_potion", global_position)
 
 
@@ -1336,7 +1369,6 @@ func _cast_fireball(input: Vector2) -> void:
 	if _spell_cooldown > 0.0:
 		return
 	if mana < SPELL_COST:
-		FloatingText.spawn(get_parent(), global_position, tr("FX_NO_MANA"), COLOR_MANA)
 		_spell_cooldown = SPELL_COOLDOWN
 		return
 	mana -= SPELL_COST
@@ -1360,25 +1392,19 @@ func pickup(id: String, amount := 1) -> void:
 		"gold":
 			inventory.gold += amount
 			Sfx.play("coin", global_position)
-			FloatingText.spawn(get_parent(), global_position, tr("FX_GOLD") % amount, Items.color(id))
 			return
 		"potion_health":
 			if potions < max_potions:
 				potions += 1
-				_pickup_text(id)
+				Sfx.play("pickup", global_position)
 				return
 		"potion_mana":
 			if mana_potions < max_mana_potions:
 				mana_potions += 1
-				_pickup_text(id)
+				Sfx.play("pickup", global_position)
 				return
 	inventory.add(id)
-	_pickup_text(id)
-
-
-func _pickup_text(id: String) -> void:
 	Sfx.play("pickup", global_position)
-	FloatingText.spawn(get_parent(), global_position, tr(Items.name_key(id)), Items.color(id))
 
 
 ## Usa un oggetto dell'inventario: indossa o toglie l'equipaggiamento,
@@ -1422,7 +1448,6 @@ func _raise_shield() -> void:
 		return
 	shield_active = true
 	shield_cooldown = shield_cooldown_max
-	FloatingText.spawn(get_parent(), global_position, tr("FX_SHIELD_UP"), COLOR_BUBBLE)
 	Sfx.play("shield_up", global_position)
 
 
@@ -1462,6 +1487,7 @@ func _resolve_attack() -> void:
 	var landed := false
 	# In aria si arriva anche ai nemici sotto di sé.
 	var reach_below := AIR_ATTACK_REACH if _air_attack or is_airborne() else HIT_HEIGHT_REACH
+	var blocked_by: Enemy = null
 	for node in get_tree().get_nodes_in_group("enemies"):
 		var enemy := node as Enemy
 		if enemy == null or enemy.is_dead():
@@ -1474,12 +1500,20 @@ func _resolve_attack() -> void:
 			continue
 		# A contatto si colpisce sempre, altrimenti serve essere girati verso il nemico.
 		if offset.length() <= RADIUS + enemy.radius or absf(facing.angle_to(offset)) <= _attack_arc() / 2.0:
+			if enemy.blocks(global_position):
+				# La guardia para il colpo: lampo nel punto d'incontro.
+				blocked_by = enemy
+				HitSpark.spawn(get_parent(), enemy.global_position - offset.normalized() * (enemy.radius + 10.0),
+						enemy.ground_elevation + enemy.radius * 0.9, 56.0, COLOR_GUARD_SPARK)
+				continue
 			enemy.take_damage(damage, offset.normalized(), heavy)
 			landed = true
 			# Scintilla nel punto di contatto, sul lato del nemico rivolto verso di noi.
 			var contact := enemy.global_position - offset.normalized() * enemy.radius * 0.8
 			HitSpark.spawn(get_parent(), contact, enemy.ground_elevation + enemy.radius * 0.9,
 					40.0 if _attack_heavy else 28.0, COLOR_HEAVY if _attack_heavy else COLOR_SLASH)
+	if blocked_by:
+		_repel(blocked_by.global_position)
 	if landed:
 		Sfx.play("hit", global_position, 0.8 if _attack_heavy else 1.0 + 0.1 * (_combo_step - 1))
 		# Un attimo di fermo: si sente il colpo (più lungo per il colpo potente).
@@ -1557,12 +1591,6 @@ func _draw() -> void:
 		if torch_on:
 			_draw_torch()
 
-	if _state == State.PARRY:
-		var shield := COLOR_SHIELD
-		if _state_time <= PERFECT_PARRY_WINDOW or _block_flash > 0.0:
-			shield = Color.WHITE
-		draw_arc(Vector2.ZERO, RADIUS + 10.0, facing.angle() - PARRY_ARC / 2.0, facing.angle() + PARRY_ARC / 2.0, 24, shield, 6.0)
-
 	# Scudo attivo: una bolla attorno al personaggio.
 	if shield_active and _state != State.DEAD:
 		Shapes.disc(self, Vector2.ZERO, RADIUS + 16.0, Color(COLOR_BUBBLE, 0.15))
@@ -1581,6 +1609,16 @@ func _draw_sword() -> void:
 		tint = Color(1.0, 0.95, 0.7)
 	if _state == State.SLAM:
 		_draw_slam_sword(tint)
+		return
+	if _state == State.PARRY:
+		# In parata la spada è di traverso davanti al corpo: si illumina
+		# all'inizio (quando la parata sarebbe perfetta) e quando para un colpo.
+		var across := -facing.orthogonal()
+		var center := facing * RADIUS * 0.95
+		if _state_time <= PERFECT_PARRY_WINDOW or _block_flash > 0.0:
+			Shapes.disc(self, center, 14.0, Color(COLOR_SHIELD, 0.45))
+			tint = Color(1.3, 1.3, 1.4)
+		BodyParts.draw_sword(self, center - across * SWORD_LENGTH * 0.45, across.angle(), SWORD_LENGTH, SWORD_WIDTH, tint)
 		return
 	if _state != State.ATTACK:
 		var rest := facing.angle() + 0.6

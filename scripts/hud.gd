@@ -1,7 +1,8 @@
 class_name Hud
 extends CanvasLayer
 ## Interfaccia del livello di test: pannello di stato in alto a sinistra
-## (HudStatus), ciclo del giorno accanto alla minimappa (DayClock), barra delle azioni in basso a sinistra (HudActions), comandi, sfida del totem in corso, potenziamenti attivi (lista a destra),
+## (HudStatus), ciclo del giorno accanto alla minimappa (DayClock), bordi
+## rossi con poca vita (LowHealthVignette), barra delle azioni in basso a sinistra (HudActions), comandi, sfida del totem in corso, potenziamenti attivi (lista a destra),
 ## scelta del potenziamento salendo di livello (tre schede con icone, prese
 ## a caso) e messaggio di fine partita.
 
@@ -43,6 +44,7 @@ var _actions := HudActions.new()
 var _boss_bar := BossBar.new()
 var _loading := LoadingOverlay.new()
 var _clock := DayClock.new()
+var _vignette := LowHealthVignette.new()
 ## Menù di pausa: Game si collega ai suoi segnali (salva, esci).
 var pause_menu := PauseMenu.new()
 @onready var _message: Label = %Message
@@ -92,6 +94,9 @@ func _ready() -> void:
 	move_child(_boss_bar, 0)
 	add_child(_clock)
 	move_child(_clock, 0)
+	# Bordi rossi con poca vita, sotto tutto il resto dell'interfaccia.
+	add_child(_vignette)
+	move_child(_vignette, 0)
 	# Pannelli sotto tutto il resto (potenziamenti, inventario, messaggi).
 	add_child(_status)
 	move_child(_status, 0)
@@ -121,6 +126,7 @@ func _process(delta: float) -> void:
 	_shop_panel.player = player
 	_status.player = player
 	_actions.player = player
+	_vignette.player = player
 	_update_power_ups()
 
 
