@@ -512,7 +512,6 @@ func _start_challenge(arena: Vector2) -> void:
 	_challenge_enemies.clear()
 	_world.set_totem_state(arena, "active")
 	Sfx.play("summon", arena)
-	FloatingText.spawn(_entities, _player.global_position, tr("FX_CHALLENGE"), Player.COLOR_EMPOWERED, 40.0)
 
 
 ## Ondata di nemici dal bordo dell'arena: quanti e quanto forti dipende
@@ -538,7 +537,6 @@ func _finish_challenge() -> void:
 	_challenge_arena = Vector2.INF
 	_player.potions = mini(_player.potions + int(data["potion_reward"]), _player.max_potions)
 	_hud.flash_challenge(tr("CHALLENGE_WON") % xp)
-	FloatingText.spawn(_entities, _player.global_position, tr("FX_XP") % xp, COLOR_XP, 24.0)
 	Sfx.play("level_up", _player.global_position)
 	_player.add_experience(xp)
 
@@ -573,7 +571,6 @@ func _on_summon_requested(summoner: Enemy, type_id: String, positions: Array[Vec
 func _on_enemy_died(enemy: Enemy) -> void:
 	_kills += 1
 	_hud.set_kills(_kills)
-	FloatingText.spawn(_entities, enemy.global_position, tr("FX_XP") % enemy.xp_reward, COLOR_XP, 24.0)
 	Sfx.play("xp", enemy.global_position)
 	_player.add_experience(enemy.xp_reward)
 	# Ogni tanto un nemico lascia monete o un oggetto (il boss ha il suo bottino).
@@ -595,7 +592,6 @@ func _show_level_up() -> void:
 	var reached := _player.level - _pending_level_ups + 1
 	var damage_before := Player.BASE_DAMAGE + Player.DAMAGE_PER_LEVEL * (reached - 2)
 	var damage_after := damage_before + Player.DAMAGE_PER_LEVEL
-	FloatingText.spawn(_entities, _player.global_position, tr("FX_LEVEL_UP"), Player.COLOR_EMPOWERED, 56.0)
 	get_tree().paused = true
 	_hud.show_level_up(reached, damage_before, damage_after)
 

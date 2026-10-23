@@ -9,6 +9,12 @@ extends Node2D
 ## zona colpita, poi il nemico scatta in avanti. Per essere meno
 ## prevedibile la carica ha durata variabile, a volte è una finta e a
 ## volte segue subito un secondo attacco più rapido.
+## Quando il giocatore attacca lì vicino, a volte (secondo il tipo) alza la
+## guardia: i colpi di spada che arrivano da davanti vengono parati, la
+## combo del giocatore si interrompe e lui viene respinto; poi spesso
+## contrattacca. Attacchi a terra e palle di fuoco passano la guardia. Se
+## invece è il giocatore a parare il suo colpo, il colpo si interrompe e il
+## nemico viene respinto. Attacca più volte di fila (fino a "max_strikes").
 ## Gli evocatori restano a distanza ed evocano altri nemici: colpirli
 ## mentre evocano interrompe l'evocazione. I tipi con "ranged" (lanciatori)
 ## restano a distanza e scagliano dardi magici (vedi EnemyBolt).
@@ -17,7 +23,7 @@ signal died(enemy: Enemy)
 ## Chiede alla scena di gioco di creare i nemici evocati.
 signal summon_requested(summoner: Enemy, type_id: String, positions: Array[Vector2])
 
-enum State { WANDER, CHASE, DASH, WINDUP, STRIKE, RECOVER, STUNNED, SUMMON, DEAD }
+enum State { WANDER, CHASE, DASH, WINDUP, STRIKE, RECOVER, STUNNED, SUMMON, DEAD, GUARD }
 
 const ACCELERATION := 750.0
 ## Lo sguardo ruota con continuità invece che a scatti.
@@ -40,13 +46,26 @@ const ATTACK_TRIGGER_GAP := 64.0
 const WINDUP_TRACKING := Vector2(0.4, 0.75)
 ## Probabilità che la carica sia una finta, interrotta a metà con uno scatto.
 const FEINT_CHANCE := 0.2
-## Probabilità di un secondo attacco subito dopo il primo, con carica più breve.
-const COMBO_CHANCE := 0.3
+## Probabilità di un altro attacco subito dopo il precedente, con carica più
+## breve, fino a "max_strikes" di fila (data/enemies.json).
+const COMBO_CHANCE := 0.5
 const COMBO_WINDUP_FACTOR := 0.6
 const STRIKE_TIME := 0.3
 const RECOVER_TIME := 0.9
 ## Dopo un attacco aspetta un tempo a caso prima di riprovare.
-const ATTACK_COOLDOWN := Vector2(0.6, 2.0)
+const ATTACK_COOLDOWN := Vector2(0.35, 1.2)
+## Guardia: si alza (con probabilità "guard_chance") quando il giocatore
+## inizia un attacco entro GUARD_RANGE girato verso il nemico, con la spada
+## di traverso davanti al corpo; para i colpi che arrivano entro GUARD_ARC
+## davanti. Dopo, per un po', non si rialza.
+const GUARD_RANGE := 230.0
+const GUARD_ARC := deg_to_rad(150.0)
+const GUARD_COOLDOWN := Vector2(1.5, 3.0)
+## Dopo una parata contrattacca con questa probabilità.
+const COUNTER_CHANCE := 0.6
+## Respinto dalla parata del giocatore: spinta e tempo di recupero.
+const REPELLED_KNOCKBACK := 380.0
+const COLOR_GUARD := Color(0.75, 0.88, 1.0)
 const STUN_TIME := 1.6
 ## Alla morte il corpo cade a terra in questo tempo, poi resta steso (lo
 ## disegna GroundFx) e il nodo sparisce.
@@ -108,7 +127,14 @@ var _attack_cooldown := 0.0
 var _windup_time := 1.0
 var _windup_tracking := 0.6
 var _feint_at := -1.0
-var _is_combo := false
+## Colpi già fatti nella serie in corso.
+var _strikes := 0
+## Guardia: tempo che dura, attesa prima di poterla rialzare, ultimo attacco
+## del giocatore già considerato e lampo della parata.
+var _guard_time := 0.0
+var _guard_cooldown := 0.0
+var _seen_attack := -1
+var _guard_flash := 0.0
 var _strike_resolved := false
 var _knockback := Vector2.ZERO
 var _hit_flash := 0.0
@@ -184,6 +210,8 @@ func _physics_process(delta: float) -> void:
 	_attack_cooldown = maxf(_attack_cooldown - delta, 0.0)
 	_summon_cooldown = maxf(_summon_cooldown - delta, 0.0)
 	_hit_flash = maxf(_hit_flash - delta, 0.0)
+	_guard_cooldown = maxf(_guard_cooldown - delta, 0.0)
+	_guard_flash = maxf(_guard_flash - delta, 0.0)
 
 	var target_velocity := Vector2.ZERO
 	var to_player := player.global_position - global_position if player else Vector2.INF
@@ -204,9 +232,12 @@ func _physics_process(delta: float) -> void:
 		State.CHASE:
 			if not player_active or distance > LEASH_RANGE:
 				_change_state(State.WANDER)
+			elif _should_guard(distance):
+				_begin_guard()
 			elif _can_summon(distance):
 				_begin_summon()
 			elif _attack_cooldown == 0.0 and distance <= _attack_trigger_range():
+				_strikes = 0
 				_begin_windup(_type["windup"][0], _type["windup"][1], true)
 			else:
 				_decision_time -= delta
@@ -222,7 +253,10 @@ func _physics_process(delta: float) -> void:
 		State.DASH:
 			_velocity = _dash_direction * _speed * DASH_SPEED_FACTOR
 			target_velocity = _velocity
-			if _state_time >= DASH_TIME:
+			# Anche durante uno scatto si può alzare la guardia.
+			if player_active and _should_guard(distance):
+				_begin_guard()
+			elif _state_time >= DASH_TIME:
 				_change_state(State.CHASE)
 
 		State.WINDUP:
@@ -241,10 +275,15 @@ func _physics_process(delta: float) -> void:
 			target_velocity = _velocity
 			if not _is_ranged() and not _strike_resolved and player_active and _player_in_strike_zone():
 				_strike_resolved = true
-				if player.receive_hit(global_position, damage) == "parried":
-					_is_combo = false
+				var result := player.receive_hit(global_position, damage)
+				if result == "parried":
 					Sfx.play("stun", global_position)
 					_change_state(State.STUNNED)
+				elif result == "blocked":
+					# Parato dal giocatore: il colpo si interrompe e si viene respinti.
+					_knockback = -_attack_direction * REPELLED_KNOCKBACK / float(_type["mass"])
+					_velocity = Vector2.ZERO
+					_change_state(State.RECOVER)
 			if _state == State.STRIKE and _is_ranged():
 				_velocity = Vector2.ZERO
 				if not _strike_resolved:
@@ -252,16 +291,20 @@ func _physics_process(delta: float) -> void:
 					_shoot_bolt()
 			if _state == State.STRIKE and _state_time >= STRIKE_TIME:
 				_velocity = _velocity * 0.2
-				if not _is_combo and player_active and randf() < COMBO_CHANCE:
-					_is_combo = true
+				if _strikes < int(_type["max_strikes"]) and player_active and randf() < COMBO_CHANCE:
 					_begin_windup(_type["windup"][0] * COMBO_WINDUP_FACTOR, _type["windup"][1] * COMBO_WINDUP_FACTOR, false)
 				else:
-					_is_combo = false
 					_change_state(State.RECOVER)
 
 		State.RECOVER:
 			if _state_time >= RECOVER_TIME:
 				_attack_cooldown = randf_range(ATTACK_COOLDOWN.x, ATTACK_COOLDOWN.y)
+				_change_state(State.CHASE)
+
+		State.GUARD:
+			# Fermo (o quasi) e girato verso il giocatore finché dura la guardia.
+			if not player_active or _state_time >= _guard_time:
+				_guard_cooldown = randf_range(GUARD_COOLDOWN.x, GUARD_COOLDOWN.y)
 				_change_state(State.CHASE)
 
 		State.STUNNED:
@@ -294,13 +337,15 @@ func _physics_process(delta: float) -> void:
 		if target_velocity != Vector2.ZERO:
 			target_velocity += _separation() * _speed
 		_velocity = _velocity.move_toward(target_velocity, ACCELERATION * delta)
-	elif _state in [State.WINDUP, State.RECOVER, State.STUNNED, State.SUMMON]:
+	elif _state in [State.WINDUP, State.RECOVER, State.STUNNED, State.SUMMON, State.GUARD]:
 		_velocity = _velocity.move_toward(Vector2.ZERO, ACCELERATION * delta)
 
 	if _state == State.STRIKE:
 		_facing = _attack_direction
 	elif _state == State.WINDUP:
 		_turn_toward(_attack_direction, delta)
+	elif _state == State.GUARD and player_active:
+		_turn_toward(to_player, delta * 2.0)
 	elif _state in [State.CHASE, State.DASH, State.SUMMON] and player_active:
 		_turn_toward(to_player, delta)
 	elif _velocity.length() > 5.0:
@@ -332,7 +377,6 @@ func take_damage(amount: int, direction: Vector2, heavy := false) -> void:
 	health -= amount
 	_hit_flash = 0.12
 	_knockback = direction * KNOCKBACK * (HEAVY_KNOCKBACK_FACTOR if heavy else 1.0) / float(_type["mass"])
-	FloatingText.spawn(get_parent(), global_position + Vector2(randf_range(-12, 12), radius - 20.0), str(amount), COLOR_DAMAGE)
 	GroundFx.bleed(global_position, ground_elevation + radius * 0.8, direction, BLEED_DROPS_HEAVY if heavy else BLEED_DROPS)
 	if health <= 0:
 		_fall_side = 1.0 if direction.x >= 0.0 else -1.0
@@ -454,7 +498,41 @@ func _start_dash(to_player: Vector2) -> void:
 	_change_state(State.DASH)
 
 
+## Il giocatore ha appena iniziato un attacco qui vicino, girato verso di
+## noi: si decide una volta per attacco se alzare la guardia.
+func _should_guard(distance: float) -> bool:
+	if player.attack_serial == _seen_attack or not player.is_attacking():
+		return false
+	_seen_attack = player.attack_serial
+	if _guard_cooldown > 0.0 or distance > GUARD_RANGE:
+		return false
+	var toward_us := (global_position - player.global_position).normalized()
+	return player.facing.dot(toward_us) > 0.3 and randf() < float(_type["guard_chance"])
+
+
+func _begin_guard() -> void:
+	var times: Array = _type["guard_time"]
+	_guard_time = randf_range(times[0], times[1])
+	Sfx.play("block", global_position, 1.4, -8.0)
+	_change_state(State.GUARD)
+
+
+## Il colpo del giocatore che arriva da from viene parato dalla guardia?
+## Se sì, la guardia si illumina e a volte si contrattacca subito.
+func blocks(from: Vector2) -> bool:
+	if _state != State.GUARD or absf(_facing.angle_to(from - global_position)) > GUARD_ARC / 2.0:
+		return false
+	_guard_flash = 0.25
+	if randf() < COUNTER_CHANCE:
+		_guard_cooldown = randf_range(GUARD_COOLDOWN.x, GUARD_COOLDOWN.y)
+		_strikes = 0
+		_attack_direction = (from - global_position).normalized()
+		_begin_windup(_type["windup"][0] * COMBO_WINDUP_FACTOR, _type["windup"][1] * COMBO_WINDUP_FACTOR, false)
+	return true
+
+
 func _begin_windup(min_time: float, max_time: float, can_feint: bool) -> void:
+	_strikes += 1
 	# I fendenti si alternano: una volta da sinistra, una da destra.
 	_swing_sign = -_swing_sign
 	_windup_time = randf_range(min_time, max_time)
@@ -640,7 +718,18 @@ func _draw_sword() -> void:
 		_:
 			angle = _facing.angle() + 0.6
 	var hand := Vector2.from_angle(angle) * radius * 0.8 if _state in [State.WINDUP, State.STRIKE, State.RECOVER] else _facing.orthogonal() * radius * 0.8
-	BodyParts.draw_sword(self, hand, angle, length, width, Color(1.0, 0.9, 0.9) if _state == State.STRIKE else Color.WHITE)
+	if _state == State.GUARD:
+		# In guardia la spada è di traverso davanti al corpo.
+		var across := -_facing.orthogonal()
+		angle = across.angle()
+		hand = _facing * radius * 0.95 - across * length * 0.45
+	var tint := Color(1.0, 0.9, 0.9) if _state == State.STRIKE else Color.WHITE
+	if _guard_flash > 0.0:
+		# La spada in guardia si illumina quando para un colpo.
+		var flash := _guard_flash / 0.25
+		Shapes.disc(self, hand + Vector2.from_angle(angle) * length * 0.45, 16.0 * flash, Color(COLOR_GUARD, 0.6 * flash))
+		tint = Color.WHITE.lerp(Color(1.4, 1.4, 1.5), flash)
+	BodyParts.draw_sword(self, hand, angle, length, width, tint)
 
 
 ## Alla morte il corpo cade a terra: si inclina, si abbassa e si stende.
@@ -670,6 +759,10 @@ func _corpse_color() -> Color:
 func _draw_staff() -> void:
 	var hand := _facing.orthogonal() * radius * 0.8
 	var top := hand + Vector2(0, -radius * 1.4)
+	if _state == State.GUARD:
+		# In guardia il bastone è di traverso davanti al corpo.
+		hand = _facing * radius * 0.9 + _facing.orthogonal() * radius * 0.7
+		top = hand - _facing.orthogonal() * radius * 1.4
 	draw_line(hand + Vector2(0, radius * 0.5), top, Color(0.45, 0.3, 0.18), maxf(3.0, radius * 0.15))
 	var glow := 0.4
 	if _state == State.WINDUP:
