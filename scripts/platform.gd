@@ -31,6 +31,11 @@ func _ready() -> void:
 	# Steam Deck; avviato da altri programmi (per esempio dall'app di
 	# itch.io in modalità desktop) si riconosce dal modello dell'hardware.
 	is_steam_deck = OS.get_environment("SteamDeck") == "1" or _is_steam_deck_hardware()
+	# Sullo Steam Deck si gioca sempre a schermo intero, anche in modalità
+	# desktop (in modalità gioco lo schermo è già tutto del gioco). Va fatto
+	# a finestra pronta: qui all'avvio sarebbe troppo presto.
+	if is_steam_deck and DisplayServer.get_name() != "headless":
+		DisplayServer.window_set_mode.call_deferred(DisplayServer.WINDOW_MODE_FULLSCREEN)
 	# Verrà aggiornato quando integreremo GodotSteam (solo desktop).
 	steam_available = false
 	Input.joy_connection_changed.connect(_on_joy_connection_changed)
