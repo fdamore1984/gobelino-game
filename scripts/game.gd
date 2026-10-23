@@ -385,20 +385,24 @@ func _spawn_boss(dungeon: Dungeon) -> void:
 	_hud.show_boss(boss)
 
 
-## Boss sconfitto: monete e oggetti rari, la caverna è completata e al
-## centro dell'arena compare l'uscita verso la superficie.
+## Boss sconfitto: monete, oggetti speciali e uno raro; il goblin ride, la
+## caverna è completata e nella parete dell'arena compare l'uscita.
 func _on_boss_died(boss: Enemy) -> void:
 	_world.cleared_caves[_cave] = true
 	var gold: Array = _dungeon_data["boss_reward_gold"]
 	var drops: Array[Array] = [["gold", int(gold[0]) + int(gold[1]) * _player.level]]
+	# Oggetti speciali che lasciano solo i boss, e uno raro dei mercanti.
+	var special := Items.boss_items()
+	special.shuffle()
+	for k in mini(int(_dungeon_data["boss_reward_items"]), special.size()):
+		drops.append([special[k], 1])
 	var rare := Items.shop_items()
-	rare.shuffle()
-	for k in mini(int(_dungeon_data["boss_reward_items"]), rare.size()):
-		drops.append([rare[k], 1])
+	drops.append([rare[randi() % rare.size()], 1])
 	_drop_loot(boss.global_position, drops)
 	var dungeon := _world.dungeon
 	_world.add_obstacle(_world.make_wall_obstacle("exit", dungeon.arena_exit, dungeon.arena_exit_side))
 	_rest_point = _player.position
+	_player.laugh()
 	_hud.flash_challenge(tr("BOSS_DEFEATED"))
 	Sfx.play("level_up", boss.global_position)
 
@@ -561,6 +565,7 @@ func _on_summon_requested(summoner: Enemy, type_id: String, positions: Array[Vec
 		# I nemici evocati danno meno esperienza, altrimenti basterebbe
 		# lasciare vivo l'evocatore per farne scorta.
 		minion.xp_reward = minion_xp
+		minion.drops_loot = false
 		summoner.add_minion(minion)
 
 
@@ -570,6 +575,11 @@ func _on_enemy_died(enemy: Enemy) -> void:
 	FloatingText.spawn(_entities, enemy.global_position, tr("FX_XP") % enemy.xp_reward, COLOR_XP, 24.0)
 	Sfx.play("xp", enemy.global_position)
 	_player.add_experience(enemy.xp_reward)
+	# Ogni tanto un nemico lascia monete o un oggetto (il boss ha il suo bottino).
+	if enemy.drops_loot and not enemy.is_boss():
+		var drops := Items.enemy_drops(_player.level)
+		if not drops.is_empty():
+			_drop_loot(enemy.global_position, drops)
 
 
 func _on_player_leveled_up(_level: int) -> void:

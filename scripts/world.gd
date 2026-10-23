@@ -720,7 +720,9 @@ func _can_pass(from: Vector2, to: Vector2, radius: float, climb: float, can_drop
 	var ahead := (to - from).normalized() * radius * 0.5
 	for probe: Vector2 in [to, to + ahead]:
 		var cell := cell_at(probe)
-		if is_barrier(cell):
+		# Nei burroni ci si può cadere (chi può scendere dai gradini) o
+		# passarci sopra saltando; montagne e roccia fermano sempre.
+		if is_barrier(cell) and not (can_drop and kind_of(cell) == Kind.RAVINE):
 			# Montagne e roccia si illuminano; nei burroni non c'è niente da illuminare.
 			_blocking_cell = cell
 			_has_blocking_cell = kind_of(cell) != Kind.RAVINE

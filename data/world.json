@@ -29,6 +29,7 @@
 		"mountain_face_colors": [[0.4, 0.38, 0.36], [0.3, 0.29, 0.28]],
 		"ravine_depth": 6,
 		"ravine_color": [0.07, 0.06, 0.06],
+		"ravine_damage": 2,
 		"cave_chance": 0.05
 	},
 	"day_night": {

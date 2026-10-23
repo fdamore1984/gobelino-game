@@ -122,6 +122,13 @@ func _build_sounds() -> void:
 		return (creak + chord) * _env(t, d, 0.005))
 	_streams["pickup"] = _render(0.15, func(t: float, d: float) -> float:
 		return _triangle(lerpf(700.0, 1300.0, t / d) * t) * 0.3 * _env(t, d, 0.003))
+	# Risatina da goblin: cinque "eh" brevi e nasali, sempre un po' più bassi.
+	_streams["giggle"] = _render(0.85, func(t: float, _d: float) -> float:
+		var syllable := fmod(t, 0.16)
+		var index := floorf(t / 0.16)
+		var pitch := 760.0 - index * 45.0 + 35.0 * sin(TAU * 17.0 * t)
+		var env := exp(-syllable * 20.0) * (1.0 - exp(-syllable * 220.0))
+		return (sin(TAU * pitch * t) * 0.55 + sin(TAU * pitch * 2.0 * t) * 0.3 + _noise() * 0.18 * exp(-syllable * 70.0)) * env * 0.4)
 	_streams["coin"] = _render(0.2, func(t: float, _d: float) -> float:
 		var note := 1800.0 if t < 0.06 else 2400.0
 		return sin(TAU * note * t) * 0.25 * exp(-fmod(t, 0.06) * 25.0))

@@ -78,6 +78,8 @@ var max_health := 40
 var xp_reward := 30
 ## Danno di un colpo: quello del tipo, aumentato per il boss (vedi Game).
 var damage := 1
+## Alla morte può lasciare bottino (no per i nemici evocati).
+var drops_loot := true
 
 var _type: Dictionary
 var _color := Color.WHITE
