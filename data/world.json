@@ -30,10 +30,12 @@
 		"ravine_depth": 6,
 		"ravine_color": [0.07, 0.06, 0.06],
 		"ravine_damage": 2,
-		"cave_chance": 0.05
+		"cave_chance": 0.3
 	},
 	"day_night": {
-		"cycle": 240,
+		"cycle": 600,
+		"sunrise": 0.92,
+		"sunset": 0.54,
 		"start": 0.2,
 		"night_threshold": 0.5,
 		"colors": [

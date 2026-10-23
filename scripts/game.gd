@@ -107,6 +107,7 @@ func _ready() -> void:
 	_player.died.connect(_on_player_died)
 	_hud.upgrade_chosen.connect(_on_upgrade_chosen)
 	_hud.player = _player
+	_hud.day_night = _day_night
 	_hud.set_health(_player.health, _player.max_health)
 	_hud.set_experience(_player.experience, _player.experience_needed(), _player.level)
 	_hud.set_kills(_kills)

@@ -20,6 +20,9 @@ const COLOR_MANA := Color(0.35, 0.55, 1.0)
 const COLOR_XP := Color(1.0, 0.8, 0.3)
 const COLOR_TEXT := Color(1, 1, 1, 0.92)
 const COLOR_DIM_TEXT := Color(1, 1, 1, 0.6)
+## Il pannello si ridisegna da solo a questo intervallo (mana, monete, nemici
+## sconfitti); vita ed esperienza lo ridisegnano subito (vedi Hud).
+const REDRAW_INTERVAL := 0.1
 ## Abilità mostrate sotto le barre: icona e valore.
 const SKILLS := ["combo", "heavy", "dodge", "jump", "run"]
 
@@ -27,6 +30,7 @@ var player: Player
 var kills := 0
 
 var _panel := StyleBoxFlat.new()
+var _redraw_timer := 0.0
 
 
 func _ready() -> void:
@@ -40,8 +44,11 @@ func _ready() -> void:
 	_panel.set_corner_radius_all(14)
 
 
-func _process(_delta: float) -> void:
-	queue_redraw()
+func _process(delta: float) -> void:
+	_redraw_timer -= delta
+	if _redraw_timer <= 0.0:
+		_redraw_timer = REDRAW_INTERVAL
+		queue_redraw()
 
 
 func _draw() -> void:
@@ -87,13 +94,15 @@ func _draw() -> void:
 	_text(font, str(kills), sword + Vector2(12, 6), FONT_SIZE, COLOR_TEXT)
 
 
-## Ritratto del goblin, con la stessa espressione del personaggio, e il
-## livello in un distintivo.
+## Ritratto del goblin (forma geometrica) con il livello in un distintivo.
 func _draw_portrait(font: Font) -> void:
 	var center := Vector2(52, 50)
 	draw_circle(center, 34.0, Color(0, 0, 0, 0.35))
 	draw_arc(center, 34.0, 0.0, TAU, 40, Color(1, 1, 1, 0.25), 2.0)
-	GoblinArt.draw_head(self, center + Vector2(0, 6), 17.0, Vector2(0.35, 1).normalized(), player.expression(), GoblinArt.SKIN)
+	draw_circle(center + Vector2(0, 4), 24.0, Player.COLOR_BODY)
+	draw_colored_polygon(PackedVector2Array([center + Vector2(26, 4), center + Vector2(12, -4), center + Vector2(12, 12)]), Player.COLOR_BODY.darkened(0.3))
+	draw_circle(center + Vector2(-6, -2), 3.5, Color(0.1, 0.1, 0.1))
+	draw_circle(center + Vector2(8, -2), 3.5, Color(0.1, 0.1, 0.1))
 	var badge := center + Vector2(26, 28)
 	draw_circle(badge, 15.0, Color(0.2, 0.15, 0.05))
 	draw_circle(badge, 13.0, COLOR_XP)

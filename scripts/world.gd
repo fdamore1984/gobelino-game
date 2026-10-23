@@ -58,6 +58,12 @@ const PLACE_MIN := 14.0
 const PLACE_MAX := 44.0
 ## Dislivello superato camminando (le rampe salgono un po' alla volta).
 const STEP_TOLERANCE := 8.0
+## Ostacoli vicinissimi (vedi obstacles_close): quadrati di questo lato,
+## ognuno con gli ostacoli che arrivano entro CLOSE_REACH dal quadrato;
+## CLOSE_COLLISION_MAX è la collisione più grande di un ostacolo.
+const CLOSE_SQUARE := 64.0
+const CLOSE_REACH := 48.0
+const CLOSE_COLLISION_MAX := 48.0
 ## Coordinate (u, v) dei vertici dentro il rombo: alto, destra, basso, sinistra.
 const CORNERS := [Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)]
 ## Direzioni in cui può salire una rampa (verso il rombo vicino più alto).
@@ -140,6 +146,10 @@ var _dungeon_wall_color: Color
 var _tuft_range := Vector2i.ZERO
 ## Pezzo -> ostacoli (dizionari), generati quando servono.
 var _chunk_obstacles := {}
+## Rettangolo di pezzi (Vector4i) -> i loro ostacoli in una sola lista (vedi obstacles_near).
+var _near_cache := {}
+## Quadrato -> ostacoli vicinissimi (vedi obstacles_close).
+var _close_cache := {}
 ## Pezzo -> {"view": nodo del terreno, "nodes": ostacoli e blocchi tra i personaggi}.
 var _chunk_views := {}
 var _maintain_timer := 0.0
@@ -695,50 +705,53 @@ func _top_height(cell: Vector2i) -> float:
 ## si viene spinti fuori dagli ostacoli solidi.
 func move(from: Vector2, motion: Vector2, radius: float, climb := 0.0, can_drop := false) -> Vector2:
 	_has_blocking_cell = false
+	var base := elevation_at(from)
 	var to := from + motion
-	if not _can_pass(from, to, radius, climb, can_drop):
+	if not _can_pass(from, base, to, radius, climb, can_drop):
 		var along_x := from + Vector2(motion.x, 0.0)
 		var along_y := from + Vector2(0.0, motion.y)
-		if _can_pass(from, along_x, radius, climb, can_drop):
+		if _can_pass(from, base, along_x, radius, climb, can_drop):
 			to = along_x
-		elif _can_pass(from, along_y, radius, climb, can_drop):
+		elif _can_pass(from, base, along_y, radius, climb, can_drop):
 			to = along_y
 		else:
 			to = from
 	var pushed := _push_out(to, radius)
-	if pushed != to and _can_pass(from, pushed, radius, climb, can_drop):
+	if pushed != to and _can_pass(from, base, pushed, radius, climb, can_drop):
 		to = pushed
 	return to
 
 
 ## Si controlla il punto d'arrivo e un punto poco più avanti, così ci si
-## ferma un po' prima del bordo di un gradino.
-func _can_pass(from: Vector2, to: Vector2, radius: float, climb: float, can_drop: bool) -> bool:
+## ferma un po' prima del bordo di un gradino (base: altezza di partenza).
+func _can_pass(from: Vector2, base: float, to: Vector2, radius: float, climb: float, can_drop: bool) -> bool:
 	if to == from:
 		return true
-	var base := elevation_at(from)
-	var ahead := (to - from).normalized() * radius * 0.5
-	for probe: Vector2 in [to, to + ahead]:
-		var cell := cell_at(probe)
-		# Nei burroni ci si può cadere (chi può scendere dai gradini) o
-		# passarci sopra saltando; montagne e roccia fermano sempre.
-		if is_barrier(cell) and not (can_drop and kind_of(cell) == Kind.RAVINE):
-			# Montagne e roccia si illuminano; nei burroni non c'è niente da illuminare.
-			_blocking_cell = cell
-			_has_blocking_cell = kind_of(cell) != Kind.RAVINE
-			return false
-		var height := elevation_at(probe)
-		if height > base + climb + STEP_TOLERANCE:
-			_blocking_cell = cell_at(probe)
-			_has_blocking_cell = true
-			return false
-		if not can_drop and height < base - STEP_TOLERANCE:
-			return false
+	return _can_stand(to, base, climb, can_drop) \
+			and _can_stand(to + (to - from).normalized() * radius * 0.5, base, climb, can_drop)
+
+
+func _can_stand(probe: Vector2, base: float, climb: float, can_drop: bool) -> bool:
+	var cell := cell_at(probe)
+	# Nei burroni ci si può cadere (chi può scendere dai gradini) o
+	# passarci sopra saltando; montagne e roccia fermano sempre.
+	if is_barrier(cell) and not (can_drop and kind_of(cell) == Kind.RAVINE):
+		# Montagne e roccia si illuminano; nei burroni non c'è niente da illuminare.
+		_blocking_cell = cell
+		_has_blocking_cell = kind_of(cell) != Kind.RAVINE
+		return false
+	var height := elevation_at(probe)
+	if height > base + climb + STEP_TOLERANCE:
+		_blocking_cell = cell
+		_has_blocking_cell = true
+		return false
+	if not can_drop and height < base - STEP_TOLERANCE:
+		return false
 	return true
 
 
 func _push_out(point: Vector2, radius: float) -> Vector2:
-	for obstacle: Dictionary in obstacles_near(point):
+	for obstacle: Dictionary in obstacles_close(point):
 		if not obstacle["solid"]:
 			continue
 		var offset: Vector2 = point - obstacle["position"]
@@ -752,7 +765,7 @@ func _push_out(point: Vector2, radius: float) -> Vector2:
 ## solidi che tocca e il blocco di terreno troppo alto incontrato
 ## dall'ultima chiamata a move. Da chiamare subito dopo move.
 func highlight_contacts(point: Vector2, radius: float) -> void:
-	for obstacle: Dictionary in obstacles_near(point):
+	for obstacle: Dictionary in obstacles_close(point):
 		if obstacle["solid"] and point.distance_to(obstacle["position"]) <= radius + obstacle["collision"] + 1.5:
 			var node: Obstacle = obstacle.get("node")
 			if is_instance_valid(node):
@@ -764,16 +777,53 @@ func highlight_contacts(point: Vector2, radius: float) -> void:
 		_wall_glow.flash(_blocking_cell)
 
 
-## Ostacoli dei pezzi di mondo attorno al punto.
-func obstacles_near(point: Vector2) -> Array[Dictionary]:
-	var result: Array[Dictionary] = []
-	var seen := {}
+## Ostacoli dei pezzi di mondo attorno al punto (entro 60 pixel), da non
+## modificare. È chiamata di continuo da tutti i personaggi: lontano dai
+## bordi dei pezzi restituisce la lista del pezzo stesso, vicino ai bordi
+## quella dei pezzi attorno, unita una volta sola e poi ricordata.
+func obstacles_near(point: Vector2) -> Array:
+	var low := _chunk_of(cell_at(point))
+	var high := low
 	for offset: Vector2 in [Vector2(-60, 0), Vector2(60, 0), Vector2(0, -60), Vector2(0, 60)]:
 		var chunk := _chunk_of(cell_at(point + offset))
-		if seen.has(chunk):
-			continue
-		seen[chunk] = true
-		result.append_array(_obstacles_of(chunk))
+		low = low.min(chunk)
+		high = high.max(chunk)
+	if low == high:
+		return _obstacles_of(low)
+	var key := Vector4i(low.x, low.y, high.x, high.y)
+	if not _near_cache.has(key):
+		var result := []
+		for i in range(low.x, high.x + 1):
+			for j in range(low.y, high.y + 1):
+				result.append_array(_obstacles_of(Vector2i(i, j)))
+		_near_cache[key] = result
+	return _near_cache[key]
+
+
+## Ostacoli che possono toccare chi sta in point con un raggio fino a
+## CLOSE_REACH: una lista breve per i controlli fatti a ogni passo
+## (spinta fuori dagli ostacoli, rallentamenti), da non modificare.
+func obstacles_close(point: Vector2) -> Array:
+	var key := Vector2i((point / CLOSE_SQUARE).floor())
+	if _close_cache.has(key):
+		return _close_cache[key]
+	var square := Rect2(Vector2(key) * CLOSE_SQUARE, Vector2(CLOSE_SQUARE, CLOSE_SQUARE))
+	var area := square.grow(CLOSE_REACH + CLOSE_COLLISION_MAX)
+	var low := _chunk_of(cell_at(area.position))
+	var high := low
+	for corner: Vector2 in [area.position + Vector2(area.size.x, 0), area.position + Vector2(0, area.size.y), area.end]:
+		var chunk := _chunk_of(cell_at(corner))
+		low = low.min(chunk)
+		high = high.max(chunk)
+	var result := []
+	for i in range(low.x, high.x + 1):
+		for j in range(low.y, high.y + 1):
+			for obstacle: Dictionary in _obstacles_of(Vector2i(i, j)):
+				var at: Vector2 = obstacle["position"]
+				var closest := at.clamp(square.position, square.end)
+				if at.distance_to(closest) <= CLOSE_REACH + float(obstacle["collision"]):
+					result.append(obstacle)
+	_close_cache[key] = result
 	return result
 
 
@@ -781,7 +831,7 @@ func obstacles_near(point: Vector2) -> Array[Dictionary]:
 ## che rallenta di più; vuoto se non ce ne sono.
 func ground_obstacle_at(point: Vector2, radius: float) -> Dictionary:
 	var found := {}
-	for obstacle: Dictionary in obstacles_near(point):
+	for obstacle: Dictionary in obstacles_close(point):
 		if obstacle["solid"]:
 			continue
 		if point.distance_to(obstacle["position"]) < radius * 0.5 + obstacle["collision"]:
@@ -991,6 +1041,8 @@ func _forget_outside(keep: Rect2i) -> void:
 	for chunk: Vector2i in _chunk_obstacles.keys():
 		if not keep.has_point(chunk) and not _chunk_views.has(chunk):
 			_chunk_obstacles.erase(chunk)
+	_near_cache.clear()
+	_close_cache.clear()
 	for cache: Dictionary in [_level_cache, _ramp_cache, _path_cache, _kind_cache]:
 		for cell: Vector2i in cache.keys():
 			if not keep.has_point(_chunk_of(cell)):
@@ -1284,6 +1336,8 @@ func set_dungeon(value: Dungeon) -> void:
 	_view_queue.clear()
 	_faded_blocks.clear()
 	_chunk_obstacles.clear()
+	_near_cache.clear()
+	_close_cache.clear()
 	for cache: Dictionary in [_level_cache, _ramp_cache, _path_cache, _kind_cache]:
 		cache.clear()
 	region = Rect2i()
@@ -1371,6 +1425,8 @@ func make_obstacle(type_id: String, at: Vector2) -> Dictionary:
 func add_obstacle(data: Dictionary) -> void:
 	var chunk := _chunk_of(cell_at(data["position"]))
 	_obstacles_of(chunk).append(data)
+	_near_cache.clear()
+	_close_cache.clear()
 	if _chunk_views.has(chunk) and entities:
 		var node := _make_obstacle_node(data)
 		_chunk_views[chunk]["nodes"].append(node)

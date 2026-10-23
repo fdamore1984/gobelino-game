@@ -41,12 +41,12 @@ func _physics_process(delta: float) -> void:
 
 func _draw() -> void:
 	var lift := Vector2(0, -altitude - FLIGHT_HEIGHT)
-	draw_circle(Vector2(0, -altitude + 4.0), RADIUS * 0.7, Color(0, 0, 0, 0.2))
+	Shapes.disc(self, Vector2(0, -altitude + 4.0), RADIUS * 0.7, Color(0, 0, 0, 0.2))
 	for i in 4:
-		draw_circle(lift - direction * (i + 1) * 9.0, RADIUS * (0.8 - i * 0.15), Color(color, 0.35 - i * 0.07))
+		Shapes.disc(self, lift - direction * (i + 1) * 9.0, RADIUS * (0.8 - i * 0.15), Color(color, 0.35 - i * 0.07))
 	var spin := _age * 12.0
-	draw_colored_polygon(PackedVector2Array([
+	draw_primitive(PackedVector2Array([
 		lift + Vector2.from_angle(spin) * RADIUS * 1.3, lift + Vector2.from_angle(spin + PI / 2.0) * RADIUS * 0.7,
 		lift + Vector2.from_angle(spin + PI) * RADIUS * 1.3, lift + Vector2.from_angle(spin + PI * 1.5) * RADIUS * 0.7,
-	]), color)
-	draw_circle(lift, RADIUS * 0.4, Color(1, 1, 1, 0.9))
+	]), PackedColorArray([color]), PackedVector2Array())
+	Shapes.disc(self, lift, RADIUS * 0.4, Color(1, 1, 1, 0.9))

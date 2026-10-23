@@ -22,7 +22,11 @@ const CRACK_COUNT := 7
 const DUST_COUNT := 12
 const COLOR_WAVE := Color(1.0, 0.85, 0.55)
 const COLOR_DUST := Color(0.55, 0.45, 0.32)
-## Gli effetti fermi (macchie che svaniscono) si ridisegnano più di rado.
+## Macchie e corpi si ridisegnano solo quando cambiano: al più ogni
+## SPLAT_REDRAW secondi quando ne arrivano di nuovi, ogni IDLE_REDRAW
+## mentre svaniscono. Onde d'urto e gocce in volo hanno un loro strato,
+## ridisegnato a ogni frame solo finché ce ne sono.
+const SPLAT_REDRAW := 0.05
 const IDLE_REDRAW := 0.2
 ## Le gocce stanno in un quadrato del mondo: la terra sotto è ellittica.
 const GROUND_SQUASH := 0.5
@@ -34,7 +38,10 @@ var _splats: Array[Dictionary] = []
 var _corpses: Array[Dictionary] = []
 var _waves: Array[Dictionary] = []
 var _air := AirLayer.new()
+var _wave_layer := WaveLayer.new()
 var _redraw_timer := 0.0
+## Ci sono macchie o corpi nuovi da disegnare.
+var _dirty := false
 
 
 func _enter_tree() -> void:
@@ -50,6 +57,8 @@ func _ready() -> void:
 	_air.fx = self
 	_air.z_index = 20
 	add_child(_air)
+	_wave_layer.fx = self
+	add_child(_wave_layer)
 
 
 ## Sangue di un colpo: gocce che schizzano nella direzione del colpo e
@@ -80,6 +89,7 @@ static func corpse(at: Vector2, elevation: float, points: PackedVector2Array, co
 	current._corpses.append({"position": at, "elevation": elevation, "points": points, "color": color, "age": 0.0})
 	if current._corpses.size() > MAX_CORPSES:
 		current._corpses.pop_front()
+	current._dirty = true
 
 
 ## Onda d'urto di un attacco a terra, larga radius, con crepe e polvere.
@@ -96,6 +106,7 @@ func clear() -> void:
 	_waves.clear()
 	queue_redraw()
 	_air.queue_redraw()
+	_wave_layer.queue_redraw()
 
 
 static func _ground(at: Vector2) -> float:
@@ -115,10 +126,13 @@ func _add_splat(at: Vector2, elevation: float, size: float, direction: Vector2, 
 	})
 	if _splats.size() > MAX_SPLATS:
 		_splats.pop_front()
+	_dirty = true
 
 
 func _process(delta: float) -> void:
-	var moving := not _drops.is_empty() or not _waves.is_empty()
+	var had_drops := not _drops.is_empty()
+	var had_waves := not _waves.is_empty()
+	var growing := false
 	for i in range(_drops.size() - 1, -1, -1):
 		var drop := _drops[i]
 		drop["age"] += delta
@@ -133,18 +147,23 @@ func _process(delta: float) -> void:
 		for item in list:
 			item["age"] += delta
 			if item.get("grow", 0.0) > 0.0 and item["age"] < item["grow"]:
-				moving = true
+				growing = true
 	while not _splats.is_empty() and _splats[0]["age"] >= SPLAT_TIME:
 		_splats.pop_front()
 	while not _corpses.is_empty() and _corpses[0]["age"] >= CORPSE_TIME:
 		_corpses.pop_front()
 	while not _waves.is_empty() and _waves[0]["age"] >= CRACK_TIME:
 		_waves.pop_front()
-	_redraw_timer -= delta
-	if moving or _redraw_timer <= 0.0:
-		_redraw_timer = IDLE_REDRAW
-		queue_redraw()
+	# Gocce e onde si muovono: si ridisegnano finché ci sono (e un'ultima volta per toglierle).
+	if had_drops or not _drops.is_empty():
 		_air.queue_redraw()
+	if had_waves or not _waves.is_empty():
+		_wave_layer.queue_redraw()
+	_redraw_timer -= delta
+	if growing or (_dirty and _redraw_timer <= IDLE_REDRAW - SPLAT_REDRAW) or _redraw_timer <= 0.0:
+		_redraw_timer = IDLE_REDRAW
+		_dirty = false
+		queue_redraw()
 
 
 ## Rettangolo visibile, per non disegnare quello che è fuori dallo schermo.
@@ -171,7 +190,7 @@ func _draw() -> void:
 		var color := Color(splat["color"], 0.85 * _fade(splat["age"], SPLAT_TIME))
 		draw_set_transform(at, 0.0, Vector2(1.0, GROUND_SQUASH) * scale_factor)
 		for blob: Vector3 in splat["blobs"]:
-			draw_circle(Vector2(blob.x, blob.y), blob.z, color)
+			Shapes.disc(self, Vector2(blob.x, blob.y), blob.z, color)
 	for body in _corpses:
 		var at: Vector2 = body["position"] - Vector2(0, body["elevation"])
 		if not view.has_point(at):
@@ -183,16 +202,15 @@ func _draw() -> void:
 		var outline: PackedVector2Array = body["points"].duplicate()
 		outline.append(outline[0])
 		draw_polyline(outline, Color(color.darkened(0.4), alpha), 2.0)
-	for wave in _waves:
-		_draw_wave(wave)
 	draw_set_transform(Vector2.ZERO)
 
 
-## Anello che si allarga, polvere che vola via e crepe che restano un po'.
-func _draw_wave(wave: Dictionary) -> void:
+## Anello che si allarga, polvere che vola via e crepe che restano un po',
+## disegnati sullo strato delle onde (canvas).
+func _draw_wave(canvas: CanvasItem, wave: Dictionary) -> void:
 	var age: float = wave["age"]
 	var radius: float = wave["radius"]
-	draw_set_transform(wave["position"] - Vector2(0, wave["elevation"]), 0.0, Vector2(1.0, GROUND_SQUASH))
+	canvas.draw_set_transform(wave["position"] - Vector2(0, wave["elevation"]), 0.0, Vector2(1.0, GROUND_SQUASH))
 	var rng := RandomNumberGenerator.new()
 	rng.seed = wave["seed"]
 	var crack_alpha := clampf((CRACK_TIME - age) / 1.0, 0.0, 1.0) * 0.6
@@ -201,16 +219,16 @@ func _draw_wave(wave: Dictionary) -> void:
 		var length := radius * rng.randf_range(0.35, 0.65) * minf(age / 0.08, 1.0)
 		var bend := direction.rotated(rng.randf_range(-0.5, 0.5))
 		var middle := direction * length * 0.5
-		draw_polyline(PackedVector2Array([Vector2.ZERO, middle, middle + bend * length * 0.5]), Color(0.15, 0.1, 0.05, crack_alpha), 3.0)
+		canvas.draw_polyline(PackedVector2Array([Vector2.ZERO, middle, middle + bend * length * 0.5]), Color(0.15, 0.1, 0.05, crack_alpha), 3.0)
 	if age < WAVE_TIME:
 		var t := age / WAVE_TIME
 		var ring := radius * (0.25 + 0.75 * ease(t, 0.4))
-		draw_circle(Vector2.ZERO, ring, Color(COLOR_WAVE, 0.18 * (1.0 - t)))
-		draw_arc(Vector2.ZERO, ring, 0.0, TAU, 48, Color(COLOR_WAVE, 0.9 * (1.0 - t)), 6.0 * (1.0 - t) + 1.0)
+		Shapes.disc(canvas, Vector2.ZERO, ring, Color(COLOR_WAVE, 0.18 * (1.0 - t)))
+		canvas.draw_arc(Vector2.ZERO, ring, 0.0, TAU, 48, Color(COLOR_WAVE, 0.9 * (1.0 - t)), 6.0 * (1.0 - t) + 1.0)
 		for k in DUST_COUNT:
 			var direction := Vector2.from_angle(TAU * k / DUST_COUNT + rng.randf_range(-0.2, 0.2))
 			var at := direction * ring * rng.randf_range(0.7, 1.05) + Vector2(0, -40.0 * t * (1.0 - t) / GROUND_SQUASH)
-			draw_circle(at, rng.randf_range(4.0, 9.0) * (1.0 - t * 0.6), Color(COLOR_DUST, 0.7 * (1.0 - t)))
+			Shapes.disc(canvas, at, rng.randf_range(4.0, 9.0) * (1.0 - t * 0.6), Color(COLOR_DUST, 0.7 * (1.0 - t)))
 
 
 ## Gocce in volo, sopra personaggi e ostacoli.
@@ -221,4 +239,16 @@ class AirLayer:
 
 	func _draw() -> void:
 		for drop in fx._drops:
-			draw_circle(drop["position"] - Vector2(0, drop["altitude"]), drop["size"], GroundFx.BLOOD_COLOR.lightened(0.1))
+			Shapes.disc(self, drop["position"] - Vector2(0, drop["altitude"]), drop["size"], GroundFx.BLOOD_COLOR.lightened(0.1))
+
+
+## Onde d'urto, sopra le macchie.
+class WaveLayer:
+	extends Node2D
+
+	var fx: GroundFx
+
+	func _draw() -> void:
+		for wave in fx._waves:
+			fx._draw_wave(self, wave)
+		draw_set_transform(Vector2.ZERO)

@@ -1,9 +1,7 @@
 class_name Player
 extends Node2D
-## Personaggio giocabile: un goblin disegnato in codice nello stile del
-## bozzetto a china (vedi GoblinArt), con l'espressione che cambia: di solito
-## arrabbiato e arrogante, urla attaccando, fa una smorfia se colpito e
-## ride sconfiggendo un boss.
+## Personaggio giocabile. Per ora è disegnato con forme geometriche:
+## verrà sostituito dagli sprite definitivi.
 ##
 ## Azioni: movimento in tutte le direzioni con accelerazione e frenata,
 ## attacchi consecutivi in combo sempre più potenti (R1), attacco potente
@@ -22,11 +20,12 @@ extends Node2D
 ## Con R3 si aggancia il nemico più vicino: il personaggio lo guarda sempre,
 ## gli attacchi e la palla di fuoco vanno verso di lui; premendo di nuovo si
 ## passa al nemico vicino successivo.
-## Attacchi a terra, che colpiscono tutti i nemici attorno: un colpo
+## Tenendo premuto R1 si continua ad attaccare; in aria R1 fa un attacco
+## aereo. Attacchi a terra, che colpiscono tutti i nemici attorno: un colpo
 ## potente subito dopo una combo di colpi normali fa saltare e colpire il
-## terreno (anche tutti i colpi potenti concatenati dopo); attaccando in
-## aria si piomba a terra; attaccando durante uno scatto in aria si piomba
-## a terra con un colpo più ampio.
+## terreno (anche tutti i colpi potenti concatenati dopo); il colpo potente
+## in aria fa piombare a terra, durante uno scatto in aria con un colpo più
+## ampio.
 ## Sconfiggere nemici dà esperienza; a ogni livello aumentano i danni
 ## base e si sceglie un potenziamento.
 
@@ -57,11 +56,11 @@ const COMBO_DAMAGE_STEP := 0.5
 const START_COMBO_HITS := 3
 ## Dopo un attacco c'è questo tempo per continuare la combo.
 const COMBO_WINDOW := 0.35
-const ATTACK_WINDUP := 0.07
-const ATTACK_ACTIVE := 0.1
-const ATTACK_RECOVERY := 0.18
+const ATTACK_WINDUP := 0.09
+const ATTACK_ACTIVE := 0.12
+const ATTACK_RECOVERY := 0.24
 ## Il colpo finale della combo ha un recupero più lungo.
-const FINISHER_RECOVERY := 0.32
+const FINISHER_RECOVERY := 0.38
 const ATTACK_RANGE := 80.0
 const ATTACK_RANGE_PER_STEP := 10.0
 const ATTACK_ARC := deg_to_rad(110.0)
@@ -82,10 +81,16 @@ const HEAVY_RANGE := 110.0
 const HEAVY_ARC := deg_to_rad(150.0)
 const HEAVY_LUNGE_SPEED := 220.0
 const START_HEAVY_CHAIN := 1
+## Attacco aereo: i colpi normali in aria fendono un arco più ampio,
+## arrivano anche ai nemici sotto di sé fino a AIR_ATTACK_REACH e, mentre si
+## colpisce, si scende più piano.
+const AIR_ATTACK_ARC := deg_to_rad(200.0)
+const AIR_ATTACK_REACH := 110.0
+const AIR_ATTACK_GRAVITY_FACTOR := 0.45
 ## Attacchi a terra: il colpo potente diventa un salto con colpo sul
-## terreno ("leap") dopo almeno SLAM_MIN_COMBO colpi normali; attaccando in
-## aria si piomba a terra ("plunge"), durante uno scatto in aria con un
-## colpo più ampio ("dash").
+## terreno ("leap") dopo almeno SLAM_MIN_COMBO colpi normali; il colpo
+## potente in aria fa piombare a terra ("plunge"), durante uno scatto in
+## aria con un colpo più ampio ("dash").
 const SLAM_MIN_COMBO := 2
 const SLAM_LEAP_SPEED := 620.0
 const SLAM_LEAP_FORWARD := 160.0
@@ -229,19 +234,12 @@ const SWORD_LENGTH := 46.0
 const HEAVY_SWORD_LENGTH := 58.0
 const SWORD_WIDTH := 5.0
 
-const COLOR_BODY := GoblinArt.SKIN
+const COLOR_BODY := Color(0.35, 0.75, 0.4)
 ## Burroni: cadendoci si precipita per FALL_TIME secondi, poi si riappare
 ## sul bordo (l'ultimo punto sicuro) perdendo vita (data/world.json). Si
 ## cade quando si scende sotto il bordo di FALL_DEPTH pixel.
 const FALL_TIME := 0.8
 const FALL_DEPTH := 48.0
-## Dopo un colpo la smorfia di dolore resta per questo tempo.
-const HURT_FACE_TIME := 0.6
-## La risatina dopo il boss dura questo tempo.
-const LAUGH_TIME := 2.2
-## Testa: raggio e altezza sopra il centro del corpo.
-const HEAD_RADIUS := 21.0
-const HEAD_RISE := 22.0
 const COLOR_HURT := Color(0.95, 0.35, 0.3)
 const COLOR_DEAD := Color(0.4, 0.4, 0.4)
 const COLOR_SHIELD := Color(0.45, 0.7, 1.0)
@@ -304,6 +302,8 @@ var _queued_attack := ""
 var _attack_resolved := false
 ## Velocità dell'attacco in corso: resta quella con cui è iniziato.
 var _attack_speed := 1.0
+## L'attacco in corso è partito in aria (attacco aereo).
+var _air_attack := false
 var _empowered_time := 0.0
 var _block_flash := 0.0
 ## Altezza da terra durante i salti e velocità verticale.
@@ -335,9 +335,6 @@ var _shake := 0.0
 ## Ultimo punto a terra fuori dai burroni e la sua altezza: si riappare lì.
 var _safe_position := Vector2.ZERO
 var _safe_altitude := 0.0
-## Tempo rimasto per la smorfia di dolore e per la risatina.
-var _hurt_face := 0.0
-var _laugh_time := 0.0
 ## Nemico agganciato (null se nessuno) e il suo mirino.
 var lock_target: Enemy
 var _lock_marker := LockMarker.new()
@@ -384,8 +381,6 @@ func _physics_process(delta: float) -> void:
 	_block_flash = maxf(_block_flash - delta, 0.0)
 	_combo_timer = maxf(_combo_timer - delta, 0.0)
 	shield_cooldown = maxf(shield_cooldown - delta, 0.0)
-	_hurt_face = maxf(_hurt_face - delta, 0.0)
-	_laugh_time = maxf(_laugh_time - delta, 0.0)
 	_spell_cooldown = maxf(_spell_cooldown - delta, 0.0)
 	if _state != State.DEAD:
 		mana = minf(mana + MANA_REGEN * delta, max_mana)
@@ -427,13 +422,11 @@ func _physics_process(delta: float) -> void:
 					_chain_dodge(dodge_input)
 				elif _dodge_cooldown == 0.0:
 					_start_dodge(dodge_input)
-			elif Input.is_action_just_pressed("heavy_attack") or Input.is_action_just_pressed("attack"):
-				if is_airborne():
-					_start_slam("plunge", input)
-				elif Input.is_action_just_pressed("heavy_attack"):
-					_start_heavy(input)
-				else:
-					_start_attack(_next_combo_step(), input)
+			elif Input.is_action_just_pressed("heavy_attack"):
+				_start_heavy(input)
+			elif Input.is_action_pressed("attack"):
+				# Tenendo premuto si continua ad attaccare; in aria è un attacco aereo.
+				_start_attack(_next_combo_step(), input)
 			elif Input.is_action_pressed("parry"):
 				_change_state(State.PARRY)
 
@@ -458,16 +451,18 @@ func _physics_process(delta: float) -> void:
 				_change_state(State.NORMAL)
 
 		State.DODGE:
-			# Attaccare o parare interrompe subito la schivata; attaccando
-			# durante lo scatto in aria si piomba a terra con un colpo ampio.
-			if Input.is_action_just_pressed("attack") or Input.is_action_just_pressed("heavy_attack"):
+			# Attaccare o parare interrompe subito la schivata; il colpo
+			# potente durante lo scatto in aria fa piombare a terra con un
+			# colpo ampio, quello normale è un attacco aereo.
+			if Input.is_action_just_pressed("heavy_attack"):
 				_end_combo()
-				if is_airborne():
-					_start_slam("dash" if _air_dash else "plunge", input)
-				elif Input.is_action_just_pressed("heavy_attack"):
-					_start_heavy(input)
+				if is_airborne() and _air_dash:
+					_start_slam("dash", input)
 				else:
-					_start_attack(1, input)
+					_start_heavy(input)
+			elif Input.is_action_just_pressed("attack"):
+				_end_combo()
+				_start_attack(1, input)
 			elif Input.is_action_just_pressed("parry"):
 				_change_state(State.PARRY)
 			elif Input.is_action_just_pressed("dodge") and _dodges_used < max_chained_dodges \
@@ -620,7 +615,6 @@ func _scratch(damage: int) -> void:
 		return
 	health = maxi(health - damage, 0)
 	health_changed.emit(health, max_health)
-	_hurt_face = HURT_FACE_TIME
 	FloatingText.spawn(get_parent(), global_position, tr("FX_THORNS"), COLOR_HURT)
 	if health == 0:
 		_change_state(State.DEAD)
@@ -636,6 +630,8 @@ func _update_height(delta: float) -> void:
 	if _height <= 0.0 and _height_velocity <= 0.0:
 		return
 	var gravity := GRAVITY * (AIR_DODGE_GRAVITY_FACTOR if _state == State.DODGE else 1.0)
+	if _state == State.ATTACK and _air_attack and _height_velocity < 0.0:
+		gravity *= AIR_ATTACK_GRAVITY_FACTOR
 	if _state == State.SLAM and not _slam_landed:
 		gravity = 0.0 if _slam_kind != "leap" and _state_time < SLAM_HANG else SLAM_GRAVITY
 	_height_velocity -= gravity * delta
@@ -685,7 +681,9 @@ func _update_attack(input: Vector2, delta: float) -> void:
 	# alla fine della combo le pressioni in più vengono ignorate.
 	if Input.is_action_just_pressed("heavy_attack") and _can_chain_heavy():
 		_queued_attack = "heavy"
-	elif Input.is_action_just_pressed("attack") and _can_chain_attack():
+	elif _can_chain_attack() and (Input.is_action_just_pressed("attack") \
+			or (Input.is_action_pressed("attack") and _queued_attack == "" and _state_time >= windup)):
+		# Tenendo premuto il tasto, il colpo successivo parte da solo.
 		_queued_attack = "attack"
 	if not _attack_resolved and _state_time >= windup:
 		_attack_resolved = true
@@ -762,7 +760,6 @@ func receive_hit(from: Vector2, damage: int) -> String:
 		died.emit()
 	else:
 		_change_state(State.HURT)
-		_hurt_face = HURT_FACE_TIME
 		_velocity = -to_attacker * HURT_KNOCKBACK
 		_invulnerable_time = HURT_INVULNERABLE_TIME
 		Sfx.play("hurt", global_position)
@@ -773,22 +770,8 @@ func is_dead() -> bool:
 	return _state == State.DEAD
 
 
-## Espressione del volto in questo momento (vedi GoblinArt).
-func expression() -> String:
-	if _state == State.DEAD:
-		return "dead"
-	if _laugh_time > 0.0:
-		return "laugh"
-	if _hurt_face > 0.0 or _state == State.HURT:
-		return "hurt"
-	if _state in [State.ATTACK, State.SLAM] or _charging:
-		return "attack"
-	return "smug"
-
-
 ## Risatina da goblin, per esempio dopo aver sconfitto un boss.
 func laugh() -> void:
-	_laugh_time = LAUGH_TIME
 	Sfx.play("giggle", global_position)
 	FloatingText.spawn(get_parent(), global_position, tr("FX_GIGGLE"), COLOR_EMPOWERED, 30.0)
 
@@ -811,7 +794,6 @@ func _climb_out_of_ravine() -> void:
 	var data: Dictionary = World.DATA.data["terrain"]
 	health = maxi(health - int(data["ravine_damage"]), 0)
 	health_changed.emit(health, max_health)
-	_hurt_face = HURT_FACE_TIME
 	FloatingText.spawn(get_parent(), global_position, tr("FX_FELL"), COLOR_HURT)
 	if health == 0:
 		_change_state(State.DEAD)
@@ -1092,6 +1074,10 @@ func _start_attack(step: int, input: Vector2) -> void:
 
 
 func _start_heavy(input: Vector2) -> void:
+	# In aria il colpo potente fa piombare a terra.
+	if is_airborne():
+		_start_slam("plunge", input)
+		return
 	# Fuori dalla combo il colpo potente parte da solo, senza bonus.
 	if _combo_timer == 0.0 and _state not in [State.ATTACK, State.SLAM]:
 		_combo_step = 0
@@ -1117,7 +1103,12 @@ func _begin_attack(input: Vector2) -> void:
 	_attack_speed = EMPOWER_ATTACK_SPEED if is_empowered() else 1.0
 	_charge = 0.0
 	_charging = false
-	_walk_velocity = _velocity.limit_length(walk_speed() * ATTACK_MOVE_FACTOR) if _state != State.ATTACK else _walk_velocity
+	_air_attack = is_airborne()
+	if _state != State.ATTACK:
+		_walk_velocity = _velocity.limit_length(walk_speed() * ATTACK_MOVE_FACTOR)
+		# In aria lo slancio del salto (o dello scatto) continua e si esaurisce piano.
+		if _air_attack:
+			_carry_velocity = _velocity - _walk_velocity
 	# I fendenti si alternano: una volta da sinistra, una da destra.
 	_swing_sign = -_swing_sign
 	_queued_attack = ""
@@ -1411,6 +1402,8 @@ func _attack_range() -> float:
 func _attack_arc() -> float:
 	if _attack_heavy:
 		return HEAVY_ARC
+	if _air_attack:
+		return AIR_ATTACK_ARC
 	return ATTACK_ARC + 0.15 * (_combo_step - 1)
 
 
@@ -1434,9 +1427,14 @@ func _resolve_attack() -> void:
 	var damage := _attack_damage()
 	var heavy := _attack_heavy or _combo_step >= max_combo_hits
 	var landed := false
+	# In aria si arriva anche ai nemici sotto di sé.
+	var reach_below := AIR_ATTACK_REACH if _air_attack or is_airborne() else HIT_HEIGHT_REACH
 	for node in get_tree().get_nodes_in_group("enemies"):
 		var enemy := node as Enemy
-		if enemy == null or enemy.is_dead() or absf(enemy.ground_elevation - altitude()) > HIT_HEIGHT_REACH:
+		if enemy == null or enemy.is_dead():
+			continue
+		var rise := altitude() - enemy.ground_elevation
+		if rise < -HIT_HEIGHT_REACH or rise > reach_below:
 			continue
 		var offset := enemy.global_position - global_position
 		if offset.length() > _attack_range() + enemy.radius:
@@ -1463,16 +1461,17 @@ func _draw() -> void:
 	if _state == State.DEAD:
 		body = COLOR_DEAD
 	elif _state == State.HURT:
-		body = COLOR_BODY.lerp(COLOR_HURT, 0.45)
-	# Lampeggia mentre è invulnerabile dopo un colpo; precipitando svanisce nel buio.
-	self_modulate.a = 0.35 if _invulnerable_time > 0.0 and int(_invulnerable_time * 12.0) % 2 == 0 else 1.0
-	if _state == State.FALL:
-		self_modulate.a = 1.0 - clampf(_state_time / FALL_TIME, 0.0, 1.0)
+		body = COLOR_HURT
+	# Lampeggia mentre è invulnerabile dopo un colpo.
+	if _invulnerable_time > 0.0 and int(_invulnerable_time * 12.0) % 2 == 0:
+		body.a = 0.35
+	# Precipitando in un burrone svanisce nel buio.
+	self_modulate.a = 1.0 - clampf(_state_time / FALL_TIME, 0.0, 1.0) if _state == State.FALL else 1.0
 
 	# L'ombra resta a terra e si rimpicciolisce durante il salto; tutto il
 	# resto sale con il personaggio. In scivolata il corpo si schiaccia.
 	var shadow_scale := clampf(1.0 - _height / 160.0, 0.5, 1.0)
-	draw_circle(Vector2(0, RADIUS * 0.8 - ground_elevation), RADIUS * 0.9 * shadow_scale, Color(0, 0, 0, 0.25))
+	Shapes.disc(self, Vector2(0, RADIUS * 0.8 - ground_elevation), RADIUS * 0.9 * shadow_scale, Color(0, 0, 0, 0.25))
 	var body_scale := Vector2(1.2, 0.6) if _state == State.SLIDE else Vector2.ONE
 	var lift := -altitude() + (RADIUS * 0.4 if _state == State.SLIDE else 0.0)
 	draw_set_transform(Vector2(0, lift), 0.0, body_scale)
@@ -1483,7 +1482,7 @@ func _draw() -> void:
 	if dashing:
 		# Scatto in aria: immagini che restano indietro lungo la traiettoria.
 		for k in range(AIR_DASH_TRAIL, 0, -1):
-			draw_circle(-_dodge_direction * k * 16.0 + Vector2(0, -LEG_LENGTH), RADIUS * (1.0 - 0.15 * k), Color(body, 0.35 / k))
+			Shapes.disc(self, -_dodge_direction * k * 16.0 + Vector2(0, -LEG_LENGTH), RADIUS * (1.0 - 0.15 * k), Color(body, 0.35 / k))
 	if _state != State.SLIDE and not rolling:
 		var foot_y := RADIUS * 0.85 - (6.0 if is_airborne() else 0.0)
 		BodyParts.draw_legs(self, -LEG_LENGTH + RADIUS * 0.55, foot_y, 8.0, 6.0, _walk_phase,
@@ -1510,23 +1509,17 @@ func _draw() -> void:
 	# Aura del potenziamento, corpo e "naso" che indica la direzione.
 	if is_empowered() and _state != State.DEAD:
 		var pulse := 0.5 + 0.5 * sin(_empowered_time * 10.0)
-		draw_circle(Vector2.ZERO, RADIUS + 8.0 + pulse * 4.0, Color(COLOR_EMPOWERED, 0.25))
+		Shapes.disc(self, Vector2.ZERO, RADIUS + 8.0 + pulse * 4.0, Color(COLOR_EMPOWERED, 0.25))
 		draw_arc(Vector2.ZERO, RADIUS + 8.0 + pulse * 4.0, 0.0, TAU, 32, Color(COLOR_EMPOWERED, 0.8), 2.0)
-	# Goblin: busto, spada e torcia, testa. Di spalle la spada sta davanti
-	# alla testa (più lontana da chi guarda), di fronte la testa sta sopra.
-	var from_behind := facing.y < -0.3
-	var head := Vector2(0, -HEAD_RISE) + Vector2(facing.x, facing.y * 0.5) * RADIUS * 0.3
-	if _laugh_time > 0.0:
-		head.y -= absf(sin(_laugh_time * 14.0)) * 3.0
-	if from_behind:
-		GoblinArt.draw_head(self, head, HEAD_RADIUS, facing, expression(), body)
-	GoblinArt.draw_torso(self, RADIUS, facing, body)
+	Shapes.disc(self, Vector2.ZERO, RADIUS, body)
+	var tip := facing * (RADIUS + 12.0)
+	var side := facing.orthogonal() * 9.0
+	draw_primitive(PackedVector2Array([tip, facing * RADIUS * 0.6 + side, facing * RADIUS * 0.6 - side]), PackedColorArray([body.darkened(0.3)]), PackedVector2Array())
+
 	if _state != State.DEAD:
 		_draw_sword()
 		if torch_on:
 			_draw_torch()
-	if not from_behind:
-		GoblinArt.draw_head(self, head, HEAD_RADIUS, facing, expression(), body)
 
 	if _state == State.PARRY:
 		var shield := COLOR_SHIELD
@@ -1536,7 +1529,7 @@ func _draw() -> void:
 
 	# Scudo attivo: una bolla attorno al personaggio.
 	if shield_active and _state != State.DEAD:
-		draw_circle(Vector2.ZERO, RADIUS + 16.0, Color(COLOR_BUBBLE, 0.15))
+		Shapes.disc(self, Vector2.ZERO, RADIUS + 16.0, Color(COLOR_BUBBLE, 0.15))
 		draw_arc(Vector2.ZERO, RADIUS + 16.0, 0.0, TAU, 40, Color(COLOR_BUBBLE, 0.7), 2.5)
 	draw_set_transform(Vector2.ZERO)
 
@@ -1555,7 +1548,6 @@ func _draw_sword() -> void:
 		return
 	if _state != State.ATTACK:
 		var rest := facing.angle() + 0.6
-		GoblinArt.draw_arm(self, _shoulder(1.0), facing.orthogonal() * RADIUS * 0.8, COLOR_BODY)
 		BodyParts.draw_sword(self, facing.orthogonal() * RADIUS * 0.8, rest, SWORD_LENGTH, SWORD_WIDTH, tint)
 		return
 	var windup := (HEAVY_WINDUP if _attack_heavy else ATTACK_WINDUP) / _attack_speed
@@ -1582,7 +1574,6 @@ func _draw_sword() -> void:
 		var alpha := 0.85 if _attack_heavy else 0.5 + 0.15 * (_combo_step - 1)
 		BodyParts.draw_trail(self, Vector2.ZERO, start, angle, RADIUS + 6.0, _attack_range() + RADIUS, Color(slash, minf(alpha, 0.9)))
 	var length := HEAVY_SWORD_LENGTH if _attack_heavy else SWORD_LENGTH
-	GoblinArt.draw_arm(self, _shoulder(1.0), Vector2.from_angle(angle) * RADIUS * 0.8, COLOR_BODY)
 	BodyParts.draw_sword(self, Vector2.from_angle(angle) * RADIUS * 0.8, angle, length, SWORD_WIDTH * (1.3 if _attack_heavy else 1.0), tint)
 
 
@@ -1603,21 +1594,14 @@ func _draw_slam_sword(tint: Color) -> void:
 		BodyParts.draw_trail(self, Vector2.ZERO, start, end, RADIUS + 6.0, HEAVY_SWORD_LENGTH + RADIUS, Color(COLOR_HEAVY, 0.7))
 	if mirror:
 		angle = PI - angle
-	GoblinArt.draw_arm(self, _shoulder(1.0), Vector2.from_angle(angle) * RADIUS * 0.8, COLOR_BODY)
 	BodyParts.draw_sword(self, Vector2.from_angle(angle) * RADIUS * 0.8, angle, HEAVY_SWORD_LENGTH, SWORD_WIDTH * 1.3, tint)
-
-
-## Spalla dal lato della spada (side = 1) o della torcia (-1).
-func _shoulder(side: float) -> Vector2:
-	return facing.orthogonal() * RADIUS * 0.55 * side + Vector2(0, -RADIUS * 0.35)
 
 
 ## Torcia nell'altra mano: bastone e fiamma che tremola.
 func _draw_torch() -> void:
 	var hand := -facing.orthogonal() * RADIUS * 0.9
-	GoblinArt.draw_arm(self, _shoulder(-1.0), hand, COLOR_BODY)
 	var top := hand + Vector2(0, -18)
 	draw_line(hand + Vector2(0, 6), top, Color(0.4, 0.26, 0.14), 4.0)
 	var flicker := randf_range(0.85, 1.15)
-	draw_circle(top + Vector2(0, -4), 7.0 * flicker, Color(COLOR_FLAME, 0.85))
-	draw_circle(top + Vector2(0, -6), 4.0 * flicker, Color(1.0, 0.95, 0.6))
+	Shapes.disc(self, top + Vector2(0, -4), 7.0 * flicker, Color(COLOR_FLAME, 0.85))
+	Shapes.disc(self, top + Vector2(0, -6), 4.0 * flicker, Color(1.0, 0.95, 0.6))

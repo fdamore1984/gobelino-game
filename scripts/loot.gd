@@ -50,6 +50,6 @@ func _draw() -> void:
 	var hop := sin(PI * t) * 50.0
 	var bob := 4.0 * sin(_age * 4.0) if t >= 1.0 else 0.0
 	var center := Vector2(0, -_lift - 18.0 - hop - bob)
-	draw_circle(Vector2(0, -_lift + 4.0), 9.0, Color(0, 0, 0, 0.25))
-	draw_circle(center, SIZE * 0.6, Color(1, 1, 0.8, 0.18 + 0.1 * sin(_age * 6.0)))
+	Shapes.disc(self, Vector2(0, -_lift + 4.0), 9.0, Color(0, 0, 0, 0.25))
+	Shapes.disc(self, center, SIZE * 0.6, Color(1, 1, 0.8, 0.18 + 0.1 * sin(_age * 6.0)))
 	ItemIcon.draw_item(self, center, SIZE, item_id)
