@@ -55,8 +55,8 @@ const TRIGGER_REARM_DISTANCE := 110.0
 const PASSAGE_HINT_DISTANCE := 200.0
 ## Nemici più vicini di così impediscono di salvare.
 const SAVE_SAFE_DISTANCE := 700.0
-## Arrivando su un piano si compare un po' lontano dalla scala d'uscita.
-const ARRIVAL_OFFSET := Vector2(0, 90)
+## Arrivando su un piano si compare a questa distanza dal passaggio nella parete.
+const ARRIVAL_DISTANCE := 70.0
 
 ## Partita da riprendere al prossimo avvio della scena (la imposta il menù).
 static var pending_save := {}
@@ -319,7 +319,10 @@ func _go_to_depth(depth: int, at: Vector2) -> void:
 	_clear_level()
 	var dungeon := Dungeon.new(hash([_cave_seed(), depth]), depth, _cave_levels)
 	_world.set_dungeon(dungeon)
-	_player.teleport(World.cell_center(dungeon.arrival) + ARRIVAL_OFFSET if at == Vector2.INF else at)
+	if at == Vector2.INF or not dungeon.is_floor(World.cell_at(at)):
+		# All'arrivo, o se il salvataggio è di una versione in cui il piano era diverso.
+		at = _world.in_front_of_wall(dungeon.arrival, dungeon.arrival_side, ARRIVAL_DISTANCE)
+	_player.teleport(at)
 	_prepare_region()
 	_rest_point = _player.position
 	_day_night.set_override(World._color(_dungeon_data["darkness"]))
@@ -393,7 +396,8 @@ func _on_boss_died(boss: Enemy) -> void:
 	for k in mini(int(_dungeon_data["boss_reward_items"]), rare.size()):
 		drops.append([rare[k], 1])
 	_drop_loot(boss.global_position, drops)
-	_world.add_obstacle(_world.make_obstacle("exit", World.cell_center(_world.dungeon.arena)))
+	var dungeon := _world.dungeon
+	_world.add_obstacle(_world.make_wall_obstacle("exit", dungeon.arena_exit, dungeon.arena_exit_side))
 	_rest_point = _player.position
 	_hud.flash_challenge(tr("BOSS_DEFEATED"))
 	Sfx.play("level_up", boss.global_position)
@@ -476,6 +480,10 @@ func _load(save: Dictionary) -> void:
 	var position_saved := SaveGame.vector(save["position"])
 	var dungeon_state: Dictionary = save.get("dungeon", {})
 	if dungeon_state.is_empty():
+		# Se una versione nuova ha cambiato il terreno, si cerca un posto
+		# libero vicino a quello salvato.
+		if _world.is_barrier(World.cell_at(position_saved)):
+			position_saved = _world.safe_position_near(position_saved)
 		_player.teleport(position_saved)
 		# Salvando davanti a una caverna non ci si rientra appena caricato.
 		_rest_point = position_saved

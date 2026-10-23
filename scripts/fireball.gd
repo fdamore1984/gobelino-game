@@ -24,6 +24,8 @@ var direction := Vector2.RIGHT
 ## Altezza del terreno da cui è partita: la palla resta a quella quota.
 var altitude := 0.0
 
+## Bersaglio scelto da chi la lancia (il nemico agganciato), o null.
+var target: Enemy
 var _target: Enemy
 var _age := 0.0
 var _exploding := 0.0
@@ -38,7 +40,7 @@ func _ready() -> void:
 	_light.energy = 0.9
 	_light.texture_scale = 0.7
 	add_child(_light)
-	_target = _find_target()
+	_target = target if target and is_instance_valid(target) and not target.is_dead() else _find_target()
 
 
 func _physics_process(delta: float) -> void:

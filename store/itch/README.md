@@ -79,8 +79,10 @@ IN THIS PROTOTYPE
 - Open chests to find gold, weapons, armor, boots, amulets, rings, spell books and potions; equip them, read the books and drink the potions from your inventory
 - Travelling merchants are scattered around the world: touch their stall to sell the items you don't use and to buy potions and rare gear you won't find in chests (dragon sword, plate armor, wind boots, archmage amulet, inferno ring, meteor and vigor tomes, elixirs)
 - Long mountain ranges and deep ravines cut across the land: you can't cross them, but now and then a cave opens in a mountain wall
-- Walk into a cave to explore a dark underground of tunnels and caverns: find the stairs down on each level (2 to 5 levels) and face the Cave Guardian, a tough boss that grows with your level, in its arena on the last one. Beat it for gold and rare items
+- Walk into a cave to explore a dark underground of tunnels and caverns: find the passage down in the cave walls on each level (2 to 5 levels) and face the Cave Guardian, a tough boss that grows with your level, in its arena on the last one. Beat it for gold and rare items
 - The game saves automatically every 5 minutes and whenever you enter a cave; you can also save from the pause menu, as long as no enemies are nearby and you are standing still. Continue your game from the title screen
+- Lock on to the nearest enemy with R3 and press again to switch target: you always face it, your strikes and fireballs go its way and the camera keeps it in view
+- Tall walls, mountains and cliffs that hide your character turn fully transparent around you, so you always see what is happening
 - Stone totems stand in the middle of wide open arenas: touch one to start a 30-second survival challenge with waves of enemies matched to your level, and earn experience and a potion
 - Earn experience to level up: every level raises your base damage and lets you choose an upgrade: one more combo hit, one more chained power strike, one more chained dodge, one more jump, one more health point, one more potion, a faster shield recharge, a faster run, more mana or a stronger spell, picked from a grid of cards with icons. Your skill levels are always shown on screen, and the active power-ups are listed on the right
 
@@ -98,6 +100,7 @@ CONTROLS
 - Mana potion: D-pad right / T
 - Torch: D-pad down / G
 - Inventory: D-pad up / I
+- Lock on the nearest enemy (press again to switch target): R3 / C
 - Pause menu (save, controls, quit): Start / Esc
 - Special attacks: power strike right after a combo = leap and slam; attack in mid-air = plunge; attack during an air dash = dash strike
 
