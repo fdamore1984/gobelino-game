@@ -31,7 +31,6 @@ const UPGRADE_NAMES := {
 	"dodge": "UPGRADE_DODGE",
 	"jump": "UPGRADE_JUMP",
 	"health": "UPGRADE_HEALTH",
-	"potion": "UPGRADE_POTION",
 	"shield": "UPGRADE_SHIELD",
 	"run": "UPGRADE_RUN",
 	"mana": "UPGRADE_MANA",
@@ -62,7 +61,6 @@ var pause_menu := PauseMenu.new()
 	"dodge": %UpgradeDodge as Button,
 	"jump": %UpgradeJump as Button,
 	"health": %UpgradeHealth as Button,
-	"potion": %UpgradePotion as Button,
 	"shield": %UpgradeShield as Button,
 	"run": %UpgradeRun as Button,
 	"mana": %UpgradeMana as Button,
@@ -153,6 +151,9 @@ func _update_power_ups() -> void:
 	if player.torch_on:
 		rows.append(["torch", tr("POWERUP_TORCH")])
 	for upgrade: String in player.upgrades_taken:
+		# I potenziamenti che non esistono più (per esempio +1 pozione) non si mostrano.
+		if not UPGRADE_NAMES.has(upgrade):
+			continue
 		var name_key := "POWERUP_" + upgrade.to_upper()
 		rows.append([upgrade, tr("POWERUP_UPGRADE") % [tr(name_key), _upgrade_value(upgrade), player.upgrades_taken[upgrade]]])
 	if rows == _power_ups_shown:
@@ -222,8 +223,6 @@ func _upgrade_value(upgrade: String) -> String:
 			return str(player.max_jumps)
 		"health":
 			return str(player.max_health)
-		"potion":
-			return str(player.max_potions)
 		"shield":
 			return "%.1f s" % player.shield_cooldown_max
 		"run":
@@ -367,7 +366,6 @@ func show_level_up(level: int, damage_before: int, damage_after: int) -> void:
 	_card_values["heavy"].text = tr("UPGRADE_VALUE") % [player.max_heavy_chain, player.max_heavy_chain + 1]
 	_card_values["dodge"].text = tr("UPGRADE_VALUE") % [player.max_chained_dodges, player.max_chained_dodges + 1]
 	_card_values["health"].text = tr("UPGRADE_VALUE") % [player.max_health, player.max_health + 1]
-	_card_values["potion"].text = tr("UPGRADE_VALUE") % [player.max_potions, player.max_potions + 1]
 	var cooldown_after := player.shield_cooldown_max * Player.SHIELD_COOLDOWN_UPGRADE
 	_card_values["shield"].text = tr("UPGRADE_VALUE_SECONDS") % [player.shield_cooldown_max, cooldown_after]
 	_card_values["jump"].text = tr("UPGRADE_VALUE") % [player.max_jumps, player.max_jumps + 1]

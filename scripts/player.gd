@@ -197,7 +197,6 @@ const MANA_REGEN := 2.0
 const MANA_UPGRADE := 20.0
 const MANA_POTION_RESTORE := 40.0
 const START_MANA_POTIONS := 1
-const MAX_MANA_POTIONS := 2
 ## Palla di fuoco: costo, attesa tra un lancio e l'altro, danni (crescono
 ## con il livello e con i potenziamenti della magia, +20% ciascuno).
 const SPELL_COST := 20.0
@@ -277,8 +276,8 @@ var _base_max_health := START_HEALTH
 var mana := START_MANA
 var max_mana := START_MANA
 var _base_max_mana := START_MANA
+## Pozioni nella cintura: non hanno limite.
 var mana_potions := START_MANA_POTIONS
-var max_mana_potions := MAX_MANA_POTIONS
 ## Bonus alla potenza della magia dai potenziamenti (0.2 = +20%).
 var spell_bonus := 0.0
 var inventory := Inventory.new()
@@ -292,7 +291,6 @@ var max_chained_dodges := START_CHAINED_DODGES
 var max_jumps := START_JUMPS
 ## Bonus alla velocità di corsa (0.02 = +2%).
 var run_speed_bonus := 0.0
-var max_potions := START_POTIONS
 var potions := START_POTIONS
 var shield_cooldown_max := SHIELD_COOLDOWN
 ## Ricarica dello scudo rimasta, e se lo scudo è attivo in questo momento.
@@ -959,8 +957,8 @@ func _face_lock() -> bool:
 func save_state() -> Dictionary:
 	return {
 		"level": level, "experience": experience, "health": health, "base_max_health": _base_max_health,
-		"mana": mana, "base_max_mana": _base_max_mana, "potions": potions, "max_potions": max_potions,
-		"mana_potions": mana_potions, "max_mana_potions": max_mana_potions, "spell_bonus": spell_bonus,
+		"mana": mana, "base_max_mana": _base_max_mana, "potions": potions,
+		"mana_potions": mana_potions, "spell_bonus": spell_bonus,
 		"max_combo_hits": max_combo_hits, "max_heavy_chain": max_heavy_chain,
 		"max_chained_dodges": max_chained_dodges, "max_jumps": max_jumps, "run_speed_bonus": run_speed_bonus,
 		"shield_cooldown_max": shield_cooldown_max, "torch_on": torch_on, "upgrades_taken": upgrades_taken,
@@ -976,9 +974,7 @@ func load_state(data: Dictionary) -> void:
 	_base_max_health = int(data.get("base_max_health", _base_max_health))
 	_base_max_mana = float(data.get("base_max_mana", _base_max_mana))
 	potions = int(data.get("potions", potions))
-	max_potions = int(data.get("max_potions", max_potions))
 	mana_potions = int(data.get("mana_potions", mana_potions))
-	max_mana_potions = int(data.get("max_mana_potions", max_mana_potions))
 	spell_bonus = float(data.get("spell_bonus", spell_bonus))
 	max_combo_hits = int(data.get("max_combo_hits", max_combo_hits))
 	max_heavy_chain = int(data.get("max_heavy_chain", max_heavy_chain))
@@ -1002,7 +998,12 @@ func load_state(data: Dictionary) -> void:
 	var kept := {}
 	var saved_items: Array = data.get("items", [])
 	for k in saved_items.size():
-		if known.has(saved_items[k]):
+		# Le pozioni di vita e di mana non stanno più nell'inventario: vanno nella cintura.
+		if saved_items[k] == "potion_health":
+			potions += 1
+		elif saved_items[k] == "potion_mana":
+			mana_potions += 1
+		elif known.has(saved_items[k]):
 			kept[k] = inventory.items.size()
 			inventory.items.append(saved_items[k])
 	inventory.equipped.clear()
@@ -1089,9 +1090,6 @@ func apply_upgrade(upgrade: String) -> void:
 			_base_max_health += 1
 			health += 1
 			_refresh_stats()
-		"potion":
-			max_potions += 1
-			potions += 1
 		"shield":
 			shield_cooldown_max *= SHIELD_COOLDOWN_UPGRADE
 			shield_cooldown = minf(shield_cooldown, shield_cooldown_max)
@@ -1398,8 +1396,9 @@ func _cast_fireball(input: Vector2) -> void:
 	Sfx.play("fireball", global_position)
 
 
-## Raccoglie un oggetto: le monete vanno nel borsello, le pozioni nella
-## cintura se c'è posto, il resto nell'inventario.
+## Raccoglie un oggetto: le monete vanno nel borsello, le pozioni di vita e
+## di mana nella cintura (senza limite, mai nell'inventario), il resto
+## nell'inventario.
 func pickup(id: String, amount := 1) -> void:
 	match id:
 		"gold":
@@ -1407,15 +1406,13 @@ func pickup(id: String, amount := 1) -> void:
 			Sfx.play("coin", global_position)
 			return
 		"potion_health":
-			if potions < max_potions:
-				potions += 1
-				Sfx.play("pickup", global_position)
-				return
+			potions += amount
+			Sfx.play("pickup", global_position)
+			return
 		"potion_mana":
-			if mana_potions < max_mana_potions:
-				mana_potions += 1
-				Sfx.play("pickup", global_position)
-				return
+			mana_potions += amount
+			Sfx.play("pickup", global_position)
+			return
 	inventory.add(id)
 	Sfx.play("pickup", global_position)
 

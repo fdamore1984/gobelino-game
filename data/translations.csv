@@ -22,7 +22,6 @@ HUD_SHIELD_READY,Shield: ready
 HUD_SHIELD_ACTIVE,Shield: active
 HUD_SHIELD_COOLDOWN,Shield: %d s
 UPGRADE_HEAVY,Chained power strikes +1
-UPGRADE_POTION,Potions +1
 UPGRADE_SHIELD,Shield recharge -2%
 TOUCH_HEAVY,Power
 TOUCH_POTION,Potion
@@ -43,7 +42,6 @@ POWERUP_HEAVY,Power strikes
 POWERUP_DODGE,Dodges
 POWERUP_JUMP,Jumps
 POWERUP_HEALTH,Max health
-POWERUP_POTION,Potions
 POWERUP_SHIELD,Shield recharge
 POWERUP_RUN,Run speed
 POWERUP_EMPOWERED,Perfect parry: empowered attacks %d s

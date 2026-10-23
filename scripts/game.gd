@@ -557,7 +557,7 @@ func _finish_challenge() -> void:
 	var xp := int(data["xp_per_level"]) * _player.level
 	_world.set_totem_state(_challenge_arena, "used")
 	_challenge_arena = Vector2.INF
-	_player.potions = mini(_player.potions + int(data["potion_reward"]), _player.max_potions)
+	_player.potions += int(data["potion_reward"])
 	_hud.flash_challenge(tr("CHALLENGE_WON") % xp)
 	Sfx.play("level_up", _player.global_position)
 	_player.add_experience(xp)
