@@ -37,6 +37,8 @@ func _ready() -> void:
 			await _capture_inventory(language)
 			await _capture_merchant(language)
 			await _capture_slam(language)
+			await _capture_cave(language)
+			await _capture_dungeon(language)
 	get_tree().quit()
 
 
@@ -175,7 +177,7 @@ func _capture_challenge(language: String) -> void:
 	await _frames(2)
 	camera.reset_smoothing()
 	camera.force_update_scroll()
-	world._update_chunks()
+	world.refresh_now()
 	await _frames(20)
 	await _save("%s_5_challenge.png" % language)
 	_end_game()
@@ -218,7 +220,7 @@ func _capture_merchant(language: String) -> void:
 	await _frames(2)
 	camera.reset_smoothing()
 	camera.force_update_scroll()
-	(_game.get_node("World") as World)._update_chunks()
+	(_game.get_node("World") as World).refresh_now()
 	await _frames(20)
 	await _save("%s_7_merchant.png" % language)
 	for id in ["sword_iron", "armor_chain", "book_mana", "ring_fire", "potion_mana", "boots_swift"]:
@@ -279,6 +281,76 @@ func _capture_slam(language: String) -> void:
 	await _frames(2)
 	await _save("%s_9_slam.png" % language)
 	_end_game()
+
+
+## Ingresso di una caverna nella parete di una montagna.
+func _capture_cave(language: String) -> void:
+	_start_game(Vector2(0, -60), 1.0)
+	_player.level = 5
+	_hud_stats()
+	var cave := _nearest("cave")
+	var into: Vector2 = World.cell_center(World.cell_at(cave["position"])) - cave["position"]
+	await _place_player(cave["position"] + into.normalized() * 110.0)
+	_player.facing = -into.normalized()
+	var hud: Hud = _game.get_node("HUD")
+	hud.show_challenge(tr("CAVE_HINT"))
+	await _frames(20)
+	await _save("%s_11_cave.png" % language)
+	_end_game()
+
+
+## Ultimo piano del sotterraneo: al buio con la torcia, davanti al boss.
+func _capture_dungeon(language: String) -> void:
+	_start_game(Vector2(0, -40), 1.0)
+	_player.level = 6
+	_hud_stats()
+	var cave := _nearest("cave")
+	_game._cave = cave["position"]
+	_game._cave_levels = 3
+	_game._go_to_depth(3, Vector2.INF)
+	var world: World = _game.get_node("World")
+	var arena := World.cell_center(world.dungeon.arena)
+	await _place_player(arena + Vector2(-150, 140))
+	_player.facing = (arena - _player.position).normalized()
+	_player.torch_on = true
+	_player._torch.enabled = true
+	_player._torch.position = Vector2(0, -_player.ground_elevation + Player.RADIUS * 0.6)
+	var boss: Enemy = _game._boss
+	boss.position = arena
+	boss._change_state(Enemy.State.WINDUP)
+	boss._windup_time = 1.0
+	boss._state_time = 0.6
+	boss._attack_direction = (_player.position - arena).normalized()
+	boss._facing = boss._attack_direction
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		enemy.set_physics_process(false)
+		enemy.queue_redraw()
+	await _frames(20)
+	await _save("%s_12_dungeon.png" % language)
+	_end_game()
+
+
+## Il punto d'interesse di quel tipo più vicino al giocatore.
+func _nearest(type_id: String) -> Dictionary:
+	var world: World = _game.get_node("World")
+	var best := {}
+	for point: Dictionary in world.points_of_interest(_player.position, 9000.0):
+		if point["type"] == type_id and (best.is_empty() or _player.position.distance_to(point["position"]) < _player.position.distance_to(best["position"])):
+			best = point
+	return best
+
+
+## Sposta il giocatore e mostra subito il terreno attorno. Con la fisica
+## del giocatore ferma la telecamera va rimessa a posto a mano.
+func _place_player(at: Vector2) -> void:
+	_player.teleport(at)
+	var camera: Camera2D = _player.get_node("Camera")
+	camera.position_smoothing_enabled = false
+	camera.reset_physics_interpolation()
+	await _frames(2)
+	camera.reset_smoothing()
+	camera.force_update_scroll()
+	(_game.get_node("World") as World).refresh_now()
 
 
 ## Mercante più vicino alla partenza nel mondo delle immagini.

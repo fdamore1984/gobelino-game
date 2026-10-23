@@ -20,7 +20,14 @@ const COLOR_USED := Color(0.5, 0.5, 0.5)
 const COLOR_LOOT := Color(1, 1, 1)
 const COLOR_MERCHANT := Color(1.0, 0.6, 0.85)
 
+## Righe campionate a ogni frame: l'immagine nuova si prepara in più
+## frame e sostituisce la vecchia quando è pronta, così non ci sono scatti.
+const ROWS_PER_FRAME := 8
+
 var _image := Image.create(SAMPLES, SAMPLES, false, Image.FORMAT_RGB8)
+var _next_image := Image.create(SAMPLES, SAMPLES, false, Image.FORMAT_RGB8)
+var _next_center := Vector2.INF
+var _next_row := 0
 var _texture: ImageTexture
 var _center := Vector2.INF
 var _refresh := 0.0
@@ -39,24 +46,42 @@ func _process(delta: float) -> void:
 		if _player == null:
 			return
 	_refresh -= delta
-	if _refresh <= 0.0 and _center.distance_to(_player.position) > REFRESH_DISTANCE:
+	if _next_center == Vector2.INF and _refresh <= 0.0 and _center.distance_to(_player.position) > REFRESH_DISTANCE:
 		_refresh = REFRESH_TIME
-		_center = _player.position
-		_update_terrain()
+		_next_center = _player.position
+		_next_row = 0
+	if _next_center != Vector2.INF:
+		_sample_rows()
 	queue_redraw()
 
 
-## Campiona il terreno attorno al giocatore: colore del livello o del sentiero.
-func _update_terrain() -> void:
+## Dopo un salto lontano (entrando o uscendo da una caverna) il terreno
+## vecchio non vale più: non si disegna finché non è pronto quello nuovo.
+func reset() -> void:
+	_center = Vector2.INF
+	_next_center = Vector2.INF
+	_refresh = 0.0
+
+
+## Campiona qualche riga del terreno attorno al punto scelto (colore del
+## blocco); finito, l'immagine nuova prende il posto della vecchia.
+func _sample_rows() -> void:
 	var world := World.current
 	if world == null:
 		return
 	var step := 2.0 * RANGE / SAMPLES
-	for i in SAMPLES:
-		for j in SAMPLES:
-			var point := _center + Vector2(-RANGE + (i + 0.5) * step, -RANGE + (j + 0.5) * step)
-			_image.set_pixel(i, j, world.map_color(point))
-	_texture.update(_image)
+	for j in range(_next_row, mini(_next_row + ROWS_PER_FRAME, SAMPLES)):
+		for i in SAMPLES:
+			var point := _next_center + Vector2(-RANGE + (i + 0.5) * step, -RANGE + (j + 0.5) * step)
+			_next_image.set_pixel(i, j, world.map_color(point))
+	_next_row += ROWS_PER_FRAME
+	if _next_row >= SAMPLES:
+		var ready := _next_image
+		_next_image = _image
+		_image = ready
+		_texture.update(_image)
+		_center = _next_center
+		_next_center = Vector2.INF
 
 
 func _draw() -> void:

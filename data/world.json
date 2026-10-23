@@ -16,7 +16,20 @@
 		"face_colors": [[0.45, 0.34, 0.23], [0.33, 0.25, 0.17]],
 		"lip_color": [0.16, 0.3, 0.14],
 		"forest_frequency": 0.0022,
-		"bramble_frequency": 0.004
+		"bramble_frequency": 0.004,
+		"pregen_radius": 12,
+		"pregen_edge": 4,
+		"barrier_frequency": 0.00016,
+		"barrier_width": 0.12,
+		"barrier_gap_frequency": 0.0009,
+		"barrier_gap": 0.4,
+		"barrier_kind_frequency": 0.00022,
+		"barrier_start_clear": 1600,
+		"mountain_colors": [[0.45, 0.43, 0.41], [0.53, 0.51, 0.49], [0.62, 0.6, 0.58], [0.9, 0.92, 0.95]],
+		"mountain_face_colors": [[0.4, 0.38, 0.36], [0.3, 0.29, 0.28]],
+		"ravine_depth": 6,
+		"ravine_color": [0.07, 0.06, 0.06],
+		"cave_chance": 0.05
 	},
 	"day_night": {
 		"cycle": 240,
@@ -54,6 +67,28 @@
 		"skin": [0.4, 0.7, 0.45],
 		"gold": [1.0, 0.82, 0.25]
 	},
+	"dungeon": {
+		"size": [34, 4],
+		"levels": [2, 5],
+		"rooms": [6, 1],
+		"room_radius": [3, 5],
+		"arena_radius": 7,
+		"wall_level": 4,
+		"enemies_per_room": [1, 3],
+		"chests": [1, 2],
+		"stalagmite_chance": 0.05,
+		"floor_colors": [[0.24, 0.22, 0.21], [0.27, 0.25, 0.23], [0.22, 0.21, 0.2]],
+		"wall_color": [0.13, 0.12, 0.12],
+		"face_colors": [[0.31, 0.28, 0.26], [0.22, 0.2, 0.19]],
+		"mushroom_chance": 0.06,
+		"mushroom_colors": [[0.4, 0.9, 0.85], [0.75, 0.55, 1.0]],
+		"darkness": [0.4, 0.38, 0.45],
+		"boss": "guardian",
+		"boss_health_per_level": 0.35,
+		"boss_damage_per_levels": 4,
+		"boss_reward_gold": [60, 15],
+		"boss_reward_items": 2
+	},
 	"obstacles": {
 		"tree": {
 			"chance": 0.02, "forest_bonus": 0.25,
@@ -80,6 +115,18 @@
 			"radius": [22, 34], "collision": 0.85, "solid": false, "slow": 0.45,
 			"damage": 1, "damage_interval": 2.0,
 			"colors": [[0.36, 0.22, 0.28], [0.3, 0.2, 0.16]], "berries": [0.7, 0.1, 0.15]
+		},
+		"cave": {
+			"chance": 0, "radius": [40, 40], "collision": 0.8, "solid": false,
+			"colors": [[0.06, 0.05, 0.06], [0.42, 0.4, 0.38]], "cleared": [0.55, 0.5, 0.42]
+		},
+		"stairs": {
+			"chance": 0, "radius": [30, 30], "collision": 0.8, "solid": false,
+			"colors": [[0.05, 0.04, 0.05], [0.45, 0.42, 0.4]], "glow": [0.5, 0.9, 1.0]
+		},
+		"exit": {
+			"chance": 0, "radius": [30, 30], "collision": 0.8, "solid": false,
+			"colors": [[0.95, 0.9, 0.7], [0.45, 0.42, 0.4]], "glow": [1.0, 0.9, 0.5]
 		}
 	},
 	"decor": {

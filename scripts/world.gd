@@ -12,12 +12,21 @@ extends Node2D
 ## loro livello, salvo le rampe. Sopra ci sono ostacoli naturali: alberi,
 ## sassi, cespugli, rovi e casse con il bottino. Qua e là ci sono arene: ampie zone piane e
 ## libere con al centro un totem che avvia una sfida (vedi Game).
+## Lunghe catene di montagne e burroni non si attraversano (hanno qualche
+## passaggio); nelle pareti delle montagne si aprono caverne che portano a
+## un sotterraneo (vedi Dungeon), disegnato con gli stessi blocchi.
 ##
 ## Le posizioni di personaggi e oggetti sono a terra (il piano x, y);
 ## l'altezza del terreno sotto di loro (elevation_at) li disegna più in
 ## alto. Il terreno viene generato e disegnato a blocchi di rombi attorno
 ## alla telecamera; i blocchi più alti di quelli dietro vengono ridisegnati
 ## tra i personaggi, così coprono chi ci passa dietro.
+##
+## Prestazioni: i dati del terreno (livelli, rampe, ostacoli) di una regione
+## grande attorno al giocatore sono generati in anticipo (begin_region,
+## generate_region); avvicinandosi al bordo Game mette in pausa e genera la
+## regione nuova. I pezzi da disegnare vengono creati un po' prima che
+## entrino nello schermo, uno per frame, così non ci sono scatti.
 
 const DATA := preload("res://data/world.json")
 
@@ -25,9 +34,13 @@ const DATA := preload("res://data/world.json")
 const CELL := 64.0
 ## Un pezzo di mondo è un quadrato di CHUNK_CELLS x CHUNK_CELLS rombi.
 const CHUNK_CELLS := 8
-## I pezzi lontani dalla telecamera vengono dimenticati.
-const FORGET_DISTANCE := 3600.0
-const MAINTAIN_INTERVAL := 0.25
+const MAINTAIN_INTERVAL := 0.15
+## I pezzi vengono creati quando arrivano a questa distanza dallo schermo
+## e tolti quando se ne allontanano di altri KEEP_MARGIN.
+const PREFETCH_MARGIN := 380.0
+const KEEP_MARGIN := 320.0
+## I dati fuori dalla regione si dimenticano solo oltre questi rombi in memoria.
+const FORGET_THRESHOLD := 110000
 ## Gli ostacoli vengono messi solo in questa parte del rombo, lontano dai bordi.
 const PLACE_MIN := 14.0
 const PLACE_MAX := 44.0
@@ -37,10 +50,13 @@ const STEP_TOLERANCE := 8.0
 const CORNERS := [Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)]
 ## Direzioni in cui può salire una rampa (verso il rombo vicino più alto).
 const RAMP_DIRECTIONS := [Vector2i(-1, 0), Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1)]
-const CACHE_LIMIT := 60000
 ## Distanza tra le linee degli strati di terra sulle pareti.
 const STRATA_STEP := 14.0
 const LIP_WIDTH := 5.0
+
+## Tipi di blocco: terreno normale, montagna o burrone (invalicabili) e
+## roccia del sotterraneo.
+enum Kind { GROUND, MOUNTAIN, RAVINE, ROCK }
 
 ## Mondo attivo: giocatore e nemici lo usano per muoversi.
 static var current: World
@@ -63,19 +79,53 @@ var _arena_cache := {}
 var _merchant: Dictionary = DATA.data["merchant"]
 ## Regione -> posizione del suo mercante (Vector2.INF se non ce l'ha).
 var _merchant_cache := {}
+## (regione, dimensione) -> arene o mercanti delle regioni attorno.
+var _sites_cache := {}
 ## Mercante -> oggetti rari che ha ancora in vendita.
 var _merchant_stocks := {}
 ## Totem (centro dell'arena) -> stato: "active" durante la sfida, "used" dopo.
 var _totem_states := {}
 ## Casse già aperte (posizione -> true).
 var _opened_chests := {}
+## Caverne il cui sotterraneo è stato completato (posizione -> true).
+var cleared_caves := {}
+## Sotterraneo in cui si trova il giocatore (null in superficie).
+var dungeon: Dungeon
+## Regione pregenerata, in pezzi, e pezzi ancora da generare.
+var region := Rect2i()
+var _region_queue: Array[Vector2i] = []
+var _region_total := 0
+## Pezzi da mostrare, il più vicino in fondo: se ne crea uno per frame.
+var _view_queue: Array[Vector2i] = []
+var _dungeon_data: Dictionary = DATA.data["dungeon"]
 var _levels: int
 var _height_noise := FastNoiseLite.new()
 var _path_noise := FastNoiseLite.new()
 var _forest_noise := FastNoiseLite.new()
 var _bramble_noise := FastNoiseLite.new()
+var _ridge_noise := FastNoiseLite.new()
+var _gap_noise := FastNoiseLite.new()
+var _barrier_kind_noise := FastNoiseLite.new()
+## Dati calcolati per rombo: livello, tipo (Kind), rampa, sentiero.
 var _level_cache := {}
+var _kind_cache := {}
 var _ramp_cache := {}
+var _path_cache := {}
+## Colori già convertiti dai dati, per disegnare in fretta.
+var _grass_colors: Array[Color] = []
+var _face_colors: Array[Color] = []
+var _mountain_colors: Array[Color] = []
+var _mountain_face_colors: Array[Color] = []
+var _dungeon_floor_colors: Array[Color] = []
+var _dungeon_face_colors: Array[Color] = []
+var _pebble_colors: Array[Color] = []
+var _flower_colors: Array[Color] = []
+var _mushroom_colors: Array[Color] = []
+var _path_color: Color
+var _lip_color: Color
+var _ravine_color: Color
+var _dungeon_wall_color: Color
+var _tuft_range := Vector2i.ZERO
 ## Pezzo -> ostacoli (dizionari), generati quando servono.
 var _chunk_obstacles := {}
 ## Pezzo -> {"view": nodo del terreno, "nodes": ostacoli e blocchi tra i personaggi}.
@@ -93,14 +143,26 @@ func _ready() -> void:
 		seed_value = randi_range(1, 1 << 30)
 	_levels = _terrain["levels"]
 	level_height = _terrain["level_height"]
-	_setup_noise(_height_noise, 0, _terrain["height_frequency"], _terrain["height_octaves"])
-	_setup_noise(_path_noise, 1, _terrain["path_frequency"], 1)
-	_setup_noise(_forest_noise, 2, _terrain["forest_frequency"], 2)
-	_setup_noise(_bramble_noise, 3, _terrain["bramble_frequency"], 1)
+	_setup_noises()
+	_grass_colors = _colors(_terrain["grass_colors"])
+	_face_colors = _colors(_terrain["face_colors"])
+	_mountain_colors = _colors(_terrain["mountain_colors"])
+	_mountain_face_colors = _colors(_terrain["mountain_face_colors"])
+	_dungeon_floor_colors = _colors(_dungeon_data["floor_colors"])
+	_dungeon_face_colors = _colors(_dungeon_data["face_colors"])
+	_pebble_colors = _colors(_decor["pebble_colors"])
+	_flower_colors = _colors(_decor["flower_colors"])
+	_mushroom_colors = _colors(_dungeon_data["mushroom_colors"])
+	_path_color = _color(_terrain["path_color"])
+	_lip_color = _color(_terrain["lip_color"])
+	_ravine_color = _color(_terrain["ravine_color"])
+	_dungeon_wall_color = _color(_dungeon_data["wall_color"])
+	var tufts: Array = _decor["grass_tufts"]
+	_tuft_range = Vector2i(tufts[0], tufts[1])
 	# I pezzi di terreno si disegnano da dietro in avanti.
 	y_sort_enabled = true
 	# Dove il terreno non è ancora disegnato si vede il colore dell'erba più bassa.
-	RenderingServer.set_default_clear_color(_color(_terrain["grass_colors"][0]).darkened(0.3))
+	RenderingServer.set_default_clear_color(_grass_colors[0].darkened(0.3))
 
 
 func _exit_tree() -> void:
@@ -108,6 +170,56 @@ func _exit_tree() -> void:
 		current = null
 	if not _wall_glow.is_inside_tree():
 		_wall_glow.free()
+
+
+## Cambia il seme (caricando una partita): rumori nuovi e dati da rifare.
+func set_seed(value: int) -> void:
+	seed_value = value
+	_setup_noises()
+	_arena_cache.clear()
+	_merchant_cache.clear()
+	_sites_cache.clear()
+	set_dungeon(dungeon)
+
+
+func _setup_noises() -> void:
+	_setup_noise(_height_noise, 0, _terrain["height_frequency"], _terrain["height_octaves"])
+	_setup_noise(_path_noise, 1, _terrain["path_frequency"], 1)
+	_setup_noise(_forest_noise, 2, _terrain["forest_frequency"], 2)
+	_setup_noise(_bramble_noise, 3, _terrain["bramble_frequency"], 1)
+	_setup_noise(_ridge_noise, 4, _terrain["barrier_frequency"], 1)
+	_setup_noise(_gap_noise, 5, _terrain["barrier_gap_frequency"], 1)
+	_setup_noise(_barrier_kind_noise, 6, _terrain["barrier_kind_frequency"], 1)
+
+
+## Stato del mondo da salvare: casse aperte, totem usati, scorte dei
+## mercanti e caverne completate (le posizioni come coppie di numeri).
+func save_state() -> Dictionary:
+	var stocks := []
+	for merchant: Vector2 in _merchant_stocks:
+		stocks.append({"at": SaveGame.array(merchant), "stock": _merchant_stocks[merchant]})
+	var totems := []
+	for arena: Vector2 in _totem_states:
+		# Una sfida interrotta dal salvataggio si potrà rifare.
+		if _totem_states[arena] == "used":
+			totems.append(SaveGame.array(arena))
+	return {
+		"chests": _opened_chests.keys().map(SaveGame.array), "totems": totems,
+		"stocks": stocks, "caves": cleared_caves.keys().map(SaveGame.array),
+	}
+
+
+func load_state(data: Dictionary) -> void:
+	for at: Array in data.get("chests", []):
+		_opened_chests[SaveGame.vector(at)] = true
+	for at: Array in data.get("totems", []):
+		_totem_states[SaveGame.vector(at)] = "used"
+	for entry: Dictionary in data.get("stocks", []):
+		var stock: Array[String] = []
+		stock.assign(entry["stock"])
+		_merchant_stocks[SaveGame.vector(entry["at"])] = stock
+	for at: Array in data.get("caves", []):
+		cleared_caves[SaveGame.vector(at)] = true
 
 
 func _setup_noise(noise: FastNoiseLite, offset: int, frequency: float, octaves: int) -> void:
@@ -122,6 +234,11 @@ func _process(delta: float) -> void:
 	if _maintain_timer <= 0.0:
 		_maintain_timer = MAINTAIN_INTERVAL
 		_update_chunks()
+	# Un pezzo nuovo per frame, il più vicino: niente scatti.
+	if not _view_queue.is_empty():
+		var chunk: Vector2i = _view_queue.pop_back()
+		if not _chunk_views.has(chunk):
+			_show_chunk(chunk)
 
 
 # --- Coordinate --------------------------------------------------------
@@ -161,14 +278,48 @@ static func _color(values: Array) -> Color:
 	return Color(values[0], values[1], values[2])
 
 
+static func _colors(list: Array) -> Array[Color]:
+	var result: Array[Color] = []
+	for values: Array in list:
+		result.append(_color(values))
+	return result
+
+
 # --- Terreno -----------------------------------------------------------
 
-## Livello di altezza del blocco (0 = il più basso). Attorno al punto di
-## partenza il terreno è piano.
+## Livello di altezza del blocco (0 = il più basso; le montagne sono più
+## alte di tutti gli altri blocchi, i burroni sotto lo zero). Attorno al
+## punto di partenza il terreno è piano. Nel sotterraneo il pavimento è al
+## livello 0 e la roccia è un blocco alto.
 func level_of(cell: Vector2i) -> int:
-	if _level_cache.has(cell):
-		return _level_cache[cell]
-	var center := cell_center(cell)
+	var cached: Variant = _level_cache.get(cell)
+	if cached != null:
+		return cached
+	var kind := Kind.GROUND
+	var level := 0
+	if dungeon:
+		if not dungeon.is_floor(cell):
+			kind = Kind.ROCK
+			level = dungeon.wall_level
+	else:
+		var center := cell_center(cell)
+		var ridge := _barrier_strength(center)
+		if ridge > 0.0:
+			if _barrier_kind_noise.get_noise_2dv(center) >= 0.0:
+				# La montagna sale a gradini verso la cresta.
+				kind = Kind.MOUNTAIN
+				level = _levels + 1 + mini(floori(ridge * 4.0), 3)
+			else:
+				kind = Kind.RAVINE
+				level = -int(_terrain["ravine_depth"])
+		else:
+			level = _ground_level(center)
+	_kind_cache[cell] = kind
+	_level_cache[cell] = level
+	return level
+
+
+func _ground_level(center: Vector2) -> int:
 	if center.length() < float(_terrain["start_flat_radius"]):
 		center = Vector2.ZERO
 	else:
@@ -181,32 +332,60 @@ func level_of(cell: Vector2i) -> int:
 		elif merchant != Vector2.INF and center.distance_to(merchant) < float(_merchant["clear_radius"]):
 			center = merchant
 	var t := _height_noise.get_noise_2dv(center) * float(_terrain["height_contrast"]) * 0.5 + 0.5
-	var level := clampi(floori(t * _levels), 0, _levels - 1)
-	if _level_cache.size() > CACHE_LIMIT:
-		_level_cache.clear()
-		_ramp_cache.clear()
-	_level_cache[cell] = level
-	return level
+	return clampi(floori(t * _levels), 0, _levels - 1)
+
+
+## Montagne e burroni corrono lungo le linee in cui un rumore vale zero,
+## con qualche passaggio; mai vicino alla partenza, alle arene o ai
+## mercanti. Restituisce 0 fuori, fino a 1 sulla linea centrale.
+func _barrier_strength(center: Vector2) -> float:
+	if center.length() < float(_terrain["barrier_start_clear"]):
+		return 0.0
+	var width := float(_terrain["barrier_width"])
+	var ridge := absf(_ridge_noise.get_noise_2dv(center))
+	if ridge >= width or _gap_noise.get_noise_2dv(center) > float(_terrain["barrier_gap"]):
+		return 0.0
+	var arena := arena_near(center)
+	if arena != Vector2.INF and center.distance_to(arena) < float(_arena["radius"]) + CELL * 3.0:
+		return 0.0
+	var merchant := merchant_near(center)
+	if merchant != Vector2.INF and center.distance_to(merchant) < float(_merchant["clear_radius"]) + CELL * 3.0:
+		return 0.0
+	return 1.0 - ridge / width
+
+
+## Tipo del blocco (vedi Kind).
+func kind_of(cell: Vector2i) -> int:
+	level_of(cell)
+	return _kind_cache[cell]
+
+
+## Montagne, burroni e roccia del sotterraneo non si attraversano mai.
+func is_barrier(cell: Vector2i) -> bool:
+	return kind_of(cell) != Kind.GROUND
 
 
 ## Direzione in cui sale la rampa del blocco, o zero se è piano. Una rampa
 ## collega un blocco piano al vicino più alto di un livello.
 func ramp_of(cell: Vector2i) -> Vector2i:
-	if _ramp_cache.has(cell):
-		return _ramp_cache[cell]
+	var cached: Variant = _ramp_cache.get(cell)
+	if cached != null:
+		return cached
 	var result := Vector2i.ZERO
-	var level := level_of(cell)
-	var center := cell_center(cell)
-	var far_from_start := center.length() > float(_terrain["start_flat_radius"]) + CELL * 2.0
-	var arena := arena_near(center)
-	var far_from_arena := arena == Vector2.INF or center.distance_to(arena) > float(_arena["radius"]) + CELL * 2.0
-	var merchant := merchant_near(center)
-	var far_from_merchant := merchant == Vector2.INF or center.distance_to(merchant) > float(_merchant["clear_radius"]) + CELL * 2.0
-	if far_from_start and far_from_arena and far_from_merchant and _random_unit([seed_value, cell.x, cell.y, "ramp"]) < float(_terrain["ramp_chance"]):
-		for direction: Vector2i in RAMP_DIRECTIONS:
-			if level_of(cell + direction) == level + 1 and level_of(cell - direction) == level:
-				result = direction
-				break
+	if dungeon == null and kind_of(cell) == Kind.GROUND:
+		var level := level_of(cell)
+		var center := cell_center(cell)
+		var far_from_start := center.length() > float(_terrain["start_flat_radius"]) + CELL * 2.0
+		var arena := arena_near(center)
+		var far_from_arena := arena == Vector2.INF or center.distance_to(arena) > float(_arena["radius"]) + CELL * 2.0
+		var merchant := merchant_near(center)
+		var far_from_merchant := merchant == Vector2.INF or center.distance_to(merchant) > float(_merchant["clear_radius"]) + CELL * 2.0
+		if far_from_start and far_from_arena and far_from_merchant and _random_unit([seed_value, cell.x, cell.y, "ramp"]) < float(_terrain["ramp_chance"]):
+			for direction: Vector2i in RAMP_DIRECTIONS:
+				if level_of(cell + direction) == level + 1 and level_of(cell - direction) == level \
+						and kind_of(cell + direction) == Kind.GROUND:
+					result = direction
+					break
 	_ramp_cache[cell] = result
 	return result
 
@@ -214,14 +393,22 @@ func ramp_of(cell: Vector2i) -> Vector2i:
 ## Sentiero sterrato: una striscia lungo una curva del rumore, e lo
 ## spiazzo di terra attorno al totem delle arene e ai mercanti.
 func is_path(cell: Vector2i) -> bool:
-	var center := cell_center(cell)
-	var arena := arena_near(center)
-	if arena != Vector2.INF and center.distance_to(arena) < float(_arena["plaza_radius"]):
-		return true
-	var merchant := merchant_near(center)
-	if merchant != Vector2.INF and center.distance_to(merchant) < float(_merchant["plaza_radius"]):
-		return true
-	return absf(_path_noise.get_noise_2dv(center)) < float(_terrain["path_width"])
+	var cached: Variant = _path_cache.get(cell)
+	if cached != null:
+		return cached
+	var result := false
+	if dungeon == null and kind_of(cell) == Kind.GROUND:
+		var center := cell_center(cell)
+		var arena := arena_near(center)
+		var merchant := merchant_near(center)
+		if arena != Vector2.INF and center.distance_to(arena) < float(_arena["plaza_radius"]):
+			result = true
+		elif merchant != Vector2.INF and center.distance_to(merchant) < float(_merchant["plaza_radius"]):
+			result = true
+		else:
+			result = absf(_path_noise.get_noise_2dv(center)) < float(_terrain["path_width"])
+	_path_cache[cell] = result
+	return result
 
 
 # --- Arene con il totem -------------------------------------------------
@@ -246,6 +433,8 @@ func _arena_of_region(region: Vector2i) -> Vector2:
 ## Centro dell'arena che contiene il punto (o la più vicina nelle regioni
 ## attorno), Vector2.INF se non ce ne sono.
 func arena_near(point: Vector2) -> Vector2:
+	if dungeon:
+		return Vector2.INF
 	return _nearest(point, _sites_near(point, float(_arena["region"]), _arena_of_region))
 
 
@@ -253,12 +442,18 @@ func arena_near(point: Vector2) -> Vector2:
 ## dà la posizione nella regione, o Vector2.INF.
 func _sites_near(point: Vector2, size: float, site_of: Callable) -> Array[Vector2]:
 	var region := Vector2i(floori(point.x / size), floori(point.y / size))
+	# Le stesse regioni servono a tutti i rombi vicini: si ricordano.
+	var key := Vector3i(region.x, region.y, int(size))
+	var cached: Variant = _sites_cache.get(key)
+	if cached != null:
+		return cached
 	var sites: Array[Vector2] = []
 	for i in range(-1, 2):
 		for j in range(-1, 2):
 			var site: Vector2 = site_of.call(region + Vector2i(i, j))
 			if site != Vector2.INF:
 				sites.append(site)
+	_sites_cache[key] = sites
 	return sites
 
 
@@ -296,6 +491,8 @@ func _merchant_of_region(region: Vector2i) -> Vector2:
 
 
 func merchant_near(point: Vector2) -> Vector2:
+	if dungeon:
+		return Vector2.INF
 	return _nearest(point, _sites_near(point, float(_merchant["region"]), _merchant_of_region))
 
 
@@ -348,14 +545,14 @@ func chest_touched(point: Vector2, reach: float) -> Dictionary:
 
 
 func is_chest_opened(at: Vector2) -> bool:
-	return _opened_chests.has(at)
+	return (dungeon.opened_chests if dungeon else _opened_chests).has(at)
 
 
 func open_chest(at: Vector2) -> void:
-	_opened_chests[at] = true
+	(dungeon.opened_chests if dungeon else _opened_chests)[at] = true
 
 
-## Casse, totem e mercanti nei pezzi di mondo attorno al punto (per la minimappa).
+## Casse, totem, mercanti, caverne e scale nei pezzi di mondo attorno al punto (per la minimappa).
 func points_of_interest(center: Vector2, radius: float) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	var corners := [center + Vector2(-radius, -radius), center + Vector2(radius, radius), center + Vector2(-radius, radius), center + Vector2(radius, -radius)]
@@ -368,7 +565,7 @@ func points_of_interest(center: Vector2, radius: float) -> Array[Dictionary]:
 	for i in range(min_chunk.x, max_chunk.x + 1):
 		for j in range(min_chunk.y, max_chunk.y + 1):
 			for obstacle: Dictionary in _obstacles_of(Vector2i(i, j)):
-				if obstacle["type"] in ["chest", "totem", "merchant"]:
+				if obstacle["type"] in ["chest", "totem", "merchant", "cave", "stairs", "exit"]:
 					result.append(obstacle)
 	return result
 
@@ -376,9 +573,7 @@ func points_of_interest(center: Vector2, radius: float) -> Array[Dictionary]:
 ## Colore del terreno nel punto, per la minimappa.
 func map_color(point: Vector2) -> Color:
 	var cell := cell_at(point)
-	if is_path(cell):
-		return _color(_terrain["path_color"])
-	return _color(_terrain["grass_colors"][level_of(cell)])
+	return _top_color(cell, kind_of(cell), is_path(cell))
 
 
 ## Stato del totem: "ready", "active" (sfida in corso) o "used".
@@ -453,6 +648,12 @@ func _can_pass(from: Vector2, to: Vector2, radius: float, climb: float, can_drop
 	var base := elevation_at(from)
 	var ahead := (to - from).normalized() * radius * 0.5
 	for probe: Vector2 in [to, to + ahead]:
+		var cell := cell_at(probe)
+		if is_barrier(cell):
+			# Montagne e roccia si illuminano; nei burroni non c'è niente da illuminare.
+			_blocking_cell = cell
+			_has_blocking_cell = kind_of(cell) != Kind.RAVINE
+			return false
 		var height := elevation_at(probe)
 		if height > base + climb + STEP_TOLERANCE:
 			_blocking_cell = cell_at(probe)
@@ -528,7 +729,7 @@ func free_position_near(point: Vector2, radius: float) -> Vector2:
 	for attempt in 12:
 		var candidate := point + Vector2.from_angle(attempt * 2.4) * attempt * 30.0
 		var height := elevation_at(candidate)
-		var free := absf(elevation_at(candidate + Vector2(radius, 0)) - height) < STEP_TOLERANCE \
+		var free := not is_barrier(cell_at(candidate)) and absf(elevation_at(candidate + Vector2(radius, 0)) - height) < STEP_TOLERANCE \
 				and absf(elevation_at(candidate - Vector2(radius, 0)) - height) < STEP_TOLERANCE
 		for obstacle: Dictionary in obstacles_near(candidate):
 			if candidate.distance_to(obstacle["position"]) < radius + obstacle["collision"] + 8.0:
@@ -548,6 +749,8 @@ func _obstacles_of(chunk: Vector2i) -> Array:
 
 
 func _generate_obstacles(chunk: Vector2i) -> Array:
+	if dungeon:
+		return _dungeon_obstacles(chunk)
 	var result: Array[Dictionary] = []
 	var rng := RandomNumberGenerator.new()
 	for i in CHUNK_CELLS:
@@ -589,6 +792,12 @@ func _generate_obstacles(chunk: Vector2i) -> Array:
 	for merchant in _sites_near(chunk_center, float(_merchant["region"]), _merchant_of_region):
 		if _chunk_of(cell_at(merchant)) == chunk:
 			result.append(_site_obstacle("merchant", merchant, _merchant["radius"], _merchant["collision"]))
+	# Ingresso di una caverna: niente ostacoli davanti.
+	var cave := _cave_in_chunk(chunk)
+	if not cave.is_empty():
+		result = result.filter(func(obstacle: Dictionary) -> bool:
+			return obstacle["position"].distance_to(cave["position"]) > 90.0)
+		result.append(cave)
 	return result
 
 
@@ -604,7 +813,8 @@ func _site_obstacle(type_id: String, at: Vector2, radius: float, collision: floa
 ## che dipendono dalla zona: boschi, macchie di rovi, alture, bordi dei gradini.
 func _pick_obstacle(cell: Vector2i, rng: RandomNumberGenerator) -> String:
 	var center := cell_center(cell)
-	if center.length() < float(_terrain["start_clear_radius"]) or is_path(cell) or ramp_of(cell) != Vector2i.ZERO:
+	if center.length() < float(_terrain["start_clear_radius"]) or kind_of(cell) != Kind.GROUND \
+			or is_path(cell) or ramp_of(cell) != Vector2i.ZERO:
 		return ""
 	var arena := arena_near(center)
 	if arena != Vector2.INF and center.distance_to(arena) < float(_arena["radius"]) + CELL:
@@ -645,15 +855,85 @@ func _placeable(spot: Vector2, radius: float) -> bool:
 	return true
 
 
-# --- Pezzi di mondo attorno alla telecamera ----------------------------
+# --- Regione pregenerata e pezzi di mondo attorno alla telecamera -------
 
+## Prepara la regione pregenerata attorno al punto (nel sotterraneo, tutto
+## il sotterraneo): dimentica i dati fuori e mette in coda i pezzi ancora
+## da generare, dal più vicino. Poi si chiama generate_region finché
+## is_region_ready.
+func begin_region(point: Vector2) -> void:
+	var center := _chunk_of(cell_at(point))
+	if dungeon:
+		region = dungeon.chunk_rect()
+	else:
+		var radius := int(_terrain["pregen_radius"])
+		region = Rect2i(center - Vector2i(radius, radius), Vector2i(radius * 2 + 1, radius * 2 + 1))
+	if _level_cache.size() > FORGET_THRESHOLD:
+		_forget_outside(region.grow(2))
+	_region_queue.clear()
+	for i in range(region.position.x, region.end.x):
+		for j in range(region.position.y, region.end.y):
+			if not _chunk_obstacles.has(Vector2i(i, j)):
+				_region_queue.append(Vector2i(i, j))
+	# Si prendono dalla fine: i più vicini per ultimi nella lista.
+	_region_queue.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return a.distance_squared_to(center) > b.distance_squared_to(center))
+	_region_total = _region_queue.size()
+
+
+## Genera pezzi della regione per al più budget_usec microsecondi.
+## Restituisce l'avanzamento, da 0 a 1.
+func generate_region(budget_usec: int) -> float:
+	var start := Time.get_ticks_usec()
+	while not _region_queue.is_empty() and Time.get_ticks_usec() - start < budget_usec:
+		_obstacles_of(_region_queue.pop_back())
+	return 1.0 if _region_total == 0 else 1.0 - float(_region_queue.size()) / _region_total
+
+
+func is_region_ready() -> bool:
+	return _region_queue.is_empty()
+
+
+## Vicino al bordo della regione pregenerata: è ora di generarne un'altra.
+func near_region_edge(point: Vector2) -> bool:
+	if dungeon:
+		return false
+	return not region.grow(-int(_terrain["pregen_edge"])).has_point(_chunk_of(cell_at(point)))
+
+
+## Dimentica i dati del terreno fuori dal rettangolo di pezzi (ma non quelli
+## dei pezzi mostrati).
+func _forget_outside(keep: Rect2i) -> void:
+	for chunk: Vector2i in _chunk_obstacles.keys():
+		if not keep.has_point(chunk) and not _chunk_views.has(chunk):
+			_chunk_obstacles.erase(chunk)
+	for cache: Dictionary in [_level_cache, _ramp_cache, _path_cache, _kind_cache]:
+		for cell: Vector2i in cache.keys():
+			if not keep.has_point(_chunk_of(cell)):
+				cache.erase(cell)
+
+
+## Mostra subito tutti i pezzi attorno alla telecamera (all'avvio o dopo un
+## salto lontano), senza aspettare un pezzo per frame.
+func refresh_now() -> void:
+	# La telecamera può non aver ancora raggiunto il giocatore appena spostato.
+	var camera := get_viewport().get_camera_2d()
+	if camera:
+		camera.force_update_scroll()
+	_update_chunks()
+	while not _view_queue.is_empty():
+		var chunk: Vector2i = _view_queue.pop_back()
+		if not _chunk_views.has(chunk):
+			_show_chunk(chunk)
+
+
+## Pezzi da mostrare: quelli sullo schermo più un margine, così sono pronti
+## prima di entrare nell'inquadratura; i pezzi ben fuori vengono tolti.
 func _update_chunks() -> void:
 	var camera := get_viewport().get_camera_2d()
 	var center := camera.get_screen_center_position() if camera else Vector2.ZERO
-	var zoom := camera.zoom if camera else Vector2.ONE
-	# Sotto lo schermo serve più margine: i blocchi alti salgono verso l'alto.
-	var half := get_viewport_rect().size / zoom / 2.0 + Vector2(CELL * 3.0, CELL * 3.0)
-	var view := Rect2(center - half, half * 2.0).grow_side(SIDE_BOTTOM, _levels * level_height)
+	var view := _view_rect(PREFETCH_MARGIN)
+	var keep := _view_rect(PREFETCH_MARGIN + KEEP_MARGIN)
 	var corners := [view.position, view.end, Vector2(view.position.x, view.end.y), Vector2(view.end.x, view.position.y)]
 	var min_chunk := _chunk_of(cell_at(corners[0]))
 	var max_chunk := min_chunk
@@ -661,21 +941,34 @@ func _update_chunks() -> void:
 		var chunk := _chunk_of(cell_at(corner))
 		min_chunk = min_chunk.min(chunk)
 		max_chunk = max_chunk.max(chunk)
-	var wanted := {}
+	_view_queue.clear()
 	for i in range(min_chunk.x, max_chunk.x + 1):
 		for j in range(min_chunk.y, max_chunk.y + 1):
 			var chunk := Vector2i(i, j)
 			# I pezzi negli angoli del rettangolo (u, v) sono fuori dallo schermo.
-			if _chunk_bounds(chunk).intersects(view):
-				wanted[chunk] = true
-				if not _chunk_views.has(chunk):
-					_show_chunk(chunk)
+			if not _chunk_views.has(chunk) and _chunk_bounds(chunk).intersects(view):
+				_view_queue.append(chunk)
+	# Si prendono dalla fine: i più vicini al centro dello schermo per primi.
+	_view_queue.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return _chunk_bounds(a).get_center().distance_squared_to(center) > _chunk_bounds(b).get_center().distance_squared_to(center))
 	for chunk: Vector2i in _chunk_views.keys():
-		if not wanted.has(chunk):
+		if not _chunk_bounds(chunk).intersects(keep):
 			_hide_chunk(chunk)
-	for chunk: Vector2i in _chunk_obstacles.keys():
-		if not wanted.has(chunk) and _chunk_bounds(chunk).get_center().distance_to(center) > FORGET_DISTANCE:
-			_chunk_obstacles.erase(chunk)
+
+
+## Rettangolo dello schermo allargato di margin; sotto serve più margine
+## perché i blocchi alti salgono verso l'alto.
+func _view_rect(margin: float) -> Rect2:
+	var camera := get_viewport().get_camera_2d()
+	var center := camera.get_screen_center_position() if camera else Vector2.ZERO
+	var zoom := camera.zoom if camera else Vector2.ONE
+	var half := get_viewport_rect().size / zoom / 2.0 + Vector2(margin, margin)
+	return Rect2(center - half, half * 2.0).grow_side(SIDE_BOTTOM, _max_level() * level_height)
+
+
+## Livello più alto possibile: le cime delle montagne o la roccia del sotterraneo.
+func _max_level() -> int:
+	return dungeon.wall_level if dungeon else _levels + 4
 
 
 func _chunk_bounds(chunk: Vector2i) -> Rect2:
@@ -685,7 +978,7 @@ func _chunk_bounds(chunk: Vector2i) -> Rect2:
 	var bounds := Rect2(_from_uv(u, v), Vector2.ZERO)
 	for corner: Vector2 in [_from_uv(u + size, v), _from_uv(u + size, v + size), _from_uv(u, v + size)]:
 		bounds = bounds.expand(corner)
-	return bounds.grow_side(SIDE_TOP, _levels * level_height)
+	return bounds.grow_side(SIDE_TOP, _max_level() * level_height)
 
 
 func _show_chunk(chunk: Vector2i) -> void:
@@ -697,17 +990,7 @@ func _show_chunk(chunk: Vector2i) -> void:
 	var nodes: Array[Node] = []
 	if entities:
 		for data: Dictionary in _obstacles_of(chunk):
-			var obstacle := Obstacle.new()
-			var type: Dictionary = _obstacle_types.get(data["type"], {})
-			match data["type"]:
-				"totem":
-					type = _arena["totem"]
-				"merchant":
-					type = _merchant
-			obstacle.setup(data, type)
-			data["node"] = obstacle
-			entities.add_child(obstacle)
-			nodes.append(obstacle)
+			nodes.append(_make_obstacle_node(data))
 		for i in CHUNK_CELLS:
 			for j in CHUNK_CELLS:
 				var cell := chunk * CHUNK_CELLS + Vector2i(i, j)
@@ -748,8 +1031,8 @@ func draw_chunk(canvas: CanvasItem, chunk: Vector2i, offset: Vector2) -> void:
 			draw_cell(canvas, chunk * CHUNK_CELLS + Vector2i(i, depth - i), offset)
 
 
-## Un blocco: pareti di terra davanti (dove il vicino è più basso) e
-## faccia superiore d'erba o di sentiero, piana o inclinata.
+## Un blocco: pareti davanti (dove il vicino è più basso) e faccia
+## superiore, piana o inclinata, del colore del suo tipo.
 func draw_cell(canvas: CanvasItem, cell: Vector2i, offset: Vector2) -> void:
 	var corners := cell_corners(cell)
 	var heights: Array[float] = []
@@ -758,15 +1041,16 @@ func draw_cell(canvas: CanvasItem, cell: Vector2i, offset: Vector2) -> void:
 		heights.append(corner_height(cell, k))
 		corners[k] += offset
 		top.append(corners[k] - Vector2(0, heights[k]))
-	var faces: Array = _terrain["face_colors"]
+	var kind := kind_of(cell)
 	# Parete destra (lato destra-basso, vicino (u+1, v)) e sinistra (lato
 	# basso-sinistra, vicino (u, v+1)): i vertici combaciano con quelli del vicino.
-	_draw_face(canvas, cell, corners, heights, 1, 2, Vector2i(1, 0), 0, 3, _color(faces[0]))
-	_draw_face(canvas, cell, corners, heights, 2, 3, Vector2i(0, 1), 1, 0, _color(faces[1]))
+	var faces := _face_colors_of(kind)
+	var lip := kind == Kind.GROUND and dungeon == null
+	_draw_face(canvas, corners, heights, cell + Vector2i(1, 0), 1, 2, 0, 3, faces[0], lip)
+	_draw_face(canvas, corners, heights, cell + Vector2i(0, 1), 2, 3, 1, 0, faces[1], lip)
 
 	var path := is_path(cell)
-	var level := level_of(cell)
-	var color := _color(_terrain["path_color"]) if path else _color(_terrain["grass_colors"][level])
+	var color := _top_color(cell, kind, path)
 	var ramp := ramp_of(cell)
 	if ramp != Vector2i.ZERO:
 		# Le rampe che salgono verso il fondo sono in ombra, le altre in luce.
@@ -774,12 +1058,32 @@ func draw_cell(canvas: CanvasItem, cell: Vector2i, offset: Vector2) -> void:
 	canvas.draw_colored_polygon(top, color)
 	if ramp != Vector2i.ZERO:
 		_draw_ramp_lines(canvas, top, ramp, color)
-	_draw_decor(canvas, cell, offset, path)
+	_draw_decor(canvas, cell, offset, kind, path)
 
 
-func _draw_face(canvas: CanvasItem, cell: Vector2i, corners: PackedVector2Array, heights: Array[float],
-		first: int, second: int, direction: Vector2i, other_first: int, other_second: int, color: Color) -> void:
-	var other := cell + direction
+func _top_color(cell: Vector2i, kind: int, path: bool) -> Color:
+	match kind:
+		Kind.MOUNTAIN:
+			return _mountain_colors[clampi(level_of(cell) - _levels - 1, 0, _mountain_colors.size() - 1)]
+		Kind.RAVINE:
+			return _ravine_color
+		Kind.ROCK:
+			return _dungeon_wall_color
+	if dungeon:
+		return _dungeon_floor_colors[posmod(hash([cell.x, cell.y]), _dungeon_floor_colors.size())]
+	return _path_color if path else _grass_colors[clampi(level_of(cell), 0, _levels - 1)]
+
+
+func _face_colors_of(kind: int) -> Array[Color]:
+	if kind == Kind.MOUNTAIN:
+		return _mountain_face_colors
+	if dungeon:
+		return _dungeon_face_colors
+	return _face_colors
+
+
+func _draw_face(canvas: CanvasItem, corners: PackedVector2Array, heights: Array[float], other: Vector2i,
+		first: int, second: int, other_first: int, other_second: int, color: Color, lip: bool) -> void:
 	var top_a := heights[first]
 	var top_b := heights[second]
 	var bottom_a := minf(corner_height(other, other_first), top_a)
@@ -794,23 +1098,26 @@ func _draw_face(canvas: CanvasItem, cell: Vector2i, corners: PackedVector2Array,
 	if top_a - bottom_a >= 0.5:
 		points.append(a - Vector2(0, bottom_a))
 	canvas.draw_colored_polygon(points, color)
-	# Strati della terra e bordo d'erba che sporge in cima.
+	# Strati della roccia o della terra, tutti in una sola chiamata.
+	var strata := PackedVector2Array()
 	var depth := STRATA_STEP
 	while depth < maxf(top_a - bottom_a, top_b - bottom_b) - 4.0:
-		var start := a - Vector2(0, top_a - minf(depth, top_a - bottom_a))
-		var end := b - Vector2(0, top_b - minf(depth, top_b - bottom_b))
-		canvas.draw_line(start, end, color.darkened(0.18), 1.5)
+		strata.append(a - Vector2(0, top_a - minf(depth, top_a - bottom_a)))
+		strata.append(b - Vector2(0, top_b - minf(depth, top_b - bottom_b)))
 		depth += STRATA_STEP
-	var lip := _color(_terrain["lip_color"])
-	var lip_a := minf(LIP_WIDTH, top_a - bottom_a)
-	var lip_b := minf(LIP_WIDTH, top_b - bottom_b)
-	var lip_points := PackedVector2Array([a - Vector2(0, top_a), b - Vector2(0, top_b)])
-	if lip_b > 0.5:
-		lip_points.append(b - Vector2(0, top_b - lip_b))
-	if lip_a > 0.5:
-		lip_points.append(a - Vector2(0, top_a - lip_a))
-	if lip_points.size() >= 3:
-		canvas.draw_colored_polygon(lip_points, lip)
+	if not strata.is_empty():
+		canvas.draw_multiline(strata, color.darkened(0.18), 1.5)
+	if lip:
+		# Bordo d'erba che sporge in cima.
+		var lip_a := minf(LIP_WIDTH, top_a - bottom_a)
+		var lip_b := minf(LIP_WIDTH, top_b - bottom_b)
+		var lip_points := PackedVector2Array([a - Vector2(0, top_a), b - Vector2(0, top_b)])
+		if lip_b > 0.5:
+			lip_points.append(b - Vector2(0, top_b - lip_b))
+		if lip_a > 0.5:
+			lip_points.append(a - Vector2(0, top_a - lip_a))
+		if lip_points.size() >= 3:
+			canvas.draw_colored_polygon(lip_points, _lip_color)
 	canvas.draw_line(a - Vector2(0, bottom_a), b - Vector2(0, bottom_b), Color(0, 0, 0, 0.3), 2.0)
 
 
@@ -831,31 +1138,41 @@ func _draw_ramp_lines(canvas: CanvasItem, top: PackedVector2Array, ramp: Vector2
 	else:
 		low = [top[3], top[2]]
 		high = [top[0], top[1]]
+	var lines := PackedVector2Array()
 	for k in range(1, 4):
 		var t := k / 4.0
-		canvas.draw_line((low[0] as Vector2).lerp(high[0], t), (low[1] as Vector2).lerp(high[1], t), color.darkened(0.15), 1.5)
+		lines.append((low[0] as Vector2).lerp(high[0], t))
+		lines.append((low[1] as Vector2).lerp(high[1], t))
+	canvas.draw_multiline(lines, color.darkened(0.15), 1.5)
 
 
-## Ciuffi d'erba e fiori sui blocchi d'erba, sassolini sui sentieri: solo decorazione.
-func _draw_decor(canvas: CanvasItem, cell: Vector2i, offset: Vector2, path: bool) -> void:
+## Ciuffi d'erba e fiori sui blocchi d'erba, sassolini sui sentieri e nel
+## sotterraneo (dove crescono anche funghi luminosi): solo decorazione.
+func _draw_decor(canvas: CanvasItem, cell: Vector2i, offset: Vector2, kind: int, path: bool) -> void:
+	if kind != Kind.GROUND:
+		return
 	var rng := RandomNumberGenerator.new()
-	rng.seed = hash([seed_value, cell.x, cell.y, "decor"])
-	if path:
-		var pebbles: Array = _decor["pebble_colors"]
+	rng.seed = hash([_decor_seed(), cell.x, cell.y, "decor"])
+	if path or dungeon:
 		for k in rng.randi_range(2, 4):
 			var at := _decor_point(cell, rng, offset)
-			canvas.draw_circle(at, rng.randf_range(1.5, 3.0), _color(pebbles[k % pebbles.size()]))
+			canvas.draw_circle(at, rng.randf_range(1.5, 3.0), _pebble_colors[k % _pebble_colors.size()])
+		if dungeon and rng.randf() < float(_dungeon_data["mushroom_chance"]):
+			var at := _decor_point(cell, rng, offset)
+			var glow := _mushroom_colors[rng.randi() % _mushroom_colors.size()]
+			canvas.draw_circle(at, 7.0, Color(glow, 0.25))
+			canvas.draw_line(at, at + Vector2(0, -5), Color(0.8, 0.8, 0.75), 2.0)
+			canvas.draw_circle(at + Vector2(0, -6), 3.5, glow)
 		return
-	var tufts: Array = _decor["grass_tufts"]
-	var grass := _color(_terrain["grass_colors"][level_of(cell)]).darkened(0.3)
-	for k in rng.randi_range(tufts[0], tufts[1]):
+	var grass := _grass_colors[clampi(level_of(cell), 0, _levels - 1)].darkened(0.3)
+	var tufts := PackedVector2Array()
+	for k in rng.randi_range(_tuft_range.x, _tuft_range.y):
 		var at := _decor_point(cell, rng, offset)
-		canvas.draw_line(at, at + Vector2(-4, -7), grass, 1.5)
-		canvas.draw_line(at, at + Vector2(0, -9), grass, 1.5)
-		canvas.draw_line(at, at + Vector2(4, -7), grass, 1.5)
+		tufts.append_array([at, at + Vector2(-4, -7), at, at + Vector2(0, -9), at, at + Vector2(4, -7)])
+	if not tufts.is_empty():
+		canvas.draw_multiline(tufts, grass, 1.5)
 	if rng.randf() < float(_decor["flower_chance"]):
-		var colors: Array = _decor["flower_colors"]
-		var color := _color(colors[rng.randi() % colors.size()])
+		var color := _flower_colors[rng.randi() % _flower_colors.size()]
 		var at := _decor_point(cell, rng, offset)
 		for k in 3:
 			canvas.draw_circle(at + Vector2.from_angle(k * TAU / 3.0) * 3.0, 2.5, color)
@@ -866,6 +1183,150 @@ func _draw_decor(canvas: CanvasItem, cell: Vector2i, offset: Vector2, path: bool
 func _decor_point(cell: Vector2i, rng: RandomNumberGenerator, offset: Vector2) -> Vector2:
 	var ground := _from_uv(cell.x * CELL + rng.randf_range(10.0, 54.0), cell.y * CELL + rng.randf_range(10.0, 54.0))
 	return ground + offset - Vector2(0, elevation_at(ground))
+
+
+# --- Sotterraneo -------------------------------------------------------
+
+## Entra nel sotterraneo (o torna in superficie con null): il terreno
+## cambia del tutto, quindi si buttano pezzi mostrati e dati calcolati.
+## Poi va chiamato begin_region.
+func set_dungeon(value: Dungeon) -> void:
+	dungeon = value
+	for chunk: Vector2i in _chunk_views.keys():
+		_hide_chunk(chunk)
+	_view_queue.clear()
+	_chunk_obstacles.clear()
+	for cache: Dictionary in [_level_cache, _ramp_cache, _path_cache, _kind_cache]:
+		cache.clear()
+	region = Rect2i()
+	var ground := _dungeon_wall_color if dungeon else _grass_colors[0].darkened(0.3)
+	RenderingServer.set_default_clear_color(ground)
+
+
+## Seme della decorazione e degli ostacoli: in superficie quello del
+## mondo, nel sotterraneo quello del piano.
+func _decor_seed() -> int:
+	return dungeon.seed_value if dungeon else seed_value
+
+
+func _dungeon_obstacles(chunk: Vector2i) -> Array:
+	var result: Array[Dictionary] = []
+	var rng := RandomNumberGenerator.new()
+	var chance := float(_dungeon_data["stalagmite_chance"])
+	var rock: Dictionary = _obstacle_types["rock"]
+	var radius_range: Array = rock["radius"]
+	for i in CHUNK_CELLS:
+		for j in CHUNK_CELLS:
+			var cell := chunk * CHUNK_CELLS + Vector2i(i, j)
+			if not dungeon.is_open(cell):
+				continue
+			rng.seed = hash([dungeon.seed_value, cell.x, cell.y, "rock"])
+			if rng.randf() >= chance:
+				continue
+			var radius := rng.randf_range(radius_range[0], radius_range[1])
+			var spot := _from_uv(cell.x * CELL + rng.randf_range(PLACE_MIN, PLACE_MAX), cell.y * CELL + rng.randf_range(PLACE_MIN, PLACE_MAX))
+			result.append({
+				"type": "rock", "position": spot, "elevation": 0.0, "radius": radius,
+				"collision": radius * float(rock["collision"]), "solid": true, "slow": 1.0, "damage": 0,
+				"damage_interval": 0.0, "variant": rng.randi(),
+			})
+	# Scala d'arrivo (riporta in superficie), scala per scendere e casse.
+	var specials := [["exit", dungeon.arrival], ["stairs", dungeon.stairs]]
+	for chest in dungeon.chests:
+		specials.append(["chest", chest])
+	for special: Array in specials:
+		var cell: Vector2i = special[1]
+		if cell.x >= 0 and _chunk_of(cell) == chunk:
+			result.append(make_obstacle(special[0], cell_center(cell)))
+	return result
+
+
+## Ostacolo speciale (cassa, caverna, scale, uscita) al punto dato, con le
+## dimensioni del suo tipo in data/world.json.
+func make_obstacle(type_id: String, at: Vector2) -> Dictionary:
+	var type: Dictionary = _obstacle_types[type_id]
+	var radius := float((type["radius"] as Array)[0])
+	return {
+		"type": type_id, "position": at, "elevation": elevation_at(at), "radius": radius,
+		"collision": radius * float(type["collision"]), "solid": type["solid"], "slow": 1.0, "damage": 0,
+		"damage_interval": 0.0, "variant": 1,
+	}
+
+
+## Aggiunge un ostacolo durante il gioco (per esempio l'uscita che compare
+## dopo il boss), anche nel pezzo già mostrato.
+func add_obstacle(data: Dictionary) -> void:
+	var chunk := _chunk_of(cell_at(data["position"]))
+	_obstacles_of(chunk).append(data)
+	if _chunk_views.has(chunk) and entities:
+		var node := _make_obstacle_node(data)
+		_chunk_views[chunk]["nodes"].append(node)
+
+
+func _make_obstacle_node(data: Dictionary) -> Obstacle:
+	var obstacle := Obstacle.new()
+	var type: Dictionary = _obstacle_types.get(data["type"], {})
+	match data["type"]:
+		"totem":
+			type = _arena["totem"]
+		"merchant":
+			type = _merchant
+	obstacle.setup(data, type)
+	data["node"] = obstacle
+	entities.add_child(obstacle)
+	return obstacle
+
+
+## Ostacolo di quel tipo toccato da chi sta in point (stesso livello e
+## abbastanza vicino): il suo dizionario, o vuoto.
+func touched(type_id: String, point: Vector2, reach: float) -> Dictionary:
+	for obstacle: Dictionary in obstacles_near(point):
+		if obstacle["type"] == type_id and point.distance_to(obstacle["position"]) <= reach + obstacle["collision"] \
+				and absf(elevation_at(point) - obstacle["elevation"]) <= STEP_TOLERANCE:
+			return obstacle
+	return {}
+
+
+## Caverne il cui sotterraneo è già stato completato: l'ingresso è chiuso.
+func is_cave_cleared(at: Vector2) -> bool:
+	return cleared_caves.has(at)
+
+
+## Davanti al blocco non c'è niente di più alto che possa coprire
+## l'ingresso di una caverna.
+func _open_in_front(cell: Vector2i) -> bool:
+	var level := level_of(cell)
+	for step: Vector2i in [Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)]:
+		if level_of(cell + step) > level:
+			return false
+	return true
+
+
+## Ingresso di una caverna nella parete di una montagna, in un blocco
+## d'erba (o di sentiero) davanti alla parete; al più uno per pezzo.
+func _cave_in_chunk(chunk: Vector2i) -> Dictionary:
+	var chance := float(_terrain["cave_chance"])
+	for i in CHUNK_CELLS:
+		for j in CHUNK_CELLS:
+			var cell := chunk * CHUNK_CELLS + Vector2i(i, j)
+			if kind_of(cell) != Kind.GROUND or ramp_of(cell) != Vector2i.ZERO or not _open_in_front(cell):
+				continue
+			for side: Vector2i in [Vector2i(-1, 0), Vector2i(0, -1)]:
+				# Un tratto dritto di parete: montagna dietro e ai due lati.
+				var along := Vector2i(side.y, side.x)
+				if kind_of(cell + side) != Kind.MOUNTAIN or kind_of(cell + side + along) != Kind.MOUNTAIN \
+						or kind_of(cell + side - along) != Kind.MOUNTAIN \
+						or _random_unit([seed_value, cell.x, cell.y, side.x, "cave"]) >= chance:
+					continue
+				# La parete della montagna è il lato del blocco che dà sulla montagna.
+				var corners := cell_corners(cell)
+				var a := corners[0]
+				var b := corners[3] if side == Vector2i(-1, 0) else corners[1]
+				var at := ((a + b) / 2.0).lerp(cell_center(cell), 0.25)
+				var cave := make_obstacle("cave", at)
+				cave["edge"] = (b - a).normalized()
+				return cave
+	return {}
 
 
 ## Un pezzo di terreno sotto i personaggi: disegnato una volta sola alla creazione.

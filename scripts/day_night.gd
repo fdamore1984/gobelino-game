@@ -9,6 +9,9 @@ const DATA := preload("res://data/world.json")
 var time := 0.0
 
 var _settings: Dictionary = DATA.data["day_night"]
+## Colore fisso al posto del ciclo (nel sotterraneo è sempre buio); con
+## alfa zero vale il ciclo del giorno.
+var _override := Color(0, 0, 0, 0)
 
 
 func _ready() -> void:
@@ -30,7 +33,20 @@ func is_night() -> bool:
 	return darkness() > float(_settings["night_threshold"])
 
 
+func set_override(value: Color) -> void:
+	_override = value
+	_apply()
+
+
+func clear_override() -> void:
+	_override = Color(0, 0, 0, 0)
+	_apply()
+
+
 func _apply() -> void:
+	if _override.a > 0.0:
+		color = Color(_override, 1.0)
+		return
 	var keys: Array = _settings["colors"]
 	for i in keys.size() - 1:
 		var from: Array = keys[i]

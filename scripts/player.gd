@@ -708,6 +708,79 @@ func is_dead() -> bool:
 	return _state == State.DEAD
 
 
+## Completamente fermo, a terra e senza fare niente: si può salvare.
+func is_still() -> bool:
+	return _state == State.NORMAL and not is_airborne() and _velocity.length() < 5.0
+
+
+## Spostamento istantaneo (entrando o uscendo da una caverna, caricando una
+## partita): niente scie, slanci o telecamera che insegue da lontano.
+func teleport(at: Vector2) -> void:
+	position = at
+	_velocity = Vector2.ZERO
+	_walk_velocity = Vector2.ZERO
+	_carry_velocity = Vector2.ZERO
+	_height = 0.0
+	_height_velocity = 0.0
+	_change_state(State.NORMAL)
+	ground_elevation = World.current.elevation_at(at) if World.current else 0.0
+	reset_physics_interpolation()
+	if _camera:
+		_camera_height = -ground_elevation
+		_look_ahead = Vector2.ZERO
+		_camera.position = Vector2(0, _camera_height)
+		_camera.reset_physics_interpolation()
+		_camera.reset_smoothing()
+
+
+## Stato da salvare: livello, caratteristiche, potenziamenti e inventario.
+func save_state() -> Dictionary:
+	return {
+		"level": level, "experience": experience, "health": health, "base_max_health": _base_max_health,
+		"mana": mana, "base_max_mana": _base_max_mana, "potions": potions, "max_potions": max_potions,
+		"mana_potions": mana_potions, "max_mana_potions": max_mana_potions, "spell_bonus": spell_bonus,
+		"max_combo_hits": max_combo_hits, "max_heavy_chain": max_heavy_chain,
+		"max_chained_dodges": max_chained_dodges, "max_jumps": max_jumps, "run_speed_bonus": run_speed_bonus,
+		"shield_cooldown_max": shield_cooldown_max, "torch_on": torch_on, "upgrades_taken": upgrades_taken,
+		"items": inventory.items, "equipped": inventory.equipped, "gold": inventory.gold, "learned": inventory.learned,
+	}
+
+
+## Ripristina lo stato salvato (i numeri dal JSON arrivano come decimali).
+func load_state(data: Dictionary) -> void:
+	level = int(data["level"])
+	experience = int(data["experience"])
+	_base_max_health = int(data["base_max_health"])
+	_base_max_mana = float(data["base_max_mana"])
+	potions = int(data["potions"])
+	max_potions = int(data["max_potions"])
+	mana_potions = int(data["mana_potions"])
+	max_mana_potions = int(data["max_mana_potions"])
+	spell_bonus = float(data["spell_bonus"])
+	max_combo_hits = int(data["max_combo_hits"])
+	max_heavy_chain = int(data["max_heavy_chain"])
+	max_chained_dodges = int(data["max_chained_dodges"])
+	max_jumps = int(data["max_jumps"])
+	run_speed_bonus = float(data["run_speed_bonus"])
+	shield_cooldown_max = float(data["shield_cooldown_max"])
+	torch_on = bool(data["torch_on"])
+	_torch.enabled = torch_on
+	upgrades_taken.clear()
+	for key: String in data["upgrades_taken"]:
+		upgrades_taken[key] = int(data["upgrades_taken"][key])
+	inventory.items.assign(data["items"])
+	inventory.equipped.clear()
+	for slot: String in data["equipped"]:
+		inventory.equipped[slot] = int(data["equipped"][slot])
+	inventory.gold = int(data["gold"])
+	inventory.learned = (data["learned"] as Dictionary).duplicate()
+	_refresh_stats()
+	health = clampi(int(data["health"]), 1, max_health)
+	mana = clampf(float(data["mana"]), 0.0, max_mana)
+	health_changed.emit(health, max_health)
+	experience_changed.emit(experience, experience_needed(), level)
+
+
 func is_empowered() -> bool:
 	return _empowered_time > 0.0
 

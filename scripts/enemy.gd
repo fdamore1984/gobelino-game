@@ -76,6 +76,8 @@ var health := 40
 var max_health := 40
 ## Esperienza data al giocatore quando viene sconfitto.
 var xp_reward := 30
+## Danno di un colpo: quello del tipo, aumentato per il boss (vedi Game).
+var damage := 1
 
 var _type: Dictionary
 var _color := Color.WHITE
@@ -118,6 +120,7 @@ func setup(id: String) -> void:
 	max_health = _type["health"]
 	health = max_health
 	xp_reward = _type["xp"]
+	damage = _type["damage"]
 	_speed = _type["speed"]
 	var color: Array = _type["color"]
 	_color = Color(color[0], color[1], color[2])
@@ -201,7 +204,7 @@ func _physics_process(delta: float) -> void:
 			target_velocity = _velocity
 			if not _is_ranged() and not _strike_resolved and player_active and _player_in_strike_zone():
 				_strike_resolved = true
-				if player.receive_hit(global_position, _type["damage"]) == "parried":
+				if player.receive_hit(global_position, damage) == "parried":
 					_is_combo = false
 					Sfx.play("stun", global_position)
 					_change_state(State.STUNNED)
@@ -315,6 +318,23 @@ func is_dead() -> bool:
 	return _state == State.DEAD
 
 
+## Il boss in fondo al sotterraneo (vedi Game).
+func is_boss() -> bool:
+	return _type.get("boss", false)
+
+
+## Corona d'oro sopra la testa del boss.
+func _draw_crown() -> void:
+	var top := Vector2(0, -radius * 1.05)
+	var width := radius * 0.7
+	var points := PackedVector2Array([top + Vector2(-width, 0), top + Vector2(width, 0)])
+	for k in range(4, -1, -1):
+		var x := -width + width * 2.0 * k / 4.0
+		points.append(top + Vector2(x, -radius * (0.55 if k % 2 == 0 else 0.3)))
+	draw_colored_polygon(points, Color(1.0, 0.8, 0.25))
+	draw_polyline(_closed(points), Color(0.55, 0.35, 0.05), 2.0)
+
+
 ## True se il nemico sta combattendo: in quel caso non va rimosso
 ## anche se il giocatore si allontana.
 func is_engaged() -> bool:
@@ -345,7 +365,7 @@ func _shoot_bolt() -> void:
 	var bolt := EnemyBolt.new()
 	bolt.direction = _attack_direction
 	bolt.speed = ranged["bolt_speed"]
-	bolt.damage = _type["damage"]
+	bolt.damage = damage
 	bolt.max_distance = ranged["range"] * 1.3
 	bolt.altitude = ground_elevation
 	bolt.color = _color.lightened(0.3)
@@ -501,6 +521,8 @@ func _draw() -> void:
 	draw_colored_polygon(_shape_points(), body)
 	draw_polyline(_closed(_shape_points()), body.darkened(0.35), 2.0)
 	draw_circle(_facing * radius * 0.5, maxf(radius * 0.2, 4.0), Color(0.1, 0.05, 0.1))
+	if is_boss():
+		_draw_crown()
 	if _is_ranged():
 		_draw_staff()
 	else:
