@@ -133,14 +133,24 @@ func _rebuild(focus_index: int) -> void:
 
 func _slot_button(index: int) -> Button:
 	var id := player.inventory.items[index]
+	var button := item_button(id, Items.name_key(id), player.inventory.is_equipped(index))
+	button.pressed.connect(_on_slot_pressed.bind(index))
+	button.focus_entered.connect(_show_details.bind(index))
+	button.focus_entered.connect(Sfx.play_ui.bind("ui_move"))
+	_grid.add_child(button)
+	return button
+
+
+## Casella di un oggetto: icona e didascalia, bordo dorato se evidenziata
+## (oggetto indossato). Usata anche dal negozio dei mercanti.
+static func item_button(id: String, caption: String, highlight: bool) -> Button:
 	var button := Button.new()
 	button.custom_minimum_size = SLOT_SIZE
-	var equipped := player.inventory.is_equipped(index)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.1, 0.12, 0.1, 0.95)
 	style.set_corner_radius_all(8)
-	style.set_border_width_all(3 if equipped else 1)
-	style.border_color = COLOR_EQUIPPED if equipped else Color(1, 1, 1, 0.2)
+	style.set_border_width_all(3 if highlight else 1)
+	style.border_color = COLOR_EQUIPPED if highlight else Color(1, 1, 1, 0.2)
 	var focus := style.duplicate() as StyleBoxFlat
 	focus.border_color = Color.WHITE
 	focus.set_border_width_all(4)
@@ -159,18 +169,14 @@ func _slot_button(index: int) -> Button:
 	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(icon)
 	var name_label := Label.new()
-	name_label.text = Items.name_key(id)
+	name_label.text = caption
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	name_label.add_theme_font_size_override("font_size", 13)
-	name_label.add_theme_color_override("font_color", COLOR_EQUIPPED if equipped else COLOR_TEXT)
+	name_label.add_theme_color_override("font_color", COLOR_EQUIPPED if highlight else COLOR_TEXT)
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(name_label)
 	button.add_child(box)
-	button.pressed.connect(_on_slot_pressed.bind(index))
-	button.focus_entered.connect(_show_details.bind(index))
-	button.focus_entered.connect(Sfx.play_ui.bind("ui_move"))
-	_grid.add_child(button)
 	return button
 
 
@@ -183,13 +189,6 @@ func _on_slot_pressed(index: int) -> void:
 ## Nome, effetti e cosa fa A sull'oggetto selezionato.
 func _show_details(index: int) -> void:
 	var id := player.inventory.items[index]
-	var effects: Array[String] = []
-	for key: String in ["damage", "health", "speed", "mana", "spell", "heal", "restore_mana"]:
-		var value := Items.stat(id, key)
-		if value == 0.0:
-			continue
-		var shown := roundi(value * 100.0) if key in ["damage", "speed", "spell"] else roundi(value)
-		effects.append(tr("STAT_" + key.to_upper()) % shown)
 	var action := "INVENTORY_USE_EQUIP"
 	match Items.category(id):
 		"book":
@@ -199,4 +198,16 @@ func _show_details(index: int) -> void:
 		_:
 			if player.inventory.is_equipped(index):
 				action = "INVENTORY_USE_UNEQUIP"
-	_details.text = "%s — %s\n%s" % [tr(Items.name_key(id)), ", ".join(effects), tr(action)]
+	_details.text = "%s\n%s" % [describe(id), tr(action)]
+
+
+## Nome ed effetti dell'oggetto, tradotti.
+static func describe(id: String) -> String:
+	var effects: Array[String] = []
+	for key: String in ["damage", "health", "speed", "mana", "spell", "heal", "restore_mana"]:
+		var value := Items.stat(id, key)
+		if value == 0.0:
+			continue
+		var shown := roundi(value * 100.0) if key in ["damage", "speed", "spell"] else roundi(value)
+		effects.append(TranslationServer.translate("STAT_" + key.to_upper()) % shown)
+	return "%s — %s" % [TranslationServer.translate(Items.name_key(id)), ", ".join(effects)]

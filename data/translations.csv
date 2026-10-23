@@ -118,3 +118,22 @@ TOUCH_SPELL,Magia,Spell
 TOUCH_MANA,Mana,Mana
 TOUCH_TORCH,Torcia,Torch
 TOUCH_INVENTORY,Zaino,Bag
+MERCHANT_TITLE,Mercante ambulante,Travelling merchant
+MERCHANT_HINT,Tocca il banco per comprare e vendere,Touch the stall to buy and sell
+SHOP_BUY,In vendita: oggetti rari che non si trovano nelle casse,For sale: rare items you won't find in chests
+SHOP_SELL,Vendi i tuoi oggetti (non quelli indossati),Sell your items (not the ones you wear)
+SHOP_PRICE,%d monete,%d gold
+SHOP_BUY_ACTION,A: compra per %d monete,A: buy for %d gold
+SHOP_SELL_ACTION,A: vendi per %d monete,A: sell for %d gold
+SHOP_NOT_ENOUGH,Non hai abbastanza monete,You don't have enough gold
+SHOP_NOTHING_TO_SELL,Niente da vendere: raccogli oggetti dalle casse,Nothing to sell: collect items from chests
+SHOP_HINT,A / Invio: compra o vendi · B / Esc / I: chiudi,A / Enter: buy or sell · B / Esc / I: close
+SHOP_CLOSE,Chiudi,Close
+ITEM_SWORD_DRAGON,Spada del drago,Dragon sword
+ITEM_ARMOR_PLATE,Armatura a piastre,Plate armor
+ITEM_BOOTS_WIND,Stivali del vento,Wind boots
+ITEM_AMULET_ARCHMAGE,Amuleto dell'arcimago,Archmage amulet
+ITEM_RING_INFERNO,Anello infernale,Inferno ring
+ITEM_BOOK_METEOR,Libro della meteora,Meteor tome
+ITEM_BOOK_VIGOR,Libro del vigore,Tome of vigor
+ITEM_POTION_ELIXIR,Elisir,Elixir

@@ -35,6 +35,7 @@ const UPGRADE_NAMES := {
 @onready var _power_ups: VBoxContainer = %PowerUps
 @onready var _challenge: Label = %Challenge
 var _inventory_panel := InventoryPanel.new()
+var _shop_panel := ShopPanel.new()
 var _status := HudStatus.new()
 var _actions := HudActions.new()
 ## I comandi in basso si attenuano dopo un po', per non coprire il gioco.
@@ -78,6 +79,7 @@ func _ready() -> void:
 	_message.visible = false
 	_challenge.visible = false
 	add_child(_inventory_panel)
+	add_child(_shop_panel)
 	# Pannelli sotto tutto il resto (potenziamenti, inventario, messaggi).
 	add_child(_status)
 	move_child(_status, 0)
@@ -106,6 +108,7 @@ func _process(delta: float) -> void:
 	if player == null:
 		return
 	_inventory_panel.player = player
+	_shop_panel.player = player
 	_status.player = player
 	_actions.player = player
 	_update_power_ups()
@@ -245,6 +248,12 @@ func set_experience(_current: int, _needed: int, _level: int) -> void:
 
 func set_kills(count: int) -> void:
 	_status.kills = count
+
+
+## Apre il negozio del mercante in quella posizione.
+func open_shop(merchant: Vector2) -> void:
+	hide_challenge()
+	_shop_panel.open(merchant)
 
 
 ## Testo della sfida del totem: suggerimento, tempo e nemici rimasti.

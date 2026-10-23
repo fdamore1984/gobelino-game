@@ -60,6 +60,11 @@ var _decor: Dictionary = DATA.data["decor"]
 var _arena: Dictionary = DATA.data["arena"]
 ## Regione -> centro della sua arena (Vector2.INF se non ce l'ha).
 var _arena_cache := {}
+var _merchant: Dictionary = DATA.data["merchant"]
+## Regione -> posizione del suo mercante (Vector2.INF se non ce l'ha).
+var _merchant_cache := {}
+## Mercante -> oggetti rari che ha ancora in vendita.
+var _merchant_stocks := {}
 ## Totem (centro dell'arena) -> stato: "active" durante la sfida, "used" dopo.
 var _totem_states := {}
 ## Casse già aperte (posizione -> true).
@@ -169,8 +174,12 @@ func level_of(cell: Vector2i) -> int:
 	else:
 		# Le arene sono tutte allo stesso livello del loro centro.
 		var arena := arena_near(center)
+		var merchant := merchant_near(center)
 		if arena != Vector2.INF and center.distance_to(arena) < float(_arena["radius"]):
 			center = arena
+		# Anche lo spiazzo del mercante è piano.
+		elif merchant != Vector2.INF and center.distance_to(merchant) < float(_merchant["clear_radius"]):
+			center = merchant
 	var t := _height_noise.get_noise_2dv(center) * float(_terrain["height_contrast"]) * 0.5 + 0.5
 	var level := clampi(floori(t * _levels), 0, _levels - 1)
 	if _level_cache.size() > CACHE_LIMIT:
@@ -191,7 +200,9 @@ func ramp_of(cell: Vector2i) -> Vector2i:
 	var far_from_start := center.length() > float(_terrain["start_flat_radius"]) + CELL * 2.0
 	var arena := arena_near(center)
 	var far_from_arena := arena == Vector2.INF or center.distance_to(arena) > float(_arena["radius"]) + CELL * 2.0
-	if far_from_start and far_from_arena and _random_unit([seed_value, cell.x, cell.y, "ramp"]) < float(_terrain["ramp_chance"]):
+	var merchant := merchant_near(center)
+	var far_from_merchant := merchant == Vector2.INF or center.distance_to(merchant) > float(_merchant["clear_radius"]) + CELL * 2.0
+	if far_from_start and far_from_arena and far_from_merchant and _random_unit([seed_value, cell.x, cell.y, "ramp"]) < float(_terrain["ramp_chance"]):
 		for direction: Vector2i in RAMP_DIRECTIONS:
 			if level_of(cell + direction) == level + 1 and level_of(cell - direction) == level:
 				result = direction
@@ -201,11 +212,14 @@ func ramp_of(cell: Vector2i) -> Vector2i:
 
 
 ## Sentiero sterrato: una striscia lungo una curva del rumore, e lo
-## spiazzo di terra attorno al totem delle arene.
+## spiazzo di terra attorno al totem delle arene e ai mercanti.
 func is_path(cell: Vector2i) -> bool:
 	var center := cell_center(cell)
 	var arena := arena_near(center)
 	if arena != Vector2.INF and center.distance_to(arena) < float(_arena["plaza_radius"]):
+		return true
+	var merchant := merchant_near(center)
+	if merchant != Vector2.INF and center.distance_to(merchant) < float(_merchant["plaza_radius"]):
 		return true
 	return absf(_path_noise.get_noise_2dv(center)) < float(_terrain["path_width"])
 
@@ -232,19 +246,82 @@ func _arena_of_region(region: Vector2i) -> Vector2:
 ## Centro dell'arena che contiene il punto (o la più vicina nelle regioni
 ## attorno), Vector2.INF se non ce ne sono.
 func arena_near(point: Vector2) -> Vector2:
-	var size := float(_arena["region"])
+	return _nearest(point, _sites_near(point, float(_arena["region"]), _arena_of_region))
+
+
+## Posizioni (arene o mercanti) delle regioni attorno al punto: site_of
+## dà la posizione nella regione, o Vector2.INF.
+func _sites_near(point: Vector2, size: float, site_of: Callable) -> Array[Vector2]:
 	var region := Vector2i(floori(point.x / size), floori(point.y / size))
-	var best := Vector2.INF
+	var sites: Array[Vector2] = []
 	for i in range(-1, 2):
 		for j in range(-1, 2):
-			var center := _arena_of_region(region + Vector2i(i, j))
-			if center != Vector2.INF and (best == Vector2.INF or point.distance_to(center) < point.distance_to(best)):
-				best = center
+			var site: Vector2 = site_of.call(region + Vector2i(i, j))
+			if site != Vector2.INF:
+				sites.append(site)
+	return sites
+
+
+static func _nearest(point: Vector2, sites: Array[Vector2]) -> Vector2:
+	var best := Vector2.INF
+	for site in sites:
+		if best == Vector2.INF or point.distance_to(site) < point.distance_to(best):
+			best = site
 	return best
 
 
 func arena_radius() -> float:
 	return _arena["radius"]
+
+
+# --- Mercanti ------------------------------------------------------------
+
+## Posizione del mercante della regione, o Vector2.INF se non ce l'ha.
+## Lontano dalla partenza e dalle arene.
+func _merchant_of_region(region: Vector2i) -> Vector2:
+	if _merchant_cache.has(region):
+		return _merchant_cache[region]
+	var site := Vector2.INF
+	var size := float(_merchant["region"])
+	var margin := float(_merchant["clear_radius"]) + CELL * 2.0
+	if _random_unit([seed_value, region.x, region.y, "merchant"]) < float(_merchant["chance"]):
+		var offset := Vector2(_random_unit([seed_value, region.x, region.y, "merchant_x"]), _random_unit([seed_value, region.x, region.y, "merchant_y"]))
+		var candidate := Vector2(region) * size + Vector2(margin, margin) + offset * (size - 2.0 * margin)
+		var arena := arena_near(candidate)
+		if candidate.length() > float(_merchant["min_start_distance"]) \
+				and (arena == Vector2.INF or candidate.distance_to(arena) > float(_merchant["arena_distance"])):
+			site = candidate
+	_merchant_cache[region] = site
+	return site
+
+
+func merchant_near(point: Vector2) -> Vector2:
+	return _nearest(point, _sites_near(point, float(_merchant["region"]), _merchant_of_region))
+
+
+## Mercante toccato da chi sta in point (stesso livello e abbastanza
+## vicino): la sua posizione, o Vector2.INF.
+func merchant_touched(point: Vector2, reach: float) -> Vector2:
+	var merchant := merchant_near(point)
+	if merchant == Vector2.INF or point.distance_to(merchant) > reach + float(_merchant["collision"]) \
+			or absf(elevation_at(point) - elevation_at(merchant)) > STEP_TOLERANCE:
+		return Vector2.INF
+	return merchant
+
+
+## Oggetti rari in vendita dal mercante: scelti a caso la prima volta,
+## spariscono quando li si compra (vedi ShopPanel).
+func merchant_stock(merchant: Vector2) -> Array[String]:
+	if not _merchant_stocks.has(merchant):
+		var rng := RandomNumberGenerator.new()
+		rng.seed = hash([seed_value, merchant, "stock"])
+		var choices := Items.shop_items()
+		var count: Array = _merchant["stock"]
+		var stock: Array[String] = []
+		for i in mini(rng.randi_range(count[0], count[1]), choices.size()):
+			stock.append(choices.pop_at(rng.randi_range(0, choices.size() - 1)))
+		_merchant_stocks[merchant] = stock
+	return _merchant_stocks[merchant]
 
 
 ## Totem toccato da chi sta in point (stesso livello e abbastanza vicino):
@@ -278,7 +355,7 @@ func open_chest(at: Vector2) -> void:
 	_opened_chests[at] = true
 
 
-## Casse e totem nei pezzi di mondo attorno al punto (per la minimappa).
+## Casse, totem e mercanti nei pezzi di mondo attorno al punto (per la minimappa).
 func points_of_interest(center: Vector2, radius: float) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	var corners := [center + Vector2(-radius, -radius), center + Vector2(radius, radius), center + Vector2(-radius, radius), center + Vector2(radius, -radius)]
@@ -291,7 +368,7 @@ func points_of_interest(center: Vector2, radius: float) -> Array[Dictionary]:
 	for i in range(min_chunk.x, max_chunk.x + 1):
 		for j in range(min_chunk.y, max_chunk.y + 1):
 			for obstacle: Dictionary in _obstacles_of(Vector2i(i, j)):
-				if obstacle["type"] in ["chest", "totem"]:
+				if obstacle["type"] in ["chest", "totem", "merchant"]:
 					result.append(obstacle)
 	return result
 
@@ -502,16 +579,25 @@ func _generate_obstacles(chunk: Vector2i) -> Array:
 			"collision": 18.0 * float(chest["collision"]), "solid": true, "slow": 1.0, "damage": 0,
 			"damage_interval": 0.0, "variant": 1,
 		})
-	# Il totem al centro dell'arena è un ostacolo solido del pezzo che lo contiene.
-	var arena := arena_near(_from_uv((chunk.x + 0.5) * CHUNK_CELLS * CELL, (chunk.y + 0.5) * CHUNK_CELLS * CELL))
-	if arena != Vector2.INF and _chunk_of(cell_at(arena)) == chunk:
-		var totem: Dictionary = _arena["totem"]
-		result.append({
-			"type": "totem", "position": arena, "elevation": elevation_at(arena), "radius": totem["radius"],
-			"collision": totem["collision"], "solid": true, "slow": 1.0, "damage": 0,
-			"damage_interval": 0.0, "variant": 0,
-		})
+	# Il totem al centro dell'arena e il banco del mercante sono ostacoli
+	# solidi del pezzo che li contiene.
+	var chunk_center := _from_uv((chunk.x + 0.5) * CHUNK_CELLS * CELL, (chunk.y + 0.5) * CHUNK_CELLS * CELL)
+	var totem: Dictionary = _arena["totem"]
+	for arena in _sites_near(chunk_center, float(_arena["region"]), _arena_of_region):
+		if _chunk_of(cell_at(arena)) == chunk:
+			result.append(_site_obstacle("totem", arena, totem["radius"], totem["collision"]))
+	for merchant in _sites_near(chunk_center, float(_merchant["region"]), _merchant_of_region):
+		if _chunk_of(cell_at(merchant)) == chunk:
+			result.append(_site_obstacle("merchant", merchant, _merchant["radius"], _merchant["collision"]))
 	return result
+
+
+func _site_obstacle(type_id: String, at: Vector2, radius: float, collision: float) -> Dictionary:
+	return {
+		"type": type_id, "position": at, "elevation": elevation_at(at), "radius": radius,
+		"collision": collision, "solid": true, "slow": 1.0, "damage": 0,
+		"damage_interval": 0.0, "variant": 0,
+	}
 
 
 ## Sceglie quale ostacolo mettere sul blocco (o nessuno), con probabilità
@@ -522,6 +608,9 @@ func _pick_obstacle(cell: Vector2i, rng: RandomNumberGenerator) -> String:
 		return ""
 	var arena := arena_near(center)
 	if arena != Vector2.INF and center.distance_to(arena) < float(_arena["radius"]) + CELL:
+		return ""
+	var merchant := merchant_near(center)
+	if merchant != Vector2.INF and center.distance_to(merchant) < float(_merchant["clear_radius"]) + CELL:
 		return ""
 	var forest := clampf(_forest_noise.get_noise_2dv(center) * 2.0, 0.0, 1.0)
 	var brambles := clampf(_bramble_noise.get_noise_2dv(center) * 2.5 - 0.6, 0.0, 1.0)
@@ -609,7 +698,13 @@ func _show_chunk(chunk: Vector2i) -> void:
 	if entities:
 		for data: Dictionary in _obstacles_of(chunk):
 			var obstacle := Obstacle.new()
-			obstacle.setup(data, _arena["totem"] if data["type"] == "totem" else _obstacle_types[data["type"]])
+			var type: Dictionary = _obstacle_types.get(data["type"], {})
+			match data["type"]:
+				"totem":
+					type = _arena["totem"]
+				"merchant":
+					type = _merchant
+			obstacle.setup(data, type)
 			data["node"] = obstacle
 			entities.add_child(obstacle)
 			nodes.append(obstacle)
