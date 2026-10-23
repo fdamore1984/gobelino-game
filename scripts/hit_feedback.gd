@@ -12,10 +12,11 @@ const MAX_STOP := 0.18
 static var _pending := 0
 
 
-## strength tra 0 e 1: un colpo normale vale circa 0,4, un colpo potente
+## strength tra 0 e 1: un colpo normale vale circa 0,35, un colpo potente
 ## carico 1. stop: durata del fermo in secondi reali (0 = nessun fermo).
-static func hit(tree: SceneTree, strength: float, stop: float) -> void:
-	vibrate(strength, 0.08 + 0.12 * strength)
+## buzz: durata della vibrazione, breve e secca.
+static func hit(tree: SceneTree, strength: float, stop: float, buzz := 0.04) -> void:
+	vibrate(strength, buzz)
 	if stop <= 0.0 or tree == null:
 		return
 	_pending += 1

@@ -31,76 +31,6 @@ script = ExtResource("6_day_night")
 process_mode = 3
 script = ExtResource("4_hud")
 
-[node name="Health" type="Label" parent="HUD"]
-unique_name_in_owner = true
-offset_left = 24.0
-offset_top = 16.0
-offset_right = 424.0
-offset_bottom = 56.0
-theme_override_font_sizes/font_size = 28
-
-[node name="Level" type="Label" parent="HUD"]
-unique_name_in_owner = true
-offset_left = 24.0
-offset_top = 56.0
-offset_right = 174.0
-offset_bottom = 90.0
-theme_override_colors/font_color = Color(0.6, 0.9, 1, 1)
-theme_override_font_sizes/font_size = 22
-
-[node name="Experience" type="ProgressBar" parent="HUD"]
-unique_name_in_owner = true
-offset_left = 150.0
-offset_top = 64.0
-offset_right = 370.0
-offset_bottom = 82.0
-show_percentage = false
-
-[node name="ExperienceLabel" type="Label" parent="HUD"]
-unique_name_in_owner = true
-offset_left = 380.0
-offset_top = 58.0
-offset_right = 560.0
-offset_bottom = 88.0
-theme_override_colors/font_color = Color(1, 1, 1, 0.7)
-theme_override_font_sizes/font_size = 18
-
-[node name="Kills" type="Label" parent="HUD"]
-unique_name_in_owner = true
-offset_left = 24.0
-offset_top = 92.0
-offset_right = 424.0
-offset_bottom = 124.0
-theme_override_colors/font_color = Color(1, 1, 1, 0.75)
-theme_override_font_sizes/font_size = 20
-
-[node name="Potions" type="Label" parent="HUD"]
-unique_name_in_owner = true
-offset_left = 24.0
-offset_top = 124.0
-offset_right = 324.0
-offset_bottom = 154.0
-theme_override_colors/font_color = Color(0.5, 1, 0.5, 1)
-theme_override_font_sizes/font_size = 20
-
-[node name="Shield" type="Label" parent="HUD"]
-unique_name_in_owner = true
-offset_left = 24.0
-offset_top = 152.0
-offset_right = 324.0
-offset_bottom = 182.0
-theme_override_colors/font_color = Color(0.55, 0.85, 1, 1)
-theme_override_font_sizes/font_size = 20
-
-[node name="Stats" type="Label" parent="HUD"]
-unique_name_in_owner = true
-offset_left = 24.0
-offset_top = 180.0
-offset_right = 824.0
-offset_bottom = 206.0
-theme_override_colors/font_color = Color(1, 0.85, 0.55, 0.9)
-theme_override_font_sizes/font_size = 18
-
 [node name="Minimap" type="Control" parent="HUD"]
 unique_name_in_owner = true
 anchors_preset = 1
@@ -125,24 +55,6 @@ offset_right = -16.0
 offset_bottom = 252.0
 grow_horizontal = 0
 theme_override_constants/separation = 4
-
-[node name="Mana" type="Label" parent="HUD"]
-unique_name_in_owner = true
-offset_left = 24.0
-offset_top = 206.0
-offset_right = 524.0
-offset_bottom = 234.0
-theme_override_colors/font_color = Color(0.5, 0.7, 1, 1)
-theme_override_font_sizes/font_size = 20
-
-[node name="Gold" type="Label" parent="HUD"]
-unique_name_in_owner = true
-offset_left = 24.0
-offset_top = 234.0
-offset_right = 324.0
-offset_bottom = 262.0
-theme_override_colors/font_color = Color(1, 0.82, 0.25, 1)
-theme_override_font_sizes/font_size = 20
 
 [node name="Challenge" type="Label" parent="HUD"]
 unique_name_in_owner = true

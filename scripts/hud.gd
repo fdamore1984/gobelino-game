@@ -1,7 +1,7 @@
 class_name Hud
 extends CanvasLayer
-## Interfaccia del livello di test: vita, livello ed esperienza, pozioni,
-## scudo, nemici sconfitti, comandi, sfida del totem in corso, potenziamenti attivi (lista a destra),
+## Interfaccia del livello di test: pannello di stato in alto a sinistra
+## (HudStatus), barra delle azioni in basso a sinistra (HudActions), comandi, sfida del totem in corso, potenziamenti attivi (lista a destra),
 ## scelta del potenziamento salendo di livello (griglia con icone) e
 ## messaggio di fine partita.
 
@@ -31,20 +31,16 @@ const UPGRADE_NAMES := {
 	"spell": "UPGRADE_SPELL",
 }
 
-@onready var _health: Label = %Health
-@onready var _level: Label = %Level
-@onready var _experience: ProgressBar = %Experience
-@onready var _experience_label: Label = %ExperienceLabel
-@onready var _kills: Label = %Kills
-@onready var _potions: Label = %Potions
-@onready var _shield: Label = %Shield
-@onready var _stats: Label = %Stats
 @onready var _deck_hint: Label = %DeckHint
 @onready var _power_ups: VBoxContainer = %PowerUps
 @onready var _challenge: Label = %Challenge
-@onready var _mana: Label = %Mana
-@onready var _gold: Label = %Gold
 var _inventory_panel := InventoryPanel.new()
+var _status := HudStatus.new()
+var _actions := HudActions.new()
+## I comandi in basso si attenuano dopo un po', per non coprire il gioco.
+var _hint_time := 0.0
+const HINT_FADE_AFTER := 25.0
+const HINT_DIM_ALPHA := 0.3
 @onready var _hint: Label = %Hint
 @onready var _message: Label = %Message
 @onready var _level_up: Control = %LevelUp
@@ -82,6 +78,12 @@ func _ready() -> void:
 	_message.visible = false
 	_challenge.visible = false
 	add_child(_inventory_panel)
+	# Pannelli sotto tutto il resto (potenziamenti, inventario, messaggi).
+	add_child(_status)
+	move_child(_status, 0)
+	add_child(_actions)
+	move_child(_actions, 1)
+	_actions.visible = not Platform.use_touch_controls()
 	_level_up.visible = false
 	for upgrade: String in _upgrade_buttons:
 		var button: Button = _upgrade_buttons[upgrade]
@@ -98,23 +100,14 @@ func _process(delta: float) -> void:
 	# Sparisce appena il gioco vede un controller (per esempio dopo aver
 	# tenuto premuto Menu sullo Steam Deck).
 	_deck_hint.visible = Platform.needs_deck_controller_hint()
+	_hint_time += delta
+	if _hint_time > HINT_FADE_AFTER:
+		_hint.modulate.a = move_toward(_hint.modulate.a, HINT_DIM_ALPHA, delta)
 	if player == null:
 		return
 	_inventory_panel.player = player
-	_potions.text = tr("HUD_POTIONS") % [player.potions, player.max_potions]
-	_mana.text = tr("HUD_MANA") % [floori(player.mana), roundi(player.max_mana), player.mana_potions, player.max_mana_potions]
-	_gold.text = tr("HUD_GOLD") % player.inventory.gold
-	if player.shield_active:
-		_shield.text = tr("HUD_SHIELD_ACTIVE")
-	elif player.shield_cooldown > 0.0:
-		_shield.text = tr("HUD_SHIELD_COOLDOWN") % ceili(player.shield_cooldown)
-	else:
-		_shield.text = tr("HUD_SHIELD_READY")
-	# Livelli delle abilità, che crescono con i potenziamenti.
-	_stats.text = tr("HUD_STATS") % [
-		player.max_combo_hits, player.max_heavy_chain, player.max_chained_dodges,
-		player.max_jumps, roundi(100.0 * (1.0 + player.run_speed_bonus)),
-	]
+	_status.player = player
+	_actions.player = player
 	_update_power_ups()
 
 
@@ -240,19 +233,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-func set_health(current: int, maximum: int) -> void:
-	_health.text = tr("HUD_HEALTH") % [current, maximum]
+## Vita ed esperienza il pannello di stato le legge dal giocatore: qui basta
+## ridisegnarlo subito.
+func set_health(_current: int, _maximum: int) -> void:
+	_status.queue_redraw()
 
 
-func set_experience(current: int, needed: int, level: int) -> void:
-	_level.text = tr("HUD_LEVEL") % level
-	_experience.max_value = needed
-	_experience.value = current
-	_experience_label.text = tr("HUD_XP") % [current, needed]
+func set_experience(_current: int, _needed: int, _level: int) -> void:
+	_status.queue_redraw()
 
 
 func set_kills(count: int) -> void:
-	_kills.text = tr("HUD_KILLS") % count
+	_status.kills = count
 
 
 ## Testo della sfida del totem: suggerimento, tempo e nemici rimasti.
