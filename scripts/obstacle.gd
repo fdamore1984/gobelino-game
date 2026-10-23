@@ -1,7 +1,7 @@
 class_name Obstacle
 extends Node2D
 ## Ostacolo naturale del mondo, disegnato con forme geometriche: albero,
-## sasso, cespuglio, rovi, cassa o il totem al centro di un'arena. La posizione è la base a terra, così
+## sasso, cespuglio, rovi, cassa, il totem al centro di un'arena o il banco di un mercante. La posizione è la base a terra, così
 ## l'ordinamento per y lo mette davanti o dietro ai personaggi; viene
 ## disegnato più in alto quanto il blocco di terreno su cui si trova. Gli effetti (blocco,
 ## rallentamento, danni dei rovi) sono gestiti da World.
@@ -33,7 +33,7 @@ func setup(data: Dictionary, type: Dictionary) -> void:
 	# Disegnato una volta sola; solo gli alberi controllano il giocatore e
 	# il totem si anima.
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
-	set_process(type_id in ["tree", "totem", "chest"])
+	set_process(type_id in ["tree", "totem", "chest", "merchant"])
 
 
 ## Il giocatore ci sta sbattendo contro: si illumina finché dura il contatto.
@@ -47,9 +47,9 @@ func _process(delta: float) -> void:
 	if _contact > 0.0:
 		_contact -= delta
 		queue_redraw()
-		if _contact <= 0.0 and type_id not in ["tree", "totem", "chest"]:
+		if _contact <= 0.0 and type_id not in ["tree", "totem", "chest", "merchant"]:
 			set_process(false)
-	if type_id == "totem":
+	if type_id in ["totem", "merchant"]:
 		queue_redraw()
 		return
 	if type_id == "chest":
@@ -101,6 +101,8 @@ func _draw() -> void:
 			_draw_totem()
 		"chest":
 			_draw_chest()
+		"merchant":
+			_draw_merchant()
 	if _contact > 0.0:
 		_draw_contact_glow(true)
 
@@ -252,6 +254,57 @@ func _draw_chest() -> void:
 	draw_rect(Rect2(-4.0, -height - 3.0, 8.0, 9.0), metal)
 	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 300.0)
 	draw_circle(Vector2(width * 0.7, -height - radius * 0.7), 2.0 + pulse * 1.5, Color(1.0, 0.95, 0.6, 0.6 + 0.4 * pulse))
+
+
+## Banco del mercante: pali e tenda a strisce, il mercante col cappello a
+## punta dietro il bancone di legno con la merce in mostra e un'insegna con
+## la moneta che brilla, per riconoscerlo da lontano.
+func _draw_merchant() -> void:
+	_draw_shadow(radius * 1.5)
+	var wood := _type_color("wood")
+	var robe := _type_color("robe")
+	var skin := _type_color("skin")
+	var gold := _type_color("gold")
+	var width := radius * 1.3
+	var height := radius * 0.75
+	var top := -height - radius * 2.0
+	for x: float in [-width, width - 5.0]:
+		draw_rect(Rect2(x, top, 5.0, radius * 2.0), wood.darkened(0.3))
+	# Il mercante dondola appena, come se respirasse.
+	var breath := sin(Time.get_ticks_msec() / 400.0) * 1.5
+	var body := Vector2(0, -height - 6.0 + breath * 0.5)
+	draw_circle(body, radius * 0.42, robe)
+	var head := body + Vector2(0, -radius * 0.55 + breath * 0.3)
+	draw_circle(head, radius * 0.28, skin)
+	draw_circle(head + Vector2(-4, -1), 2.2, Color(0.1, 0.1, 0.1))
+	draw_circle(head + Vector2(4, -1), 2.2, Color(0.1, 0.1, 0.1))
+	draw_colored_polygon(PackedVector2Array([head + Vector2(-radius * 0.36, -radius * 0.14), head + Vector2(radius * 0.36, -radius * 0.14),
+			head + Vector2(radius * 0.12, -radius * 0.85)]), robe.darkened(0.25))
+	draw_line(head + Vector2(-radius * 0.42, -radius * 0.14), head + Vector2(radius * 0.42, -radius * 0.14), robe.darkened(0.45), 3.0)
+	# Tenda inclinata a strisce, col bordo a festoni.
+	var stripes := 6
+	var back := top
+	var front := top + radius * 0.45
+	for k in stripes:
+		var x0 := -width - 6.0 + (width * 2.0 + 12.0) * k / stripes
+		var x1 := -width - 6.0 + (width * 2.0 + 12.0) * (k + 1) / stripes
+		var color := _color(k)
+		draw_colored_polygon(PackedVector2Array([Vector2(x0 * 0.92, back), Vector2(x1 * 0.92, back), Vector2(x1, front), Vector2(x0, front)]), color)
+		draw_circle(Vector2((x0 + x1) / 2.0, front), (x1 - x0) / 2.0, color.darkened(0.08))
+	# Bancone con la merce.
+	draw_rect(Rect2(-width, -height, width * 2.0, height), wood)
+	draw_rect(Rect2(width * 0.6, -height, width * 0.4, height), wood.darkened(0.25))
+	draw_rect(Rect2(-width - 4.0, -height - 5.0, width * 2.0 + 8.0, 6.0), wood.lightened(0.15))
+	draw_circle(Vector2(-width * 0.6, -height - 10.0), 5.0, Items.color("potion_health"))
+	draw_circle(Vector2(-width * 0.38, -height - 9.0), 4.0, Items.color("potion_mana"))
+	draw_rect(Rect2(width * 0.15, -height - 11.0, 14.0, 7.0), Items.color("book_fire"))
+	draw_line(Vector2(width * 0.5, -height - 4.0), Vector2(width * 0.85, -height - 16.0), Items.color("sword_steel"), 3.0)
+	# Insegna con la moneta sopra la tenda.
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 300.0)
+	var board := Vector2(0, top - 10.0)
+	draw_circle(board, 9.0, gold.darkened(0.3))
+	draw_circle(board, 7.0, gold)
+	draw_circle(board + Vector2(7, -7), 1.5 + pulse * 1.5, Color(1.0, 0.97, 0.7, 0.5 + 0.5 * pulse))
 
 
 ## Bagliore dietro l'ostacolo (front = false) e anello luminoso alla base

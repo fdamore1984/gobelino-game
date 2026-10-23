@@ -35,6 +35,7 @@ func _ready() -> void:
 			await _capture_level_up(language)
 			await _capture_challenge(language)
 			await _capture_inventory(language)
+			await _capture_merchant(language)
 	get_tree().quit()
 
 
@@ -193,6 +194,52 @@ func _capture_inventory(language: String) -> void:
 	await _save("%s_6_inventory.png" % language)
 	hud._inventory_panel.close()
 	_end_game()
+
+
+## Il banco di un mercante nel mondo e il suo negozio aperto.
+func _capture_merchant(language: String) -> void:
+	_start_game(Vector2(0, -40), 1.25)
+	_player.level = 5
+	_hud_stats()
+	var site := _nearest_merchant()
+	_player.position = site + Vector2(-40, 105)
+	_player.ground_elevation = (_game.get_node("World") as World).elevation_at(_player.position)
+	_player.facing = Vector2(0.3, -1).normalized()
+	_player.reset_physics_interpolation()
+	var hud: Hud = _game.get_node("HUD")
+	hud.show_challenge(tr("MERCHANT_HINT"))
+	var camera: Camera2D = _player.get_node("Camera")
+	camera.reset_physics_interpolation()
+	camera.reset_smoothing()
+	await _frames(2)
+	camera.reset_smoothing()
+	camera.force_update_scroll()
+	(_game.get_node("World") as World)._update_chunks()
+	await _frames(20)
+	await _save("%s_7_merchant.png" % language)
+	for id in ["sword_iron", "armor_chain", "book_mana", "ring_fire", "potion_mana", "boots_swift"]:
+		_player.inventory.add(id)
+	_player.inventory.gold = 312
+	_player.inventory.equipped = {"armor": 1}
+	_player._refresh_stats()
+	hud._shop_panel.player = _player
+	hud.open_shop(site)
+	await _frames(4)
+	await _save("%s_8_shop.png" % language)
+	hud._shop_panel.close()
+	_end_game()
+
+
+## Mercante più vicino alla partenza nel mondo delle immagini.
+func _nearest_merchant() -> Vector2:
+	var world: World = _game.get_node("World")
+	var best := Vector2.INF
+	for x in range(-4, 5):
+		for y in range(-4, 5):
+			var site := world.merchant_near(Vector2(x, y) * 1000.0)
+			if site != Vector2.INF and (best == Vector2.INF or site.length() < best.length()):
+				best = site
+	return best
 
 
 func _capture_cover(language: String) -> void:

@@ -30,7 +30,7 @@ godot --path . --resolution 1260x1000 res://tools/store_capture.tscn -- cover
 | Languages | English, Italian |
 | Inputs | Keyboard, Xbox controller, Playstation controller |
 | Cover image | `cover_en.png` (630×500) |
-| Screenshots | `en_1_combat.png`, `en_2_parry.png`, `en_5_challenge.png`, `en_6_inventory.png`, `en_3_level_up.png`, `en_4_menu.png` (le versioni `it_` sono le stesse in italiano) |
+| Screenshots | `en_1_combat.png`, `en_2_parry.png`, `en_5_challenge.png`, `en_6_inventory.png`, `en_7_merchant.png`, `en_8_shop.png`, `en_3_level_up.png`, `en_4_menu.png` (le versioni `it_` sono le stesse in italiano) |
 
 ### Tags
 
@@ -76,8 +76,9 @@ IN THIS PROTOTYPE
 - Enemies circle around you with quick sidesteps; their sword slashes are slow and wide but unpredictable: watch them wind up (they light up and pull back their weapon), beware of feints and follow-up strikes
 - Hold the power strike to charge it up to double damage; every hit you land shakes the controller, freezes the action for an instant, throws sparks and knocks the enemy back. Whatever blocks your way (rocks, trees, chests, walls too high to climb) lights up while you bump into it
 - Cast fireballs that seek out and chase the nearest enemy (they cost mana: drink mana potions to refill)
-- Day turns to night: light your torch to see in the dark. A minimap shows the area around you, enemies as red dots, chests and totems
+- Day turns to night: light your torch to see in the dark. A minimap shows the area around you, enemies as red dots, chests, totems and merchants
 - Open chests to find gold, weapons, armor, boots, amulets, rings, spell books and potions; equip them, read the books and drink the potions from your inventory
+- Travelling merchants are scattered around the world: touch their stall to sell the items you don't use and to buy potions and rare gear you won't find in chests (dragon sword, plate armor, wind boots, archmage amulet, inferno ring, meteor and vigor tomes, elixirs)
 - Stone totems stand in the middle of wide open arenas: touch one to start a 30-second survival challenge with waves of enemies matched to your level, and earn experience and a potion
 - Earn experience to level up: every level raises your base damage and lets you choose an upgrade: one more combo hit, one more chained power strike, one more chained dodge, one more jump, one more health point, one more potion, a faster shield recharge, a faster run, more mana or a stronger spell, picked from a grid of cards with icons. Your skill levels are always shown on screen, and the active power-ups are listed on the right
 
@@ -124,8 +125,9 @@ IN QUESTO PROTOTIPO
 - I nemici ti girano attorno con scatti laterali; i loro fendenti di spada sono lenti e ampi ma imprevedibili: guardali caricare (si accendono e portano indietro l'arma), attento alle finte e ai secondi colpi
 - Tieni premuto il colpo potente per caricarlo fino al doppio del danno; ogni colpo a segno fa vibrare il controller, ferma l'azione per un istante, fa scintille e spinge indietro il nemico. Quello che ti blocca il passo (sassi, alberi, casse, muri troppo alti da salire) si illumina finché ci sbatti contro
 - Lancia palle di fuoco che cercano e inseguono il nemico più vicino (costano mana: bevi le pozioni di mana per ricaricarlo)
-- Il giorno lascia il posto alla notte: accendi la torcia per vedere al buio. Una minimappa mostra l'area attorno, i nemici come puntini rossi, le casse e i totem
+- Il giorno lascia il posto alla notte: accendi la torcia per vedere al buio. Una minimappa mostra l'area attorno, i nemici come puntini rossi, le casse, i totem e i mercanti
 - Apri le casse per trovare monete, armi, armature, stivali, amuleti, anelli, libri di magia e pozioni; dall'inventario puoi equipaggiarli, leggere i libri e bere le pozioni
+- Nel mondo sono sparsi dei mercanti ambulanti: tocca il loro banco per vendere gli oggetti che non usi e comprare pozioni e oggetti rari che nelle casse non si trovano (spada del drago, armatura a piastre, stivali del vento, amuleto dell'arcimago, anello infernale, libri della meteora e del vigore, elisir)
 - Al centro di ampie arene ci sono totem di pietra: toccane uno per avviare una sfida di sopravvivenza di 30 secondi con ondate di nemici adatte al tuo livello, e guadagna esperienza e una pozione
 - Guadagna esperienza per salire di livello: ogni livello aumenta i danni base e ti fa scegliere un potenziamento: un colpo in più nella combo, un colpo potente concatenato in più, una schivata concatenata in più, un salto in più, un punto vita in più, una pozione in più, una ricarica più rapida dello scudo, una corsa più veloce, più mana o una magia più potente, scelti da una griglia di schede con icone. I livelli delle abilità sono sempre visibili a schermo e i potenziamenti attivi sono elencati a destra
 

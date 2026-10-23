@@ -1,7 +1,7 @@
 extends Control
 ## Minimappa in alto a destra: il terreno attorno al giocatore (livelli
-## d'altezza e sentieri), i nemici come puntini rossi, casse, totem e
-## oggetti a terra; il giocatore è la freccia bianca al centro.
+## d'altezza e sentieri), i nemici come puntini rossi, casse, totem,
+## mercanti e oggetti a terra; il giocatore è la freccia bianca al centro.
 
 ## Metà del lato dell'area mostrata, in pixel del mondo.
 const RANGE := 1100.0
@@ -18,6 +18,7 @@ const COLOR_TOTEM := Color(0.4, 1.0, 0.9)
 const COLOR_TOTEM_ACTIVE := Color(1.0, 0.4, 0.2)
 const COLOR_USED := Color(0.5, 0.5, 0.5)
 const COLOR_LOOT := Color(1, 1, 1)
+const COLOR_MERCHANT := Color(1.0, 0.6, 0.85)
 
 var _image := Image.create(SAMPLES, SAMPLES, false, Image.FORMAT_RGB8)
 var _texture: ImageTexture
@@ -81,6 +82,10 @@ func _draw() -> void:
 					elif state == "used":
 						color = COLOR_USED
 					draw_colored_polygon(PackedVector2Array([at + Vector2(0, -6), at + Vector2(5, 0), at + Vector2(0, 6), at + Vector2(-5, 0)]), color)
+				"merchant":
+					# Una tenda: tetto a triangolo sopra il banco.
+					draw_colored_polygon(PackedVector2Array([at + Vector2(-6, -1), at + Vector2(6, -1), at + Vector2(0, -7)]), COLOR_MERCHANT)
+					draw_rect(Rect2(at + Vector2(-4, -1), Vector2(8, 5)), COLOR_MERCHANT.darkened(0.3))
 	for node in get_tree().get_nodes_in_group("loot"):
 		var at := _to_map((node as Node2D).global_position)
 		if _inside(at):

@@ -12,6 +12,9 @@ extends Node2D
 ##
 ## Toccando una cassa la si apre: escono monete e oggetti a caso
 ## (data/items.json), adatti al livello, da raccogliere passandoci sopra.
+##
+## Toccando il banco di un mercante si apre il suo negozio (ShopPanel):
+## per riaprirlo bisogna prima allontanarsi.
 
 const MENU_SCENE := "res://scenes/menu.tscn"
 
@@ -27,6 +30,8 @@ const COLOR_XP := Color(0.6, 0.9, 1.0)
 const CHALLENGE := preload("res://data/challenge.json")
 ## Distanza dal totem entro cui l'HUD suggerisce di toccarlo.
 const TOTEM_HINT_DISTANCE := 220.0
+## Distanza dal mercante entro cui l'HUD suggerisce di toccarlo.
+const MERCHANT_HINT_DISTANCE := 260.0
 
 @onready var _world: World = $World
 @onready var _entities: Node2D = $Entities
@@ -43,6 +48,8 @@ var _challenge_arena := Vector2.INF
 var _challenge_time := 0.0
 var _challenge_waves: Array = []
 var _challenge_enemies: Array[Enemy] = []
+## Mercante di cui è appena stato aperto il negozio (Vector2.INF se nessuno).
+var _last_merchant := Vector2.INF
 
 
 func _ready() -> void:
@@ -67,6 +74,7 @@ func _process(delta: float) -> void:
 		return
 	_update_challenge(delta)
 	_check_chests()
+	_check_merchant()
 	_maintain_timer -= delta
 	if _maintain_timer <= 0.0:
 		_maintain_timer = MAINTAIN_INTERVAL
@@ -100,6 +108,8 @@ func _update_challenge(delta: float) -> void:
 		elif arena != Vector2.INF and _world.totem_state(arena) == "ready" \
 				and _player.position.distance_to(arena) < TOTEM_HINT_DISTANCE:
 			_hud.show_challenge(tr("CHALLENGE_HINT"))
+		elif _player.position.distance_to(_world.merchant_near(_player.position)) < MERCHANT_HINT_DISTANCE:
+			_hud.show_challenge(tr("MERCHANT_HINT"))
 		else:
 			_hud.hide_challenge()
 		return
@@ -150,6 +160,21 @@ func _check_chests() -> void:
 		var angle := away.angle() + (i - (drops.size() - 1) / 2.0) * 0.7
 		loot.launch(at, _world.free_position_near(at + Vector2.from_angle(angle) * 60.0, 10.0))
 		_entities.add_child(loot)
+
+
+## Toccando il banco del mercante si apre il negozio; si riapre solo dopo
+## essersi allontanati, così non ricompare appena chiuso.
+func _check_merchant() -> void:
+	if _player.is_dead():
+		return
+	if _last_merchant != Vector2.INF:
+		if _player.position.distance_to(_last_merchant) > float(World.DATA.data["merchant"]["reopen_distance"]):
+			_last_merchant = Vector2.INF
+		return
+	var merchant := _world.merchant_touched(_player.position, Player.RADIUS + 10.0)
+	if merchant != Vector2.INF:
+		_last_merchant = merchant
+		_hud.open_shop(merchant)
 
 
 func _start_challenge(arena: Vector2) -> void:
