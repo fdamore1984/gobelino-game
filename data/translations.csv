@@ -1,5 +1,5 @@
 keys,en
-MENU_START,Start
+MENU_START,New game
 MENU_QUIT,Quit
 MENU_VERSION,Version %s
 HUD_HEALTH,Health  %d / %d
@@ -150,7 +150,7 @@ CONTROLS_POTION,Health potion | Q | D-pad left
 CONTROLS_MANA,Mana potion | T | D-pad right
 CONTROLS_TORCH,Torch | G | D-pad down
 CONTROLS_INVENTORY,Inventory | I / Tab | D-pad up
-CONTROLS_MENU,Back to the menu | Esc | Start
+CONTROLS_MENU,"Pause menu (save, controls, quit) | Esc | Start"
 CONTROLS_SPECIAL_TITLE,Special attacks
 CONTROLS_SPECIAL_LEAP,"Power strike right after a combo: leap and slam the ground, hitting every enemy around"
 CONTROLS_SPECIAL_PLUNGE,"Attack in mid-air: plunge onto the ground, hitting the enemies where you land"
@@ -158,3 +158,23 @@ CONTROLS_SPECIAL_DASH,Attack during an air dash: dash strike that smashes a wide
 CONTROLS_TOUCH,On touch screens use the on-screen buttons
 CONTROLS_BACK,Back
 FX_SLAM,Slam!
+MENU_CONTINUE,Continue
+PAUSE_TITLE,Paused
+PAUSE_RESUME,Resume
+PAUSE_SAVE,Save game
+PAUSE_CONTROLS,Controls
+PAUSE_QUIT,Quit to title
+SAVE_DONE,Game saved
+SAVE_AUTO,Game saved automatically
+SAVE_BLOCKED_ENEMIES,Can't save: enemies nearby
+SAVE_BLOCKED_MOVING,Can't save: stand completely still first
+SAVE_BLOCKED_CHALLENGE,Can't save during a challenge
+SAVE_BLOCKED_DEAD,Can't save now
+LOADING_LANDS,Exploring new lands…
+CAVE_HINT,A cave: walk in to explore the depths
+CAVE_CLEARED,This cave has been cleared
+STAIRS_HINT,Stairs going down
+EXIT_HINT,The way back to the surface
+DUNGEON_LEVEL,Underground · level %d of %d
+BOSS_NAME,Cave Guardian
+BOSS_DEFEATED,Guardian defeated! The way out is open

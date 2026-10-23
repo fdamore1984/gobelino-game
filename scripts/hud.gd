@@ -38,6 +38,10 @@ var _inventory_panel := InventoryPanel.new()
 var _shop_panel := ShopPanel.new()
 var _status := HudStatus.new()
 var _actions := HudActions.new()
+var _boss_bar := BossBar.new()
+var _loading := LoadingOverlay.new()
+## Menù di pausa: Game si collega ai suoi segnali (salva, esci).
+var pause_menu := PauseMenu.new()
 @onready var _message: Label = %Message
 @onready var _level_up: Control = %LevelUp
 @onready var _level_up_title: Label = %LevelUpTitle
@@ -67,12 +71,15 @@ var _challenge_flash := 0.0
 
 
 func _ready() -> void:
-	# Sui dispositivi touch i comandi sono già scritti sui pulsanti a schermo.
 	_deck_hint.text = tr("DECK_HINT")
 	_message.visible = false
 	_challenge.visible = false
 	add_child(_inventory_panel)
 	add_child(_shop_panel)
+	add_child(pause_menu)
+	add_child(_loading)
+	add_child(_boss_bar)
+	move_child(_boss_bar, 0)
 	# Pannelli sotto tutto il resto (potenziamenti, inventario, messaggi).
 	add_child(_status)
 	move_child(_status, 0)
@@ -238,6 +245,24 @@ func set_experience(_current: int, _needed: int, _level: int) -> void:
 
 func set_kills(count: int) -> void:
 	_status.kills = count
+
+
+## Schermata d'attesa mentre si genera il territorio.
+func show_loading(text: String, progress: float) -> void:
+	_loading.show_progress(text, progress)
+
+
+func hide_loading() -> void:
+	_loading.visible = false
+
+
+## Barra della vita del boss (null per toglierla).
+func show_boss(boss: Enemy) -> void:
+	_boss_bar.boss = boss
+
+
+func is_menu_open() -> bool:
+	return pause_menu.is_open() or _inventory_panel.is_open() or _shop_panel.is_open()
 
 
 ## Apre il negozio del mercante in quella posizione.

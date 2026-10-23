@@ -25,6 +25,9 @@ static func pick_random(player_level: int) -> String:
 	for id: String in ids():
 		var weight: Array = get_type(id)["spawn_weight"]
 		var value := maxf(weight[0] + weight[1] * (player_level - 1), 0.0)
+		if value <= 0.0:
+			# Il boss (peso zero) non compare mai a caso.
+			continue
 		weights[id] = value
 		total += value
 	var roll := randf() * total

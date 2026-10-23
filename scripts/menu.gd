@@ -1,11 +1,12 @@
 extends Control
-## Menù iniziale: avvia il livello di test, mostra i comandi (ControlsPanel)
-## o chiude il gioco. Si usa con mouse, touch, tastiera o controller.
+## Menù iniziale: riprende la partita salvata (se c'è), ne avvia una
+## nuova, mostra i comandi (ControlsPanel) o chiude il gioco. Si usa con mouse, touch, tastiera o controller.
 ## In basso a sinistra mostra versione e piattaforma, per riconoscere
 ## a colpo d'occhio le build scaricate da itch.io.
 
 const GAME_SCENE := "res://scenes/game.tscn"
 
+@onready var _continue: Button = %Continue
 @onready var _start: Button = %Start
 @onready var _quit: Button = %Quit
 @onready var _controls: Button = %Controls
@@ -19,19 +20,22 @@ var _controls_panel := ControlsPanel.new()
 
 func _ready() -> void:
 	_start.pressed.connect(_on_start_pressed)
+	_continue.pressed.connect(_on_continue_pressed)
+	_continue.visible = SaveGame.exists()
 	_quit.pressed.connect(_on_quit_pressed)
 	_controls.pressed.connect(_on_controls_pressed)
 	add_child(_controls_panel)
 	_controls_panel.closed.connect(_controls.grab_focus)
 
 	# Navigazione col controller: dall'ultimo pulsante si torna al primo e viceversa.
-	_quit.focus_neighbor_bottom = _start.get_path()
-	_start.focus_neighbor_top = _quit.get_path()
+	var first := _continue if _continue.visible else _start
+	_quit.focus_neighbor_bottom = first.get_path()
+	first.focus_neighbor_top = _quit.get_path()
 
-	for button: Button in [_start, _controls, _quit]:
+	for button: Button in [_continue, _start, _controls, _quit]:
 		button.focus_entered.connect(Sfx.play_ui.bind("ui_move"))
 	Input.joy_connection_changed.connect(_on_joy_connection_changed)
-	_start.grab_focus()
+	first.grab_focus()
 	_update_info()
 
 
@@ -53,7 +57,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	# nodo non è più nell'albero e non c'è niente da segnare.
 	if _controls_panel.visible:
 		return
-	if UiNav.handle(event, get_viewport(), _start) and is_inside_tree():
+	if UiNav.handle(event, get_viewport(), _continue if _continue.visible else _start) and is_inside_tree():
 		get_viewport().set_input_as_handled()
 
 
@@ -88,6 +92,17 @@ func _on_joy_connection_changed(_device: int, _connected: bool) -> void:
 
 func _on_start_pressed() -> void:
 	Sfx.play_ui("ui_confirm")
+	get_tree().change_scene_to_file(GAME_SCENE)
+
+
+func _on_continue_pressed() -> void:
+	var save := SaveGame.read()
+	if save.is_empty():
+		_continue.visible = false
+		_start.grab_focus()
+		return
+	Sfx.play_ui("ui_confirm")
+	Game.pending_save = save
 	get_tree().change_scene_to_file(GAME_SCENE)
 
 

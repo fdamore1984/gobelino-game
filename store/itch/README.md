@@ -30,7 +30,7 @@ godot --path . --resolution 1260x1000 res://tools/store_capture.tscn -- cover
 | Languages | English |
 | Inputs | Keyboard, Xbox controller, Playstation controller |
 | Cover image | `cover_en.png` (630×500) |
-| Screenshots | `en_1_combat.png`, `en_2_parry.png`, `en_5_challenge.png`, `en_6_inventory.png`, `en_9_slam.png`, `en_7_merchant.png`, `en_8_shop.png`, `en_3_level_up.png`, `en_4_menu.png`, `en_10_controls.png` (per ora il gioco è solo in inglese) |
+| Screenshots | `en_1_combat.png`, `en_2_parry.png`, `en_5_challenge.png`, `en_6_inventory.png`, `en_9_slam.png`, `en_11_cave.png`, `en_12_dungeon.png`, `en_7_merchant.png`, `en_8_shop.png`, `en_3_level_up.png`, `en_4_menu.png`, `en_10_controls.png` (per ora il gioco è solo in inglese) |
 
 ### Tags
 
@@ -78,6 +78,9 @@ IN THIS PROTOTYPE
 - Day turns to night: light your torch to see a wide area in the dark. A minimap shows the area around you, enemies as red dots, chests, totems and merchants
 - Open chests to find gold, weapons, armor, boots, amulets, rings, spell books and potions; equip them, read the books and drink the potions from your inventory
 - Travelling merchants are scattered around the world: touch their stall to sell the items you don't use and to buy potions and rare gear you won't find in chests (dragon sword, plate armor, wind boots, archmage amulet, inferno ring, meteor and vigor tomes, elixirs)
+- Long mountain ranges and deep ravines cut across the land: you can't cross them, but now and then a cave opens in a mountain wall
+- Walk into a cave to explore a dark underground of tunnels and caverns: find the stairs down on each level (2 to 5 levels) and face the Cave Guardian, a tough boss that grows with your level, in its arena on the last one. Beat it for gold and rare items
+- The game saves automatically every 5 minutes and whenever you enter a cave; you can also save from the pause menu, as long as no enemies are nearby and you are standing still. Continue your game from the title screen
 - Stone totems stand in the middle of wide open arenas: touch one to start a 30-second survival challenge with waves of enemies matched to your level, and earn experience and a potion
 - Earn experience to level up: every level raises your base damage and lets you choose an upgrade: one more combo hit, one more chained power strike, one more chained dodge, one more jump, one more health point, one more potion, a faster shield recharge, a faster run, more mana or a stronger spell, picked from a grid of cards with icons. Your skill levels are always shown on screen, and the active power-ups are listed on the right
 
@@ -95,7 +98,7 @@ CONTROLS
 - Mana potion: D-pad right / T
 - Torch: D-pad down / G
 - Inventory: D-pad up / I
-- Menu: Start / Esc
+- Pause menu (save, controls, quit): Start / Esc
 - Special attacks: power strike right after a combo = leap and slam; attack in mid-air = plunge; attack during an air dash = dash strike
 
 Play with a controller (Steam Deck built-in controls included) or keyboard. The full list of controls is in the main menu. English only for now.

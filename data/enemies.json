@@ -59,5 +59,6 @@
 		"color": [0.6, 0.35, 0.85], "shape": "cross",
 		"spawn_weight": [4, 3],
 		"ranged": {"range": 400, "bolt_speed": 250}
-	}
+	},
+	"guardian": {"health": 900, "xp": 600, "damage": 2, "radius": 50, "speed": 72, "mass": 6.0, "aggro_range": 520, "orbit_distance": 150, "windup": [0.9, 1.5], "lunge_speed": 260, "strike_reach": 110, "strike_arc": 240, "color": [0.6, 0.2, 0.25], "shape": "octagon", "spawn_weight": [0, 0], "boss": true, "summon": {"type": "scout", "count": 2, "max_minions": 3, "cooldown": [7.0, 11.0], "channel_time": 1.4, "minion_xp": 5}}
 }

@@ -1,7 +1,8 @@
 class_name Obstacle
 extends Node2D
 ## Ostacolo naturale del mondo, disegnato con forme geometriche: albero,
-## sasso, cespuglio, rovi, cassa, il totem al centro di un'arena o il banco di un mercante. La posizione è la base a terra, così
+## sasso, cespuglio, rovi, cassa, il totem al centro di un'arena, il banco di un mercante,
+## l'ingresso di una caverna o le scale del sotterraneo. La posizione è la base a terra, così
 ## l'ordinamento per y lo mette davanti o dietro ai personaggi; viene
 ## disegnato più in alto quanto il blocco di terreno su cui si trova. Gli effetti (blocco,
 ## rallentamento, danni dei rovi) sono gestiti da World.
@@ -21,6 +22,8 @@ const CONTACT_HOLD := 0.15
 const COLOR_CONTACT := Color(1.0, 0.9, 0.45)
 ## Altezza del terreno sotto l'ostacolo.
 var _lift := 0.0
+## Ingresso della caverna: direzione della parete in cui si apre.
+var _edge := Vector2.RIGHT
 
 
 func setup(data: Dictionary, type: Dictionary) -> void:
@@ -30,10 +33,11 @@ func setup(data: Dictionary, type: Dictionary) -> void:
 	_variant = data["variant"]
 	_lift = data["elevation"]
 	_type = type
+	_edge = data.get("edge", Vector2.RIGHT)
 	# Disegnato una volta sola; solo gli alberi controllano il giocatore e
 	# il totem si anima.
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
-	set_process(type_id in ["tree", "totem", "chest", "merchant"])
+	set_process(type_id in ["tree", "totem", "chest", "merchant", "stairs", "exit"])
 
 
 ## Il giocatore ci sta sbattendo contro: si illumina finché dura il contatto.
@@ -47,9 +51,9 @@ func _process(delta: float) -> void:
 	if _contact > 0.0:
 		_contact -= delta
 		queue_redraw()
-		if _contact <= 0.0 and type_id not in ["tree", "totem", "chest", "merchant"]:
+		if _contact <= 0.0 and type_id not in ["tree", "totem", "chest", "merchant", "stairs", "exit"]:
 			set_process(false)
-	if type_id in ["totem", "merchant"]:
+	if type_id in ["totem", "merchant", "stairs", "exit"]:
 		queue_redraw()
 		return
 	if type_id == "chest":
@@ -103,6 +107,12 @@ func _draw() -> void:
 			_draw_chest()
 		"merchant":
 			_draw_merchant()
+		"cave":
+			_draw_cave()
+		"stairs":
+			_draw_stairs()
+		"exit":
+			_draw_exit()
 	if _contact > 0.0:
 		_draw_contact_glow(true)
 
@@ -305,6 +315,63 @@ func _draw_merchant() -> void:
 	draw_circle(board, 9.0, gold.darkened(0.3))
 	draw_circle(board, 7.0, gold)
 	draw_circle(board + Vector2(7, -7), 1.5 + pulse * 1.5, Color(1.0, 0.97, 0.7, 0.5 + 0.5 * pulse))
+
+
+## Ingresso della caverna: un arco buio nella parete della montagna, con
+## il bordo di pietre; chiuso da massi se il sotterraneo è già completato.
+func _draw_cave() -> void:
+	var width := radius * 1.1
+	var height := radius * 2.0
+	var arch := PackedVector2Array()
+	var rim := PackedVector2Array()
+	for k in 17:
+		var angle := PI * k / 16.0
+		arch.append(_edge * cos(angle) * width + Vector2(0, -sin(angle) * height))
+		rim.append(_edge * cos(angle) * (width + 7.0) + Vector2(0, -sin(angle) * (height + 7.0)))
+	var stone := _color(1)
+	draw_colored_polygon(rim, stone.darkened(0.2))
+	draw_colored_polygon(arch, _color(0))
+	for k in 7:
+		var angle := PI * k / 6.0
+		draw_circle(_edge * cos(angle) * (width + 4.0) + Vector2(0, -sin(angle) * (height + 4.0)), 6.0, stone)
+	if World.current and World.current.is_cave_cleared(position):
+		var rubble := _type_color("cleared")
+		for k in 6:
+			draw_circle(_edge * (k - 2.5) * width * 0.35 + Vector2(0, -8.0 - (k % 2) * 10.0), 11.0, rubble.darkened(0.1 * (k % 3)))
+		return
+	# Un filo d'aria fredda che esce dal buio.
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 500.0)
+	draw_circle(Vector2(0, -height * 0.35), width * 0.35, Color(0.4, 0.5, 0.7, 0.08 + 0.06 * pulse))
+
+
+## Scala che scende al piano sotto: un buco nel pavimento con i gradini e
+## una luce fredda che pulsa dal fondo.
+func _draw_stairs() -> void:
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 350.0)
+	draw_set_transform(Vector2(0, -_lift), 0.0, Vector2(1.0, 0.5))
+	draw_circle(Vector2.ZERO, radius * 1.35, _color(1))
+	for k in 4:
+		draw_circle(Vector2(0, k * 4.0), radius * (1.15 - k * 0.22), _color(1).darkened(0.15 + k * 0.18))
+	draw_circle(Vector2(0, 16.0), radius * 0.35, _color(0))
+	draw_circle(Vector2(0, 16.0), radius * 0.45, Color(_type_color("glow"), 0.15 + 0.2 * pulse))
+	draw_set_transform(Vector2(0, -_lift))
+
+
+## Uscita verso la superficie: gradini di pietra che salgono e un fascio di
+## luce calda che scende dall'alto.
+func _draw_exit() -> void:
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 400.0)
+	var light := _type_color("glow")
+	draw_set_transform(Vector2(0, -_lift), 0.0, Vector2(1.0, 0.5))
+	draw_circle(Vector2.ZERO, radius * 1.4, Color(light, 0.18 + 0.1 * pulse))
+	draw_set_transform(Vector2(0, -_lift))
+	var stone := _color(1)
+	for k in 3:
+		var y := -k * 9.0
+		var w := radius * (1.0 - k * 0.22)
+		draw_rect(Rect2(-w, y - 9.0, w * 2.0, 9.0), stone.lightened(k * 0.08))
+	var beam := PackedVector2Array([Vector2(-radius * 0.7, -20), Vector2(radius * 0.7, -20), Vector2(radius * 0.4, -radius * 5.0), Vector2(-radius * 0.4, -radius * 5.0)])
+	draw_colored_polygon(beam, Color(light, 0.12 + 0.08 * pulse))
 
 
 ## Bagliore dietro l'ostacolo (front = false) e anello luminoso alla base

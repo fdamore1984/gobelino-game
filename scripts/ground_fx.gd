@@ -88,6 +88,16 @@ static func shockwave(at: Vector2, elevation: float, radius: float) -> void:
 		current._waves.append({"position": at, "elevation": elevation, "radius": radius, "age": 0.0, "seed": randi()})
 
 
+## Toglie tutto (passando tra superficie e sotterraneo).
+func clear() -> void:
+	_drops.clear()
+	_splats.clear()
+	_corpses.clear()
+	_waves.clear()
+	queue_redraw()
+	_air.queue_redraw()
+
+
 static func _ground(at: Vector2) -> float:
 	return World.current.elevation_at(at) if World.current else 0.0
 
