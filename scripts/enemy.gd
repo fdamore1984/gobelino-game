@@ -22,7 +22,6 @@ enum State { WANDER, CHASE, DASH, WINDUP, STRIKE, RECOVER, STUNNED, SUMMON, DEAD
 const ACCELERATION := 750.0
 ## Lo sguardo ruota con continuità invece che a scatti.
 const TURN_RATE := 9.0
-const SHARD_COUNT := 7
 const LEASH_RANGE := 700.0
 const SEPARATION_RANGE := 60.0
 const KNOCKBACK := 320.0
@@ -49,7 +48,12 @@ const RECOVER_TIME := 0.9
 ## Dopo un attacco aspetta un tempo a caso prima di riprovare.
 const ATTACK_COOLDOWN := Vector2(0.6, 2.0)
 const STUN_TIME := 1.6
-const DEATH_FADE_TIME := 0.4
+## Alla morte il corpo cade a terra in questo tempo, poi resta steso (lo
+## disegna GroundFx) e il nodo sparisce.
+const DEATH_FALL_TIME := 0.35
+## Sangue perso a ogni colpo (gocce), di più con i colpi potenti.
+const BLEED_DROPS := 5
+const BLEED_DROPS_HEAVY := 10
 ## I nemici evocati compaiono a questa distanza dall'evocatore.
 const SUMMON_DISTANCE := 70.0
 
@@ -94,6 +98,8 @@ var _is_combo := false
 var _strike_resolved := false
 var _knockback := Vector2.ZERO
 var _hit_flash := 0.0
+## Lato verso cui cade il corpo (+1 destra, -1 sinistra).
+var _fall_side := 1.0
 var _summon_cooldown := 0.0
 var _summon_positions: Array[Vector2] = []
 var _minions: Array[Enemy] = []
@@ -233,8 +239,14 @@ func _physics_process(delta: float) -> void:
 				_finish_summon()
 
 		State.DEAD:
-			modulate.a = 1.0 - _state_time / DEATH_FADE_TIME
-			if _state_time >= DEATH_FADE_TIME:
+			# Il colpo che lo abbatte lo spinge ancora un po' mentre cade.
+			_knockback = _knockback.move_toward(Vector2.ZERO, 1200.0 * delta)
+			if World.current:
+				position = World.current.move(position, _knockback * delta, radius * 0.8)
+				ground_elevation = World.current.elevation_at(position)
+			queue_redraw()
+			if _state_time >= DEATH_FALL_TIME:
+				GroundFx.corpse(global_position, ground_elevation, _corpse_points(1.0), _corpse_color())
 				queue_free()
 			return
 
@@ -278,7 +290,10 @@ func take_damage(amount: int, direction: Vector2, heavy := false) -> void:
 	_hit_flash = 0.12
 	_knockback = direction * KNOCKBACK * (HEAVY_KNOCKBACK_FACTOR if heavy else 1.0) / float(_type["mass"])
 	FloatingText.spawn(get_parent(), global_position + Vector2(randf_range(-12, 12), radius - 20.0), str(amount), COLOR_DAMAGE)
+	GroundFx.bleed(global_position, ground_elevation + radius * 0.8, direction, BLEED_DROPS_HEAVY if heavy else BLEED_DROPS)
 	if health <= 0:
+		_fall_side = 1.0 if direction.x >= 0.0 else -1.0
+		GroundFx.pool(global_position, radius * 0.9)
 		_change_state(State.DEAD)
 		remove_from_group("enemies")
 		Sfx.play("enemy_death", global_position, 1.0 / sqrt(_type["mass"]))
@@ -468,6 +483,10 @@ func _draw() -> void:
 			body = _color.lerp(COLOR_SUMMON, 0.5 + 0.5 * sin(_state_time * 20.0))
 	if _hit_flash > 0.0:
 		body = Color.WHITE
+	if _state == State.DEAD:
+		draw_set_transform(Vector2(0, -ground_elevation))
+		_draw_falling(_color.lerp(_corpse_color(), minf(_state_time / DEATH_FALL_TIME, 1.0)) if _hit_flash <= 0.0 else body)
+		return
 
 	# Ombra, gambe, corpo con la forma del tipo sopra le gambe e un
 	# "occhio" che indica la direzione.
@@ -479,9 +498,6 @@ func _draw() -> void:
 	# Camminando il corpo ondeggia un poco su e giù.
 	var bob := absf(sin(_walk_phase)) * radius * 0.1 if walking else 0.0
 	draw_set_transform(Vector2(0, -ground_elevation - leg - bob))
-	if _state == State.DEAD:
-		_draw_shards(body)
-		return
 	draw_colored_polygon(_shape_points(), body)
 	draw_polyline(_closed(_shape_points()), body.darkened(0.35), 2.0)
 	draw_circle(_facing * radius * 0.5, maxf(radius * 0.2, 4.0), Color(0.1, 0.05, 0.1))
@@ -527,18 +543,27 @@ func _draw_sword() -> void:
 	BodyParts.draw_sword(self, hand, angle, length, width, Color(1.0, 0.9, 0.9) if _state == State.STRIKE else Color.WHITE)
 
 
-## Alla morte il corpo si rompe in frammenti che volano via.
-func _draw_shards(color: Color) -> void:
-	var t := _state_time / DEATH_FADE_TIME
-	for i in SHARD_COUNT:
-		var direction := Vector2.from_angle(TAU * i / SHARD_COUNT + float(get_instance_id() % 7))
-		var center := direction * radius * (0.3 + 1.6 * t) + Vector2(0, 30.0 * t * t)
-		var size := radius * 0.35 * (1.0 - 0.5 * t)
-		var spin := t * 6.0 + i
-		draw_colored_polygon(PackedVector2Array([
-			center + Vector2.from_angle(spin) * size, center + Vector2.from_angle(spin + 2.2) * size,
-			center + Vector2.from_angle(spin + 4.1) * size * 0.7,
-		]), color)
+## Alla morte il corpo cade a terra: si inclina, si abbassa e si stende.
+func _draw_falling(color: Color) -> void:
+	var points := _corpse_points(ease(minf(_state_time / DEATH_FALL_TIME, 1.0), 0.5))
+	draw_colored_polygon(points, color)
+	draw_polyline(_closed(points), color.darkened(0.35), 2.0)
+
+
+## Forma del corpo durante la caduta (t da 0, in piedi, a 1, steso a terra),
+## rispetto alla base del nemico.
+func _corpse_points(t: float) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	var standing := Vector2(0, -radius * LEG_FACTOR)
+	var lying := Vector2(_fall_side * radius * 0.25, radius * 0.15)
+	for point in _shape_points():
+		var flat := Vector2(point.x * 1.15, point.y * 0.42).rotated(_fall_side * 0.15)
+		points.append((point + standing).lerp(flat + lying, t))
+	return points
+
+
+func _corpse_color() -> Color:
+	return _color.darkened(0.2).lerp(Color(0.3, 0.27, 0.25), 0.2)
 
 
 ## Bastone del lanciatore con la sfera che si accende caricando il dardo.

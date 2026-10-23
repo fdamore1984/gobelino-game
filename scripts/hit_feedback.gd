@@ -1,7 +1,6 @@
 class_name HitFeedback
-## Sensazione del colpo: vibrazione del controller (e del telefono) e un
-## attimo di "fermo" del gioco quando un colpo va a segno, così si sente
-## l'impatto.
+## Sensazione del colpo: un attimo di "fermo" del gioco quando un colpo va
+## a segno, così si sente l'impatto. Il controller non vibra.
 
 ## Durante il fermo il gioco va a questa frazione della velocità normale.
 const STOP_TIME_SCALE := 0.05
@@ -12,24 +11,14 @@ const MAX_STOP := 0.18
 static var _pending := 0
 
 
-## strength tra 0 e 1: un colpo normale vale circa 0,35, un colpo potente
-## carico 1. stop: durata del fermo in secondi reali (0 = nessun fermo).
-## buzz: durata della vibrazione, breve e secca.
-static func hit(tree: SceneTree, strength: float, stop: float, buzz := 0.04) -> void:
-	vibrate(strength, buzz)
+## stop: durata del fermo in secondi reali (0 = nessun fermo).
+static func hit(tree: SceneTree, stop: float) -> void:
 	if stop <= 0.0 or tree == null:
 		return
 	_pending += 1
 	Engine.time_scale = STOP_TIME_SCALE
 	# Il timer ignora il rallentamento e la pausa, così il gioco riparte sempre.
 	tree.create_timer(minf(stop, MAX_STOP), true, false, true).timeout.connect(func() -> void: _end_stop())
-
-
-static func vibrate(strength: float, duration: float) -> void:
-	for device in Input.get_connected_joypads():
-		Input.start_joy_vibration(device, clampf(strength * 0.7, 0.0, 1.0), clampf(strength, 0.0, 1.0), duration)
-	if OS.has_feature("mobile"):
-		Input.vibrate_handheld(int(duration * 1000.0), clampf(strength, 0.1, 1.0))
 
 
 static func _end_stop() -> void:

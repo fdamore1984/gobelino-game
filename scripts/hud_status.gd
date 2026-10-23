@@ -5,6 +5,8 @@ extends Control
 ## nemici sconfitti. Tutto disegnato con forme geometriche.
 
 const PANEL_SIZE := Vector2(440, 146)
+## Il pannello è disegnato a questa scala, per coprire meno l'area di gioco.
+const PANEL_SCALE := 0.72
 const BAR_X := 104.0
 const BAR_WIDTH := 320.0
 const FONT_SIZE := 15
@@ -31,6 +33,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	position = Vector2(16, 16)
 	size = PANEL_SIZE
+	scale = Vector2(PANEL_SCALE, PANEL_SCALE)
 	_panel.bg_color = COLOR_PANEL
 	_panel.border_color = COLOR_BORDER
 	_panel.set_border_width_all(2)

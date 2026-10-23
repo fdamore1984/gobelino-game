@@ -1,139 +1,160 @@
-keys,it,en
-MENU_START,Inizia,Start
-MENU_QUIT,Esci,Quit
-MENU_LANGUAGE,English,Italiano
-MENU_VERSION,Versione %s,Version %s
-HUD_HEALTH,Vita  %d / %d,Health  %d / %d
-HUD_KILLS,Nemici sconfitti  %d,Enemies defeated  %d
-HUD_DEFEAT,Sconfitto!,Defeated!
-HUD_HINT,Muovi: WASD / levetta    Attacco: J / R1    Potente (tieni premuto per caricare): L / L2    Parata: K / L1    Schivata: Spazio / B    Salto: F / A    Corsa: Maiusc / R2,Move: WASD / stick    Attack: J / R1    Power strike (hold to charge): L / L2    Parry: K / L1    Dodge: Space / B    Jump: F / A    Run: Shift / R2
-FX_DODGED,Schivato!,Dodged!
-FX_BLOCKED,Parato,Blocked
-FX_PERFECT_PARRY,Parata perfetta!,Perfect parry!
-FX_EMPOWERED,Potenziato!,Empowered!
-TOUCH_ATTACK,Attacco,Attack
-TOUCH_PARRY,Parata,Parry
-TOUCH_DODGE,Schivata,Dodge
-TOUCH_MENU,Menu,Menu
-HUD_LEVEL,Livello %d,Level %d
-HUD_XP,EXP %d / %d,XP %d / %d
-FX_XP,+%d EXP,+%d XP
-FX_COMBO,Combo x%d,Combo x%d
-FX_LEVEL_UP,Livello superiore!,Level up!
-LEVELUP_TITLE,Livello %d!,Level %d!
-LEVELUP_DAMAGE,Danni base: %d → %d,Base damage: %d → %d
-LEVELUP_CHOOSE,Scegli un potenziamento,Choose an upgrade
-UPGRADE_COMBO,Colpi in combo +1,Combo hits +1
-UPGRADE_DODGE,Schivate concatenate +1,Chained dodges +1
-UPGRADE_HEALTH,Punti vita +1,Health +1
-HUD_HINT_2,Palla di fuoco: U / X    Scudo: R / Y    Pozione: Q / croce sinistra    Mana: T / croce destra    Torcia: G / croce giù    Inventario: I / croce su    Menu: Esc / Start,Fireball: U / X    Shield: R / Y    Potion: Q / D-pad left    Mana: T / D-pad right    Torch: G / D-pad down    Inventory: I / D-pad up    Menu: Esc / Start
-HUD_POTIONS,Pozioni  %d / %d,Potions  %d / %d
-HUD_SHIELD_READY,Scudo: pronto,Shield: ready
-HUD_SHIELD_ACTIVE,Scudo: attivo,Shield: active
-HUD_SHIELD_COOLDOWN,Scudo: %d s,Shield: %d s
-FX_HEAVY,Colpo potente!,Power strike!
-FX_POTION,+%d vita,+%d HP
-FX_SHIELD_UP,Scudo!,Shield!
-FX_SHIELD_BLOCK,Assorbito!,Absorbed!
-UPGRADE_HEAVY,Colpi potenti concatenati +1,Chained power strikes +1
-UPGRADE_POTION,Pozioni +1,Potions +1
-UPGRADE_SHIELD,Ricarica scudo -2%,Shield recharge -2%
-TOUCH_HEAVY,Potente,Power
-TOUCH_POTION,Pozione,Potion
-TOUCH_SHIELD,Scudo,Shield
-MENU_CONTROLLER,Controller %d: %s · %s · %s,Controller %d: %s · %s · %s
-MENU_NO_CONTROLLER,Nessun controller rilevato,No controller detected
-HUD_STATS,Combo %d · Colpi potenti %d · Schivate %d · Salti %d · Corsa %d%%,Combo %d · Power strikes %d · Dodges %d · Jumps %d · Run %d%%
-FX_JUMPED,Saltato!,Jumped!
-UPGRADE_JUMP,Salti consecutivi +1,Chained jumps +1
-UPGRADE_RUN,Velocità di corsa +2%,Run speed +2%
-TOUCH_JUMP,Salto,Jump
-TOUCH_RUN,Corsa,Run
-MENU_LAST_INPUT,Ultimo comando: %s,Last input: %s
-DECK_HINT,"Steam Deck: per usare i comandi integrati come controller tieni premuto il tasto Menu (Start) per 1 secondo, oppure avvia il gioco da Steam","Steam Deck: to use the built-in controls as a controller hold the Menu (Start) button for 1 second, or launch the game from Steam"
-MENU_JOY_MAPPED,pulsanti riconosciuti,buttons recognized
-MENU_JOY_UNMAPPED,pulsanti NON riconosciuti,buttons NOT recognized
-MENU_DESKTOP_INPUT_OFF,Steam Deck: tastiera e mouse ignorati finché c'è un controller,Steam Deck: keyboard and mouse ignored while a controller is connected
-MENU_DEVICE,controller %d,controller %d
-UPGRADE_VALUE,%d → %d,%d → %d
-UPGRADE_VALUE_SECONDS,%.1f s → %.1f s,%.1f s → %.1f s
-UPGRADE_VALUE_PERCENT,%d%% → %d%%,%d%% → %d%%
-POWERUPS_TITLE,Potenziamenti attivi,Active power-ups
-POWERUP_UPGRADE,%s %s  (×%d),%s %s  (×%d)
-POWERUP_COMBO,Colpi in combo,Combo hits
-POWERUP_HEAVY,Colpi potenti,Power strikes
-POWERUP_DODGE,Schivate,Dodges
-POWERUP_JUMP,Salti,Jumps
-POWERUP_HEALTH,Vita massima,Max health
-POWERUP_POTION,Pozioni,Potions
-POWERUP_SHIELD,Ricarica scudo,Shield recharge
-POWERUP_RUN,Corsa,Run speed
-POWERUP_EMPOWERED,Parata perfetta: attacchi potenziati %d s,Perfect parry: empowered attacks %d s
-POWERUP_SHIELD_ACTIVE,Scudo attivo,Shield active
-FX_THORNS,Rovi!,Thorns!
-CHALLENGE_HINT,Tocca il totem per avviare una sfida di sopravvivenza,Touch the totem to start a survival challenge
-CHALLENGE_STATUS,Sopravvivi! %d s · Nemici: %d,Survive! %d s · Enemies: %d
-CHALLENGE_WON,Sfida superata! +%d EXP e una pozione,Challenge complete! +%d XP and a potion
-FX_CHALLENGE,Sfida!,Challenge!
-HUD_MANA,Mana %d/%d · Pozioni di mana %d/%d,Mana %d/%d · Mana potions %d/%d
-HUD_GOLD,Monete %d,Gold %d
-POWERUP_TORCH,Torcia accesa,Torch lit
-POWERUP_MANA,Mana massimo,Max mana
-POWERUP_SPELL,Palla di fuoco,Fireball
-UPGRADE_MANA,Mana massimo +20,Max mana +20
-UPGRADE_SPELL,Potenza della magia +20%,Spell power +20%
-FX_MANA_POTION,+Mana,+Mana
-FX_NO_MANA,Mana insufficiente,Not enough mana
-FX_GOLD,+%d monete,+%d gold
-INVENTORY_TITLE,Inventario,Inventory
-INVENTORY_EQUIPPED,"Equipaggiamento: arma, armatura, stivali, amuleto, anello","Equipment: weapon, armor, boots, amulet, ring"
-INVENTORY_EMPTY,Ancora niente: apri le casse per trovare oggetti,Nothing yet: open chests to find items
-INVENTORY_HINT,A / Invio: usa · B / Esc / I: chiudi,A / Enter: use · B / Esc / I: close
-INVENTORY_GOLD,Monete: %d,Gold: %d
-INVENTORY_USE_EQUIP,A: equipaggia,A: equip
-INVENTORY_USE_UNEQUIP,A: togli,A: unequip
-INVENTORY_USE_READ,A: leggi (bonus permanente),A: read (permanent bonus)
-INVENTORY_USE_DRINK,A: bevi,A: drink
-STAT_DAMAGE,+%d%% danni,+%d%% damage
-STAT_HEALTH,+%d vita massima,+%d max health
-STAT_SPEED,+%d%% velocità,+%d%% speed
-STAT_MANA,+%d mana massimo,+%d max mana
-STAT_SPELL,+%d%% potenza della magia,+%d%% spell power
-STAT_HEAL,cura %d punti vita,heals %d health
-STAT_RESTORE_MANA,+%d mana,+%d mana
-ITEM_GOLD,Monete,Gold
-ITEM_SWORD_IRON,Spada di ferro,Iron sword
-ITEM_SWORD_STEEL,Spada d'acciaio,Steel sword
-ITEM_SWORD_RUNE,Spada runica,Rune sword
-ITEM_ARMOR_LEATHER,Armatura di cuoio,Leather armor
-ITEM_ARMOR_CHAIN,Cotta di maglia,Chain mail
-ITEM_BOOTS_SWIFT,Stivali rapidi,Swift boots
-ITEM_AMULET_MANA,Amuleto del mana,Mana amulet
-ITEM_RING_FIRE,Anello del fuoco,Ring of fire
-ITEM_BOOK_FIRE,Libro: Fiamme,Book: Flames
-ITEM_BOOK_MANA,Libro: Mente arcana,Book: Arcane mind
-ITEM_POTION_HEALTH,Pozione di vita,Health potion
-ITEM_POTION_MANA,Pozione di mana,Mana potion
-TOUCH_SPELL,Magia,Spell
-TOUCH_MANA,Mana,Mana
-TOUCH_TORCH,Torcia,Torch
-TOUCH_INVENTORY,Zaino,Bag
-MERCHANT_TITLE,Mercante ambulante,Travelling merchant
-MERCHANT_HINT,Tocca il banco per comprare e vendere,Touch the stall to buy and sell
-SHOP_BUY,In vendita: oggetti rari che non si trovano nelle casse,For sale: rare items you won't find in chests
-SHOP_SELL,Vendi i tuoi oggetti (non quelli indossati),Sell your items (not the ones you wear)
-SHOP_PRICE,%d monete,%d gold
-SHOP_BUY_ACTION,A: compra per %d monete,A: buy for %d gold
-SHOP_SELL_ACTION,A: vendi per %d monete,A: sell for %d gold
-SHOP_NOT_ENOUGH,Non hai abbastanza monete,You don't have enough gold
-SHOP_NOTHING_TO_SELL,Niente da vendere: raccogli oggetti dalle casse,Nothing to sell: collect items from chests
-SHOP_HINT,A / Invio: compra o vendi · B / Esc / I: chiudi,A / Enter: buy or sell · B / Esc / I: close
-SHOP_CLOSE,Chiudi,Close
-ITEM_SWORD_DRAGON,Spada del drago,Dragon sword
-ITEM_ARMOR_PLATE,Armatura a piastre,Plate armor
-ITEM_BOOTS_WIND,Stivali del vento,Wind boots
-ITEM_AMULET_ARCHMAGE,Amuleto dell'arcimago,Archmage amulet
-ITEM_RING_INFERNO,Anello infernale,Inferno ring
-ITEM_BOOK_METEOR,Libro della meteora,Meteor tome
-ITEM_BOOK_VIGOR,Libro del vigore,Tome of vigor
-ITEM_POTION_ELIXIR,Elisir,Elixir
+keys,en
+MENU_START,Start
+MENU_QUIT,Quit
+MENU_VERSION,Version %s
+HUD_HEALTH,Health  %d / %d
+HUD_KILLS,Enemies defeated  %d
+HUD_DEFEAT,Defeated!
+FX_DODGED,Dodged!
+FX_BLOCKED,Blocked
+FX_PERFECT_PARRY,Perfect parry!
+FX_EMPOWERED,Empowered!
+TOUCH_ATTACK,Attack
+TOUCH_PARRY,Parry
+TOUCH_DODGE,Dodge
+TOUCH_MENU,Menu
+HUD_LEVEL,Level %d
+HUD_XP,XP %d / %d
+FX_XP,+%d XP
+FX_COMBO,Combo x%d
+FX_LEVEL_UP,Level up!
+LEVELUP_TITLE,Level %d!
+LEVELUP_DAMAGE,Base damage: %d → %d
+LEVELUP_CHOOSE,Choose an upgrade
+UPGRADE_COMBO,Combo hits +1
+UPGRADE_DODGE,Chained dodges +1
+UPGRADE_HEALTH,Health +1
+HUD_POTIONS,Potions  %d / %d
+HUD_SHIELD_READY,Shield: ready
+HUD_SHIELD_ACTIVE,Shield: active
+HUD_SHIELD_COOLDOWN,Shield: %d s
+FX_HEAVY,Power strike!
+FX_POTION,+%d HP
+FX_SHIELD_UP,Shield!
+FX_SHIELD_BLOCK,Absorbed!
+UPGRADE_HEAVY,Chained power strikes +1
+UPGRADE_POTION,Potions +1
+UPGRADE_SHIELD,Shield recharge -2%
+TOUCH_HEAVY,Power
+TOUCH_POTION,Potion
+TOUCH_SHIELD,Shield
+MENU_CONTROLLER,Controller %d: %s · %s · %s
+MENU_NO_CONTROLLER,No controller detected
+HUD_STATS,Combo %d · Power strikes %d · Dodges %d · Jumps %d · Run %d%%
+FX_JUMPED,Jumped!
+UPGRADE_JUMP,Chained jumps +1
+UPGRADE_RUN,Run speed +2%
+TOUCH_JUMP,Jump
+TOUCH_RUN,Run
+MENU_LAST_INPUT,Last input: %s
+DECK_HINT,"Steam Deck: to use the built-in controls as a controller hold the Menu (Start) button for 1 second, or launch the game from Steam"
+MENU_JOY_MAPPED,buttons recognized
+MENU_JOY_UNMAPPED,buttons NOT recognized
+MENU_DESKTOP_INPUT_OFF,Steam Deck: keyboard and mouse ignored while a controller is connected
+MENU_DEVICE,controller %d
+UPGRADE_VALUE,%d → %d
+UPGRADE_VALUE_SECONDS,%.1f s → %.1f s
+UPGRADE_VALUE_PERCENT,%d%% → %d%%
+POWERUPS_TITLE,Active power-ups
+POWERUP_UPGRADE,%s %s  (×%d)
+POWERUP_COMBO,Combo hits
+POWERUP_HEAVY,Power strikes
+POWERUP_DODGE,Dodges
+POWERUP_JUMP,Jumps
+POWERUP_HEALTH,Max health
+POWERUP_POTION,Potions
+POWERUP_SHIELD,Shield recharge
+POWERUP_RUN,Run speed
+POWERUP_EMPOWERED,Perfect parry: empowered attacks %d s
+POWERUP_SHIELD_ACTIVE,Shield active
+FX_THORNS,Thorns!
+CHALLENGE_HINT,Touch the totem to start a survival challenge
+CHALLENGE_STATUS,Survive! %d s · Enemies: %d
+CHALLENGE_WON,Challenge complete! +%d XP and a potion
+FX_CHALLENGE,Challenge!
+HUD_MANA,Mana %d/%d · Mana potions %d/%d
+HUD_GOLD,Gold %d
+POWERUP_TORCH,Torch lit
+POWERUP_MANA,Max mana
+POWERUP_SPELL,Fireball
+UPGRADE_MANA,Max mana +20
+UPGRADE_SPELL,Spell power +20%
+FX_MANA_POTION,+Mana
+FX_NO_MANA,Not enough mana
+FX_GOLD,+%d gold
+INVENTORY_TITLE,Inventory
+INVENTORY_EQUIPPED,"Equipment: weapon, armor, boots, amulet, ring"
+INVENTORY_EMPTY,Nothing yet: open chests to find items
+INVENTORY_HINT,A / Enter: use · B / Esc / I: close
+INVENTORY_GOLD,Gold: %d
+INVENTORY_USE_EQUIP,A: equip
+INVENTORY_USE_UNEQUIP,A: unequip
+INVENTORY_USE_READ,A: read (permanent bonus)
+INVENTORY_USE_DRINK,A: drink
+STAT_DAMAGE,+%d%% damage
+STAT_HEALTH,+%d max health
+STAT_SPEED,+%d%% speed
+STAT_MANA,+%d max mana
+STAT_SPELL,+%d%% spell power
+STAT_HEAL,heals %d health
+STAT_RESTORE_MANA,+%d mana
+ITEM_GOLD,Gold
+ITEM_SWORD_IRON,Iron sword
+ITEM_SWORD_STEEL,Steel sword
+ITEM_SWORD_RUNE,Rune sword
+ITEM_ARMOR_LEATHER,Leather armor
+ITEM_ARMOR_CHAIN,Chain mail
+ITEM_BOOTS_SWIFT,Swift boots
+ITEM_AMULET_MANA,Mana amulet
+ITEM_RING_FIRE,Ring of fire
+ITEM_BOOK_FIRE,Book: Flames
+ITEM_BOOK_MANA,Book: Arcane mind
+ITEM_POTION_HEALTH,Health potion
+ITEM_POTION_MANA,Mana potion
+TOUCH_SPELL,Spell
+TOUCH_MANA,Mana
+TOUCH_TORCH,Torch
+TOUCH_INVENTORY,Bag
+MERCHANT_TITLE,Travelling merchant
+MERCHANT_HINT,Touch the stall to buy and sell
+SHOP_BUY,For sale: rare items you won't find in chests
+SHOP_SELL,Sell your items (not the ones you wear)
+SHOP_PRICE,%d gold
+SHOP_BUY_ACTION,A: buy for %d gold
+SHOP_SELL_ACTION,A: sell for %d gold
+SHOP_NOT_ENOUGH,You don't have enough gold
+SHOP_NOTHING_TO_SELL,Nothing to sell: collect items from chests
+SHOP_HINT,A / Enter: buy or sell · B / Esc / I: close
+SHOP_CLOSE,Close
+ITEM_SWORD_DRAGON,Dragon sword
+ITEM_ARMOR_PLATE,Plate armor
+ITEM_BOOTS_WIND,Wind boots
+ITEM_AMULET_ARCHMAGE,Archmage amulet
+ITEM_RING_INFERNO,Inferno ring
+ITEM_BOOK_METEOR,Meteor tome
+ITEM_BOOK_VIGOR,Tome of vigor
+ITEM_POTION_ELIXIR,Elixir
+MENU_CONTROLS,Controls
+CONTROLS_TITLE,Controls
+CONTROLS_HEADER,Action | Keyboard | Controller
+CONTROLS_MOVE,Move | WASD | Left stick
+CONTROLS_ATTACK,Attack (combo) | J | R1
+CONTROLS_HEAVY,Power strike (hold to charge) | L | L2
+CONTROLS_PARRY,Parry | K | L1
+CONTROLS_DODGE,"Dodge (roll, air dash while jumping) | Space | B"
+CONTROLS_JUMP,Jump | F | A
+CONTROLS_RUN,Run (dodge while running to slide) | Shift | R2
+CONTROLS_SPELL,Fireball | U | X
+CONTROLS_SHIELD,Shield | R | Y
+CONTROLS_POTION,Health potion | Q | D-pad left
+CONTROLS_MANA,Mana potion | T | D-pad right
+CONTROLS_TORCH,Torch | G | D-pad down
+CONTROLS_INVENTORY,Inventory | I / Tab | D-pad up
+CONTROLS_MENU,Back to the menu | Esc | Start
+CONTROLS_SPECIAL_TITLE,Special attacks
+CONTROLS_SPECIAL_LEAP,"Power strike right after a combo: leap and slam the ground, hitting every enemy around"
+CONTROLS_SPECIAL_PLUNGE,"Attack in mid-air: plunge onto the ground, hitting the enemies where you land"
+CONTROLS_SPECIAL_DASH,Attack during an air dash: dash strike that smashes a wide area
+CONTROLS_TOUCH,On touch screens use the on-screen buttons
+CONTROLS_BACK,Back
+FX_SLAM,Slam!

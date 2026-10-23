@@ -91,7 +91,7 @@ func _explode(enemy: Enemy) -> void:
 	_exploding = 0.001
 	if enemy:
 		enemy.take_damage(damage, direction, true)
-		HitFeedback.hit(get_tree(), 0.4, 0.05, 0.05)
+		HitFeedback.hit(get_tree(), 0.05)
 	Sfx.play("fireball_hit", global_position, 1.0, -2.0 if enemy else -8.0)
 
 

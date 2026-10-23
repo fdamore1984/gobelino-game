@@ -1,9 +1,9 @@
 # Regole di lavoro per Gobelino
 
-- **Due lingue**: tutto ciò che vede il giocatore è in italiano e in inglese.
-  I testi del gioco stanno in `data/translations.csv` (una colonna per lingua)
+- **Lingua**: per ora tutto ciò che vede il giocatore è solo in inglese.
+  I testi del gioco stanno in `data/translations.csv` (colonna `en`)
   e nel codice si usano con `tr("CHIAVE")`; mai testi scritti nel codice.
-  Anche la pagina itch.io è bilingue. Documentazione interna, commenti e
+  Anche la pagina itch.io è solo in inglese. Documentazione interna, commenti e
   commit restano in italiano.
 - **Pagina itch.io sempre aggiornata**: a ogni modifica che cambia ciò che il
   gioco fa o mostra, aggiorna `store/itch/README.md` (descrizione, comandi,

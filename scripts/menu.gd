@@ -1,6 +1,6 @@
 extends Control
-## Menù iniziale: avvia il livello di test o chiude il gioco, e permette
-## di cambiare lingua. Si usa con mouse, touch, tastiera o controller.
+## Menù iniziale: avvia il livello di test, mostra i comandi (ControlsPanel)
+## o chiude il gioco. Si usa con mouse, touch, tastiera o controller.
 ## In basso a sinistra mostra versione e piattaforma, per riconoscere
 ## a colpo d'occhio le build scaricate da itch.io.
 
@@ -8,26 +8,27 @@ const GAME_SCENE := "res://scenes/game.tscn"
 
 @onready var _start: Button = %Start
 @onready var _quit: Button = %Quit
-@onready var _language: Button = %Language
+@onready var _controls: Button = %Controls
 @onready var _info: Label = %Info
 @onready var _deck_hint: Label = %DeckHint
 
 ## Ultimo comando ricevuto, mostrato per capire cosa arriva dal controller.
 var _last_input := ""
+var _controls_panel := ControlsPanel.new()
 
 
 func _ready() -> void:
 	_start.pressed.connect(_on_start_pressed)
 	_quit.pressed.connect(_on_quit_pressed)
-	_language.pressed.connect(_on_language_pressed)
+	_controls.pressed.connect(_on_controls_pressed)
+	add_child(_controls_panel)
+	_controls_panel.closed.connect(_controls.grab_focus)
 
-	# Navigazione col controller: dai pulsanti centrali si scende alla lingua e viceversa.
-	_quit.focus_neighbor_bottom = _language.get_path()
-	_language.focus_neighbor_top = _quit.get_path()
-	_language.focus_neighbor_bottom = _start.get_path()
-	_start.focus_neighbor_top = _language.get_path()
+	# Navigazione col controller: dall'ultimo pulsante si torna al primo e viceversa.
+	_quit.focus_neighbor_bottom = _start.get_path()
+	_start.focus_neighbor_top = _quit.get_path()
 
-	for button: Button in [_start, _quit, _language]:
+	for button: Button in [_start, _controls, _quit]:
 		button.focus_entered.connect(Sfx.play_ui.bind("ui_move"))
 	Input.joy_connection_changed.connect(_on_joy_connection_changed)
 	_start.grab_focus()
@@ -50,6 +51,8 @@ func _input(event: InputEvent) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	# Il pulsante premuto può aver già cambiato scena: in quel caso questo
 	# nodo non è più nell'albero e non c'è niente da segnare.
+	if _controls_panel.visible:
+		return
 	if UiNav.handle(event, get_viewport(), _start) and is_inside_tree():
 		get_viewport().set_input_as_handled()
 
@@ -92,6 +95,6 @@ func _on_quit_pressed() -> void:
 	get_tree().quit()
 
 
-func _on_language_pressed() -> void:
+func _on_controls_pressed() -> void:
 	Sfx.play_ui("ui_confirm")
-	Settings.toggle_language()
+	_controls_panel.open()

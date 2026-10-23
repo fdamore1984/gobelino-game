@@ -32,7 +32,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	position = Vector2(16, get_viewport_rect().size.y - size.y - 74)
+	position = Vector2(16, get_viewport_rect().size.y - size.y - 12)
 	queue_redraw()
 
 
