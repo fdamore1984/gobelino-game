@@ -140,6 +140,8 @@ const LEAN_ANGLE := 0.12
 const SQUASH_AMOUNT := 0.22
 const SQUASH_RECOVERY := 5.0
 const START_JUMPS := 1
+## Sopra questa velocità di caduta l'atterraggio fa vibrare il controller.
+const LANDING_BUZZ_SPEED := 250.0
 
 ## Mana: serve per le magie e si ricarica piano da solo.
 const START_MANA := 60.0
@@ -539,6 +541,9 @@ func _update_height(delta: float) -> void:
 
 
 func _land() -> void:
+	# Toccando terra dopo un salto o una caduta il controller vibra appena.
+	if _height_velocity < -LANDING_BUZZ_SPEED:
+		HitFeedback.vibrate(clampf(-_height_velocity / 1800.0, 0.15, 0.4), 0.04)
 	_height_velocity = 0.0
 	_jumps_used = 0
 
@@ -556,7 +561,7 @@ func _update_attack(input: Vector2, delta: float) -> void:
 			_state_time = windup * 0.9
 			if _charge >= 1.0 and not was_full:
 				Sfx.play("charge_full", global_position)
-				HitFeedback.vibrate(0.25, 0.1)
+				HitFeedback.vibrate(0.25, 0.05)
 		elif not Input.is_action_pressed("heavy_attack"):
 			_charging = false
 	# Lo slancio di una scivolata si esaurisce durante l'attacco.
@@ -1051,10 +1056,14 @@ func _resolve_attack() -> void:
 	if landed:
 		Sfx.play("hit", global_position, 0.8 if _attack_heavy else 1.0 + 0.1 * (_combo_step - 1))
 		# Vibrazione e un attimo di fermo: si sente il colpo.
+		# Vibrazione piccola e istantanea; un po' più lunga per il colpo
+		# potente e per l'ultimo colpo della combo.
 		if _attack_heavy:
-			HitFeedback.hit(get_tree(), 0.6 + 0.4 * _charge, 0.12 + 0.05 * _charge)
+			HitFeedback.hit(get_tree(), 0.6 + 0.3 * _charge, 0.12 + 0.05 * _charge, 0.07 + 0.03 * _charge)
+		elif _combo_step >= max_combo_hits:
+			HitFeedback.hit(get_tree(), 0.5, 0.1, 0.07)
 		else:
-			HitFeedback.hit(get_tree(), 0.3 + 0.1 * _combo_step, 0.09)
+			HitFeedback.hit(get_tree(), 0.35, 0.09, 0.04)
 
 
 func _draw() -> void:

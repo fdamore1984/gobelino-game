@@ -672,8 +672,6 @@ func draw_cell(canvas: CanvasItem, cell: Vector2i, offset: Vector2) -> void:
 	var path := is_path(cell)
 	var level := level_of(cell)
 	var color := _color(_terrain["path_color"]) if path else _color(_terrain["grass_colors"][level])
-	var tint := (_random_unit([seed_value, cell.x, cell.y, "tint"]) - 0.5) * 0.03
-	color = Color(color.r + tint, color.g + tint * 1.3, color.b + tint)
 	var ramp := ramp_of(cell)
 	if ramp != Vector2i.ZERO:
 		# Le rampe che salgono verso il fondo sono in ombra, le altre in luce.
@@ -682,9 +680,6 @@ func draw_cell(canvas: CanvasItem, cell: Vector2i, offset: Vector2) -> void:
 	if ramp != Vector2i.ZERO:
 		_draw_ramp_lines(canvas, top, ramp, color)
 	_draw_decor(canvas, cell, offset, path)
-	# Bordi: chiari dietro, scuri davanti.
-	canvas.draw_polyline(PackedVector2Array([top[3], top[0], top[1]]), color.lightened(0.15), 2.0)
-	canvas.draw_polyline(PackedVector2Array([top[1], top[2], top[3]]), color.darkened(0.2), 1.5)
 
 
 func _draw_face(canvas: CanvasItem, cell: Vector2i, corners: PackedVector2Array, heights: Array[float],
