@@ -38,11 +38,6 @@ var _inventory_panel := InventoryPanel.new()
 var _shop_panel := ShopPanel.new()
 var _status := HudStatus.new()
 var _actions := HudActions.new()
-## I comandi in basso si attenuano dopo un po', per non coprire il gioco.
-var _hint_time := 0.0
-const HINT_FADE_AFTER := 25.0
-const HINT_DIM_ALPHA := 0.3
-@onready var _hint: Label = %Hint
 @onready var _message: Label = %Message
 @onready var _level_up: Control = %LevelUp
 @onready var _level_up_title: Label = %LevelUpTitle
@@ -72,9 +67,7 @@ var _challenge_flash := 0.0
 
 
 func _ready() -> void:
-	_hint.text = tr("HUD_HINT") + "\n" + tr("HUD_HINT_2")
 	# Sui dispositivi touch i comandi sono già scritti sui pulsanti a schermo.
-	_hint.visible = not Platform.use_touch_controls()
 	_deck_hint.text = tr("DECK_HINT")
 	_message.visible = false
 	_challenge.visible = false
@@ -102,9 +95,6 @@ func _process(delta: float) -> void:
 	# Sparisce appena il gioco vede un controller (per esempio dopo aver
 	# tenuto premuto Menu sullo Steam Deck).
 	_deck_hint.visible = Platform.needs_deck_controller_hint()
-	_hint_time += delta
-	if _hint_time > HINT_FADE_AFTER:
-		_hint.modulate.a = move_toward(_hint.modulate.a, HINT_DIM_ALPHA, delta)
 	if player == null:
 		return
 	_inventory_panel.player = player

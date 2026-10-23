@@ -54,6 +54,10 @@ var _last_merchant := Vector2.INF
 
 func _ready() -> void:
 	_world.entities = _entities
+	# Effetti a terra (sangue, corpi, onde d'urto) tra il terreno e i personaggi.
+	var ground_fx := GroundFx.new()
+	add_child(ground_fx)
+	move_child(ground_fx, _entities.get_index())
 	_world.player = _player
 	_player.health_changed.connect(_hud.set_health)
 	_player.experience_changed.connect(_hud.set_experience)

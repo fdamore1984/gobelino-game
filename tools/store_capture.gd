@@ -1,6 +1,6 @@
 extends Node
 ## Genera copertina e screenshot per la pagina itch.io (store/itch/), in
-## italiano e in inglese, componendo scene di gioco reali. Va rilanciato a
+## inglese (l'unica lingua del gioco per ora), componendo scene di gioco reali. Va rilanciato a
 ## ogni modifica visibile del gioco. Serve una finestra (non --headless):
 ##
 ##   godot --path . --resolution 1280x720 res://tools/store_capture.tscn -- screenshots
@@ -9,8 +9,8 @@ extends Node
 ## Non fa parte del gioco: la cartella tools/ è esclusa dagli export.
 
 const OUTPUT := "res://store/itch/"
-const LANGUAGES := ["en", "it"]
-const SUBTITLE := {"it": "RPG d'azione · prototipo", "en": "Action RPG · prototype"}
+const LANGUAGES := ["en"]
+const SUBTITLE := {"en": "Action RPG · prototype"}
 const COVER_SIZE := Vector2i(630, 500)
 ## Seme del mondo usato per le immagini, così il terreno è sempre lo stesso.
 const WORLD_SEED := 1234
@@ -36,6 +36,7 @@ func _ready() -> void:
 			await _capture_challenge(language)
 			await _capture_inventory(language)
 			await _capture_merchant(language)
+			await _capture_slam(language)
 	get_tree().quit()
 
 
@@ -46,6 +47,9 @@ func _capture_menu(language: String) -> void:
 	var info: Label = menu.get_node("%Info")
 	info.text = "\n".join(info.text.split("\n").slice(0, 2))
 	await _save("%s_4_menu.png" % language)
+	menu._on_controls_pressed()
+	await _frames(3)
+	await _save("%s_10_controls.png" % language)
 	menu.queue_free()
 	await _frames(2)
 
@@ -227,6 +231,53 @@ func _capture_merchant(language: String) -> void:
 	await _frames(4)
 	await _save("%s_8_shop.png" % language)
 	hud._shop_panel.close()
+	_end_game()
+
+
+## Colpo a terra dopo la combo: onda d'urto, nemici colpiti che perdono
+## sangue e nemici abbattuti stesi a terra.
+func _capture_slam(language: String) -> void:
+	_start_game(Vector2(0, -10), 1.2)
+	_player.level = 6
+	_hud_stats()
+	var origin := _player.position
+	# Nemici abbattuti poco prima, con le pozze di sangue.
+	for spot: Array in [["warrior", Vector2(-230, 60)], ["scout", Vector2(210, 120)], ["lancer", Vector2(-120, -170)]]:
+		var dead := _enemy(spot[0], origin + spot[1], Enemy.State.WANDER, 0.0)
+		dead._fall_side = 1.0 if spot[1].x > 0.0 else -1.0
+		GroundFx.pool(dead.position, dead.radius * 0.9)
+		for k in 3:
+			GroundFx.bleed(dead.position, dead.ground_elevation + dead.radius, Vector2.from_angle(randf() * TAU), 6)
+		GroundFx.corpse(dead.position, dead.ground_elevation, dead._corpse_points(1.0), dead._corpse_color())
+		dead.queue_free()
+	# Nemici colpiti dall'onda d'urto, spinti via.
+	var hit: Array[Enemy] = []
+	for spot: Array in [["brute", Vector2(110, -40)], ["warrior", Vector2(-100, 30)], ["scout", Vector2(30, 105)]]:
+		var enemy := _enemy(spot[0], origin + spot[1], Enemy.State.STUNNED, 0.2)
+		enemy.health = int(enemy.max_health * 0.4)
+		hit.append(enemy)
+	await _frames(50)
+	_player._state = Player.State.SLAM
+	_player._slam_kind = "leap"
+	_player._slam_landed = true
+	_player._squash = 0.7
+	_player.facing = Vector2(1, 0.2).normalized()
+	_player.queue_redraw()
+	GroundFx.shockwave(origin, _player.ground_elevation, Player.SLAM_RADIUS["leap"])
+	for enemy in hit:
+		var direction := (enemy.position - origin).normalized()
+		GroundFx.bleed(enemy.position, enemy.ground_elevation + enemy.radius, direction, 10)
+		enemy._hit_flash = 0.1
+		enemy.queue_redraw()
+		FloatingText.spawn(_entities(), enemy.position + Vector2(0, enemy.radius - 20.0), str(64), Enemy.COLOR_DAMAGE)
+	FloatingText.spawn(_entities(), origin, tr("FX_SLAM"), Player.COLOR_HEAVY, 12.0)
+	# L'onda d'urto ferma a metà, qualunque sia la durata dei frame.
+	var fx := GroundFx.current
+	fx.set_process(false)
+	fx._waves[-1]["age"] = 0.15
+	fx.queue_redraw()
+	await _frames(2)
+	await _save("%s_9_slam.png" % language)
 	_end_game()
 
 

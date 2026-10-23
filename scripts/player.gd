@@ -17,6 +17,11 @@ extends Node2D
 ## combinano; schivando mentre si corre si fa una scivolata, durante la
 ## quale si può attaccare (anche in combo), schivare, saltare o parare.
 ## Una parata perfetta potenzia gli attacchi per qualche secondo.
+## Attacchi a terra, che colpiscono tutti i nemici attorno: un colpo
+## potente subito dopo una combo di colpi normali fa saltare e colpire il
+## terreno (anche tutti i colpi potenti concatenati dopo); attaccando in
+## aria si piomba a terra; attaccando durante uno scatto in aria si piomba
+## a terra con un colpo più ampio.
 ## Sconfiggere nemici dà esperienza; a ogni livello aumentano i danni
 ## base e si sceglie un potenziamento.
 
@@ -25,7 +30,7 @@ signal experience_changed(current: int, needed: int, level: int)
 signal leveled_up(level: int)
 signal died
 
-enum State { NORMAL, ATTACK, PARRY, DODGE, SLIDE, HURT, DEAD }
+enum State { NORMAL, ATTACK, PARRY, DODGE, SLIDE, HURT, DEAD, SLAM }
 
 const RADIUS := 22.0
 const START_HEALTH := 5
@@ -72,6 +77,27 @@ const HEAVY_RANGE := 110.0
 const HEAVY_ARC := deg_to_rad(150.0)
 const HEAVY_LUNGE_SPEED := 220.0
 const START_HEAVY_CHAIN := 1
+## Attacchi a terra: il colpo potente diventa un salto con colpo sul
+## terreno ("leap") dopo almeno SLAM_MIN_COMBO colpi normali; attaccando in
+## aria si piomba a terra ("plunge"), durante uno scatto in aria con un
+## colpo più ampio ("dash").
+const SLAM_MIN_COMBO := 2
+const SLAM_LEAP_SPEED := 620.0
+const SLAM_LEAP_FORWARD := 160.0
+const SLAM_GRAVITY := 2600.0
+## In picchiata ci si ferma un attimo in aria, poi si scende veloci.
+const SLAM_HANG := 0.1
+const SLAM_DIVE_SPEED := 650.0
+const SLAM_RECOVERY := 0.32
+## Se per qualche motivo non si tocca terra, l'impatto arriva comunque.
+const SLAM_MAX_TIME := 2.0
+const SLAM_RADIUS := {"leap": 140.0, "plunge": 105.0, "dash": 165.0}
+const SLAM_LEAP_DAMAGE_FACTOR := 0.8
+const PLUNGE_DAMAGE_FACTOR := 1.6
+const DASH_SLAM_DAMAGE_FACTOR := 2.4
+## All'impatto la telecamera trema, sempre meno.
+const CAMERA_SHAKE := 9.0
+const CAMERA_SHAKE_DECAY := 4.0
 
 ## Mentre si para ci si muove più lentamente.
 const PARRY_SPEED_FACTOR := 0.35
@@ -140,8 +166,6 @@ const LEAN_ANGLE := 0.12
 const SQUASH_AMOUNT := 0.22
 const SQUASH_RECOVERY := 5.0
 const START_JUMPS := 1
-## Sopra questa velocità di caduta l'atterraggio fa vibrare il controller.
-const LANDING_BUZZ_SPEED := 250.0
 
 ## Mana: serve per le magie e si ricarica piano da solo.
 const START_MANA := 60.0
@@ -165,7 +189,7 @@ const HEAVY_CHARGE_TIME := 0.9
 ## Torcia: luce attorno al personaggio, utile di notte.
 const TORCH_COLOR := Color(1.0, 0.78, 0.45)
 const TORCH_ENERGY := 1.15
-const TORCH_SCALE := 1.15
+const TORCH_SCALE := 1.9
 
 ## Ogni pozione cura questi punti vita.
 const POTION_HEAL := 3
@@ -279,6 +303,11 @@ var _camera_height := 0.0
 var _spell_cooldown := 0.0
 ## La schivata in corso è uno scatto in aria (altrimenti è una capriola).
 var _air_dash := false
+## Attacco a terra in corso: "leap", "plunge" o "dash", e se ha già toccato terra.
+var _slam_kind := ""
+var _slam_landed := false
+## Tremolio della telecamera (0-1).
+var _shake := 0.0
 ## Carica del colpo potente (0-1) e se il tasto è ancora tenuto premuto.
 var _charge := 0.0
 var _charging := false
@@ -354,10 +383,13 @@ func _physics_process(delta: float) -> void:
 					_chain_dodge(dodge_input)
 				elif _dodge_cooldown == 0.0:
 					_start_dodge(dodge_input)
-			elif Input.is_action_just_pressed("heavy_attack"):
-				_start_heavy(input)
-			elif Input.is_action_just_pressed("attack"):
-				_start_attack(_next_combo_step(), input)
+			elif Input.is_action_just_pressed("heavy_attack") or Input.is_action_just_pressed("attack"):
+				if is_airborne():
+					_start_slam("plunge", input)
+				elif Input.is_action_just_pressed("heavy_attack"):
+					_start_heavy(input)
+				else:
+					_start_attack(_next_combo_step(), input)
 			elif Input.is_action_pressed("parry"):
 				_change_state(State.PARRY)
 
@@ -381,13 +413,16 @@ func _physics_process(delta: float) -> void:
 				_change_state(State.NORMAL)
 
 		State.DODGE:
-			# Attaccare o parare interrompe subito la schivata.
-			if Input.is_action_just_pressed("attack"):
+			# Attaccare o parare interrompe subito la schivata; attaccando
+			# durante lo scatto in aria si piomba a terra con un colpo ampio.
+			if Input.is_action_just_pressed("attack") or Input.is_action_just_pressed("heavy_attack"):
 				_end_combo()
-				_start_attack(1, input)
-			elif Input.is_action_just_pressed("heavy_attack"):
-				_end_combo()
-				_start_heavy(input)
+				if is_airborne():
+					_start_slam("dash" if _air_dash else "plunge", input)
+				elif Input.is_action_just_pressed("heavy_attack"):
+					_start_heavy(input)
+				else:
+					_start_attack(1, input)
 			elif Input.is_action_just_pressed("parry"):
 				_change_state(State.PARRY)
 			elif Input.is_action_just_pressed("dodge") and _dodges_used < max_chained_dodges \
@@ -437,6 +472,9 @@ func _physics_process(delta: float) -> void:
 				if _state_time >= SLIDE_TIME:
 					_change_state(State.NORMAL)
 
+		State.SLAM:
+			_update_slam(input, delta)
+
 		State.HURT:
 			_velocity = _velocity.move_toward(Vector2.ZERO, HURT_KNOCKBACK * 4.0 * delta)
 			if _state_time >= HURT_TIME:
@@ -465,6 +503,9 @@ func _physics_process(delta: float) -> void:
 		var ahead := (_velocity * CAMERA_LOOK_AHEAD).limit_length(CAMERA_LOOK_AHEAD_MAX)
 		_look_ahead = _look_ahead.lerp(ahead, minf(CAMERA_LOOK_AHEAD_FOLLOW * delta, 1.0))
 		_camera.position = Vector2(0, _camera_height) + _look_ahead
+		# Il tremolio va sullo scostamento, che non viene ammorbidito.
+		_shake = move_toward(_shake, 0.0, CAMERA_SHAKE_DECAY * delta)
+		_camera.offset = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * CAMERA_SHAKE * _shake * _shake
 	queue_redraw()
 
 
@@ -531,6 +572,8 @@ func _update_height(delta: float) -> void:
 	if _height <= 0.0 and _height_velocity <= 0.0:
 		return
 	var gravity := GRAVITY * (AIR_DODGE_GRAVITY_FACTOR if _state == State.DODGE else 1.0)
+	if _state == State.SLAM and not _slam_landed:
+		gravity = 0.0 if _slam_kind != "leap" and _state_time < SLAM_HANG else SLAM_GRAVITY
 	_height_velocity -= gravity * delta
 	_height += _height_velocity * delta
 	if _height <= 0.0:
@@ -541,11 +584,10 @@ func _update_height(delta: float) -> void:
 
 
 func _land() -> void:
-	# Toccando terra dopo un salto o una caduta il controller vibra appena.
-	if _height_velocity < -LANDING_BUZZ_SPEED:
-		HitFeedback.vibrate(clampf(-_height_velocity / 1800.0, 0.15, 0.4), 0.04)
 	_height_velocity = 0.0
 	_jumps_used = 0
+	if _state == State.SLAM and not _slam_landed:
+		_slam_impact()
 
 
 ## Avanzamento dell'attacco in corso: affondo, colpo, combo e recupero.
@@ -561,7 +603,6 @@ func _update_attack(input: Vector2, delta: float) -> void:
 			_state_time = windup * 0.9
 			if _charge >= 1.0 and not was_full:
 				Sfx.play("charge_full", global_position)
-				HitFeedback.vibrate(0.25, 0.05)
 		elif not Input.is_action_pressed("heavy_attack"):
 			_charging = false
 	# Lo slancio di una scivolata si esaurisce durante l'attacco.
@@ -660,7 +701,6 @@ func receive_hit(from: Vector2, damage: int) -> String:
 		_velocity = -to_attacker * HURT_KNOCKBACK
 		_invulnerable_time = HURT_INVULNERABLE_TIME
 		Sfx.play("hurt", global_position)
-		HitFeedback.vibrate(0.8, 0.25)
 	return "hit"
 
 
@@ -806,13 +846,18 @@ func _start_attack(step: int, input: Vector2) -> void:
 
 func _start_heavy(input: Vector2) -> void:
 	# Fuori dalla combo il colpo potente parte da solo, senza bonus.
-	if _combo_timer == 0.0 and _state != State.ATTACK:
+	if _combo_timer == 0.0 and _state not in [State.ATTACK, State.SLAM]:
 		_combo_step = 0
 		_heavy_step = 0
 	if _heavy_step >= max_heavy_chain:
 		_heavy_step = 0
 		_combo_step = 0
 	_heavy_step += 1
+	# Dopo una combo di colpi normali il colpo potente diventa un salto con
+	# colpo sul terreno (anche i colpi potenti concatenati dopo).
+	if _combo_step >= SLAM_MIN_COMBO and not is_airborne():
+		_start_slam("leap", input)
+		return
 	_attack_heavy = true
 	_begin_attack(input)
 	_charging = true
@@ -843,6 +888,102 @@ func _begin_attack(input: Vector2) -> void:
 func _next_combo_step() -> int:
 	var continues := _combo_timer > 0.0 and _heavy_step == 0 and _combo_step < max_combo_hits
 	return _combo_step + 1 if continues else 1
+
+
+## Inizia un attacco a terra: salto (leap) o sosta in aria prima di
+## piombare giù (plunge, dash).
+func _start_slam(kind: String, input: Vector2) -> void:
+	_slam_kind = kind
+	_slam_landed = false
+	_attack_heavy = kind == "leap"
+	_attack_speed = EMPOWER_ATTACK_SPEED if is_empowered() else 1.0
+	_charge = 0.0
+	_charging = false
+	_queued_attack = ""
+	_combo_timer = 0.0
+	_carry_velocity = Vector2.ZERO
+	if kind == "dash":
+		_target_facing = _dodge_direction
+	elif input != Vector2.ZERO:
+		_target_facing = input.normalized()
+	facing = _target_facing
+	if kind == "leap":
+		_height_velocity = SLAM_LEAP_SPEED
+		Sfx.play("jump", global_position, 0.8)
+	else:
+		_height_velocity = 0.0
+	Sfx.play("heavy_swing", global_position, 0.85)
+	_change_state(State.SLAM)
+
+
+## Attacco a terra: salita (o sosta in aria), discesa e, toccato terra,
+## l'impatto (vedi _land); poi un breve recupero. Si può già chiedere il
+## colpo potente successivo della catena.
+func _update_slam(input: Vector2, delta: float) -> void:
+	if Input.is_action_just_pressed("heavy_attack") and _slam_kind == "leap" and _can_chain_heavy():
+		_queued_attack = "heavy"
+	if not _slam_landed:
+		if _slam_kind != "leap" and _state_time >= SLAM_HANG and _height_velocity > -SLAM_DIVE_SPEED:
+			_height_velocity = -SLAM_DIVE_SPEED
+		# In aria ci si sposta piano; lo scatto continua nella sua direzione.
+		var target := input * walk_speed() * ATTACK_MOVE_FACTOR
+		if _slam_kind == "dash":
+			target = _dodge_direction * DODGE_SPEED * 0.45
+		elif _slam_kind == "leap":
+			target += facing * SLAM_LEAP_FORWARD
+		_velocity = _velocity.move_toward(target, ACCELERATION_FULL * delta)
+		if _state_time >= SLAM_MAX_TIME:
+			_slam_impact()
+		return
+	_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * 2.0 * delta)
+	if _state_time < SLAM_RECOVERY / _attack_speed:
+		return
+	if _queued_attack == "heavy":
+		_start_heavy(input)
+		return
+	if _slam_kind == "leap" and _can_chain_heavy():
+		_combo_timer = COMBO_WINDOW
+	else:
+		_end_combo()
+	_change_state(State.NORMAL)
+
+
+## Il colpo tocca terra: danni a tutti i nemici nel raggio, onda d'urto,
+## un attimo di fermo e la telecamera che trema.
+func _slam_impact() -> void:
+	_slam_landed = true
+	_state_time = 0.0
+	_squash = 1.0
+	_shake = 1.0
+	var radius: float = SLAM_RADIUS[_slam_kind]
+	var damage := _slam_damage()
+	var landed := false
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as Enemy
+		if enemy == null or enemy.is_dead() or absf(enemy.ground_elevation - ground_elevation) > HIT_HEIGHT_REACH:
+			continue
+		var offset := enemy.global_position - global_position
+		if offset.length() > radius + enemy.radius:
+			continue
+		var direction := offset.normalized() if offset != Vector2.ZERO else facing
+		enemy.take_damage(damage, direction, true)
+		HitSpark.spawn(get_parent(), enemy.global_position - direction * enemy.radius * 0.8, enemy.ground_elevation + enemy.radius * 0.5, 40.0, COLOR_HEAVY)
+		landed = true
+	GroundFx.shockwave(global_position, ground_elevation, radius)
+	FloatingText.spawn(get_parent(), global_position, tr("FX_SLAM"), COLOR_HEAVY, 12.0)
+	Sfx.play("fireball_hit", global_position, 0.6)
+	if landed:
+		Sfx.play("hit", global_position, 0.7)
+		HitFeedback.hit(get_tree(), 0.14)
+
+
+func _slam_damage() -> int:
+	if _slam_kind == "leap":
+		return roundi(_attack_damage() * SLAM_LEAP_DAMAGE_FACTOR)
+	var multiplier := PLUNGE_DAMAGE_FACTOR if _slam_kind == "plunge" else DASH_SLAM_DAMAGE_FACTOR
+	if _attack_speed > 1.0:
+		multiplier *= EMPOWER_DAMAGE_FACTOR
+	return roundi(base_damage() * multiplier * (1.0 + inventory.bonus("damage")))
 
 
 func _jump() -> void:
@@ -1055,15 +1196,11 @@ func _resolve_attack() -> void:
 					40.0 if _attack_heavy else 28.0, COLOR_HEAVY if _attack_heavy else COLOR_SLASH)
 	if landed:
 		Sfx.play("hit", global_position, 0.8 if _attack_heavy else 1.0 + 0.1 * (_combo_step - 1))
-		# Vibrazione e un attimo di fermo: si sente il colpo.
-		# Vibrazione piccola e istantanea; un po' più lunga per il colpo
-		# potente e per l'ultimo colpo della combo.
+		# Un attimo di fermo: si sente il colpo (più lungo per il colpo potente).
 		if _attack_heavy:
-			HitFeedback.hit(get_tree(), 0.6 + 0.3 * _charge, 0.12 + 0.05 * _charge, 0.07 + 0.03 * _charge)
-		elif _combo_step >= max_combo_hits:
-			HitFeedback.hit(get_tree(), 0.5, 0.1, 0.07)
+			HitFeedback.hit(get_tree(), 0.12 + 0.05 * _charge)
 		else:
-			HitFeedback.hit(get_tree(), 0.35, 0.09, 0.04)
+			HitFeedback.hit(get_tree(), 0.1 if _combo_step >= max_combo_hits else 0.09)
 
 
 func _draw() -> void:
@@ -1151,6 +1288,9 @@ func _draw_sword() -> void:
 		tint = Items.color(inventory.items[inventory.equipped["weapon"]]).lightened(0.3)
 	if is_empowered():
 		tint = Color(1.0, 0.95, 0.7)
+	if _state == State.SLAM:
+		_draw_slam_sword(tint)
+		return
 	if _state != State.ATTACK:
 		var rest := facing.angle() + 0.6
 		BodyParts.draw_sword(self, facing.orthogonal() * RADIUS * 0.8, rest, SWORD_LENGTH, SWORD_WIDTH, tint)
@@ -1180,6 +1320,26 @@ func _draw_sword() -> void:
 		BodyParts.draw_trail(self, Vector2.ZERO, start, angle, RADIUS + 6.0, _attack_range() + RADIUS, Color(slash, minf(alpha, 0.9)))
 	var length := HEAVY_SWORD_LENGTH if _attack_heavy else SWORD_LENGTH
 	BodyParts.draw_sword(self, Vector2.from_angle(angle) * RADIUS * 0.8, angle, length, SWORD_WIDTH * (1.3 if _attack_heavy else 1.0), tint)
+
+
+## Attacco a terra: spada alzata sopra la testa in salita, che cala con una
+## scia scendendo e resta piantata nel terreno dopo l'impatto. Gli angoli
+## sono pensati guardando a destra e specchiati guardando a sinistra.
+func _draw_slam_sword(tint: Color) -> void:
+	var mirror := facing.x < 0.0
+	var raised := -PI / 2.0 - 0.5
+	var down := PI / 2.0 - 0.35
+	var angle := raised
+	if _slam_landed:
+		angle = down
+	elif _height_velocity < 0.0:
+		angle = lerpf(raised, down, clampf(-_height_velocity / 900.0, 0.0, 1.0))
+		var start := PI - raised if mirror else raised
+		var end := PI - angle if mirror else angle
+		BodyParts.draw_trail(self, Vector2.ZERO, start, end, RADIUS + 6.0, HEAVY_SWORD_LENGTH + RADIUS, Color(COLOR_HEAVY, 0.7))
+	if mirror:
+		angle = PI - angle
+	BodyParts.draw_sword(self, Vector2.from_angle(angle) * RADIUS * 0.8, angle, HEAVY_SWORD_LENGTH, SWORD_WIDTH * 1.3, tint)
 
 
 ## Torcia nell'altra mano: bastone e fiamma che tremola.

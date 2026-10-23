@@ -27,10 +27,10 @@ godot --path . --resolution 1260x1000 res://tools/store_capture.tscn -- cover
 | Genre | Role Playing |
 | Tags | vedi sotto |
 | AI generation disclosure | Sì: codice, testi e grafica provvisoria sono stati prodotti con l'aiuto di un'IA (Claude) |
-| Languages | English, Italian |
+| Languages | English |
 | Inputs | Keyboard, Xbox controller, Playstation controller |
 | Cover image | `cover_en.png` (630×500) |
-| Screenshots | `en_1_combat.png`, `en_2_parry.png`, `en_5_challenge.png`, `en_6_inventory.png`, `en_7_merchant.png`, `en_8_shop.png`, `en_3_level_up.png`, `en_4_menu.png` (le versioni `it_` sono le stesse in italiano) |
+| Screenshots | `en_1_combat.png`, `en_2_parry.png`, `en_5_challenge.png`, `en_6_inventory.png`, `en_9_slam.png`, `en_7_merchant.png`, `en_8_shop.png`, `en_3_level_up.png`, `en_4_menu.png`, `en_10_controls.png` (per ora il gioco è solo in inglese) |
 
 ### Tags
 
@@ -45,7 +45,7 @@ action-rpg, fantasy, medieval, goblins, isometric, 2d, controller, singleplayer,
 ## Short description or tagline
 
 ```
-A feral goblin, a world to explore, real-time combat. · Un goblin selvatico, un mondo da esplorare, combattimenti in tempo reale.
+A feral goblin, a world to explore, real-time combat.
 ```
 
 ---
@@ -56,8 +56,6 @@ Da incollare così com'è nel campo *Description* (l'editor accetta il testo
 formattato; i titoli si possono rendere in grassetto).
 
 ```
-🇬🇧 ENGLISH
-
 Gobelino is a 2D medieval fantasy action RPG with an isometric view.
 
 You are a lone goblin with no past, living in a den like a wild animal. Starting from the woods around your den, you will explore the world beyond, grow stronger and meet those who will open new paths for you.
@@ -74,9 +72,10 @@ IN THIS PROTOTYPE
 - Healing potions (you start with 2) and a magic shield that absorbs one hit, recharging in 30 seconds
 - Eight kinds of enemies: quick scouts, warriors, heavy brutes, summoners that call in reinforcements (hit them while they summon to interrupt them), lancers with long thrusts, whirlers that strike all around, huge golems and casters that hurl magic bolts from afar
 - Enemies circle around you with quick sidesteps; their sword slashes are slow and wide but unpredictable: watch them wind up (they light up and pull back their weapon), beware of feints and follow-up strikes
-- Hold the power strike to charge it up to double damage; every hit you land shakes the controller, freezes the action for an instant, throws sparks and knocks the enemy back. Whatever blocks your way (rocks, trees, chests, walls too high to climb) lights up while you bump into it
+- Ground attacks that hit every enemy around: a power strike right after a combo makes you leap and slam the ground (every chained power strike after the combo does it too), attacking in mid-air plunges you onto the ground, and attacking during an air dash smashes a wide area
+- Hold the power strike to charge it up to double damage; every hit you land freezes the action for an instant, throws sparks, knocks the enemy back and spills blood that stays on the ground; fallen enemies lie on the ground for a while. Whatever blocks your way (rocks, trees, chests, walls too high to climb) lights up while you bump into it
 - Cast fireballs that seek out and chase the nearest enemy (they cost mana: drink mana potions to refill)
-- Day turns to night: light your torch to see in the dark. A minimap shows the area around you, enemies as red dots, chests, totems and merchants
+- Day turns to night: light your torch to see a wide area in the dark. A minimap shows the area around you, enemies as red dots, chests, totems and merchants
 - Open chests to find gold, weapons, armor, boots, amulets, rings, spell books and potions; equip them, read the books and drink the potions from your inventory
 - Travelling merchants are scattered around the world: touch their stall to sell the items you don't use and to buy potions and rare gear you won't find in chests (dragon sword, plate armor, wind boots, archmage amulet, inferno ring, meteor and vigor tomes, elixirs)
 - Stone totems stand in the middle of wide open arenas: touch one to start a 30-second survival challenge with waves of enemies matched to your level, and earn experience and a potion
@@ -97,60 +96,12 @@ CONTROLS
 - Torch: D-pad down / G
 - Inventory: D-pad up / I
 - Menu: Start / Esc
+- Special attacks: power strike right after a combo = leap and slam; attack in mid-air = plunge; attack during an air dash = dash strike
 
-Play with a controller (Steam Deck built-in controls included) or keyboard. Available in English and Italian.
+Play with a controller (Steam Deck built-in controls included) or keyboard. The full list of controls is in the main menu. English only for now.
 
 PLATFORMS
 Linux and SteamOS (Steam Deck).
-
---------------------------------------------------------------
-
-🇮🇹 ITALIANO
-
-Gobelino è un RPG d'azione 2D fantasy medievale con visuale isometrica.
-
-Sei un goblin solitario e senza passato, che vive in una tana come un animale selvatico. Partendo dai dintorni della tana esplorerai il mondo che ti circonda, diventerai più forte e incontrerai chi ti aprirà nuove strade.
-
-⚠️ Questa è una build di prototipo: personaggi e nemici sono forme geometriche provvisorie e i suoni sono provvisori, sintetizzati. Serve a provare il combattimento.
-
-IN QUESTO PROTOTIPO
-- Un mondo isometrico 3D senza confini, fatto di blocchi e generato a caso: piattaforme d'erba a gradini su diverse altezze, rampe inclinate e sentieri sterrati. Salta per salire sui blocchi più alti (con più salti in aria raggiungi i più alti) e lasciati cadere verso quelli più bassi. Qua e là alberi, sassi, cespugli e rovi spinosi (cespugli e rovi rallentano, i rovi pungono)
-- Combattimento in tempo reale: concatena fino a 3 attacchi in combo, ogni colpo più forte del precedente, e chiudila con un colpo potente per un grosso bonus
-- Para, e fallo appena prima del colpo per una parata perfetta: il nemico resta stordito e i tuoi attacchi sono potenziati per qualche secondo (doppio danno, colpi più rapidi)
-- Schiva con una capriola a terra o uno scatto in aria durante il salto, cambia direzione durante la schivata, e premi di nuovo per concatenarne un'altra. Schivata e parata sono sempre disponibili e interrompono la combo; attaccare interrompe la schivata con un colpo immediato. Mentre attacchi puoi continuare a muoverti: ogni colpo è un fendente di spada, alternato da sinistra e da destra
-- Salta per evitare gli attacchi dei nemici (sblocca più salti in aria) e combina salti e schivate
-- Tieni premuto R2 per correre; schiva mentre corri per una scivolata, da cui puoi attaccare, schivare, saltare o parare
-- Pozioni curative (ne hai 2 all'inizio) e uno scudo magico che assorbe un colpo e si ricarica in 30 secondi
-- Otto tipi di nemici: esploratori rapidi, guerrieri, bruti corazzati, evocatori che chiamano rinforzi (colpiscili mentre evocano per interromperli), lancieri con affondi lunghi, rotanti che colpiscono tutto attorno, golem enormi e lanciatori che scagliano dardi magici da lontano
-- I nemici ti girano attorno con scatti laterali; i loro fendenti di spada sono lenti e ampi ma imprevedibili: guardali caricare (si accendono e portano indietro l'arma), attento alle finte e ai secondi colpi
-- Tieni premuto il colpo potente per caricarlo fino al doppio del danno; ogni colpo a segno fa vibrare il controller, ferma l'azione per un istante, fa scintille e spinge indietro il nemico. Quello che ti blocca il passo (sassi, alberi, casse, muri troppo alti da salire) si illumina finché ci sbatti contro
-- Lancia palle di fuoco che cercano e inseguono il nemico più vicino (costano mana: bevi le pozioni di mana per ricaricarlo)
-- Il giorno lascia il posto alla notte: accendi la torcia per vedere al buio. Una minimappa mostra l'area attorno, i nemici come puntini rossi, le casse, i totem e i mercanti
-- Apri le casse per trovare monete, armi, armature, stivali, amuleti, anelli, libri di magia e pozioni; dall'inventario puoi equipaggiarli, leggere i libri e bere le pozioni
-- Nel mondo sono sparsi dei mercanti ambulanti: tocca il loro banco per vendere gli oggetti che non usi e comprare pozioni e oggetti rari che nelle casse non si trovano (spada del drago, armatura a piastre, stivali del vento, amuleto dell'arcimago, anello infernale, libri della meteora e del vigore, elisir)
-- Al centro di ampie arene ci sono totem di pietra: toccane uno per avviare una sfida di sopravvivenza di 30 secondi con ondate di nemici adatte al tuo livello, e guadagna esperienza e una pozione
-- Guadagna esperienza per salire di livello: ogni livello aumenta i danni base e ti fa scegliere un potenziamento: un colpo in più nella combo, un colpo potente concatenato in più, una schivata concatenata in più, un salto in più, un punto vita in più, una pozione in più, una ricarica più rapida dello scudo, una corsa più veloce, più mana o una magia più potente, scelti da una griglia di schede con icone. I livelli delle abilità sono sempre visibili a schermo e i potenziamenti attivi sono elencati a destra
-
-COMANDI
-- Movimento: levetta sinistra / WASD / levetta a schermo
-- Attacco (combo): R1 / J
-- Colpo potente (chiude la combo; tieni premuto per caricarlo): L2 / L
-- Parata (tieni premuto): L1 / K
-- Schivata (premi di nuovo per concatenare): B / Spazio
-- Salto: A / F
-- Corsa (tieni premuto; schivata mentre corri = scivolata): R2 / Maiusc
-- Palla di fuoco: X / U
-- Scudo: Y / R
-- Pozione: croce sinistra / Q
-- Pozione di mana: croce destra / T
-- Torcia: croce giù / G
-- Inventario: croce su / I
-- Menù: Start / Esc
-
-Gioca con il controller (anche i comandi integrati dello Steam Deck) o con la tastiera. Disponibile in italiano e in inglese.
-
-PIATTAFORME
-Linux e SteamOS (Steam Deck).
 ```
 
 ---
@@ -160,15 +111,9 @@ Linux e SteamOS (Steam Deck).
 Campo *Download & install instructions* (sotto la sezione Uploads).
 
 ```
-🇬🇧 HOW TO INSTALL
+HOW TO INSTALL
 
 Linux / Steam Deck: download the Linux file, extract it and run Gobelino.x86_64 (if needed, make it executable first: right click → Properties → Allow executing, or chmod +x Gobelino.x86_64). On Steam Deck do this in Desktop Mode, then add it to Steam as a non-Steam game (Steam → Games → Add a Non-Steam Game) and always launch it from Steam: this way the built-in controller works as a gamepad, both in Game Mode and in Desktop Mode. If you launch it from the itch.io app in Desktop Mode instead, hold the Menu (Start) button for 1 second to switch the built-in controls to controller mode: while a controller is connected the game ignores the keys Steam's desktop layout keeps sending. The main menu shows the detected controller and whether its buttons are recognized.
 
 Tip: with the itch.io app (https://itch.io/app) the game updates automatically to the latest build.
-
-🇮🇹 COME INSTALLARE
-
-Linux / Steam Deck: scarica il file per Linux, estrailo e avvia Gobelino.x86_64 (se serve, rendilo prima eseguibile: tasto destro → Proprietà → Consenti l'esecuzione, oppure chmod +x Gobelino.x86_64). Su Steam Deck fallo in modalità Desktop, poi aggiungilo a Steam come gioco non Steam (Steam → Giochi → Aggiungi un gioco non Steam) e avvialo sempre da Steam: così i comandi integrati funzionano come un controller, sia in modalità Gioco sia in modalità Desktop. Se invece lo avvii dall'app di itch.io in modalità Desktop, tieni premuto il tasto Menu (Start) per 1 secondo per passare i comandi integrati alla modalità controller: finché c'è un controller il gioco ignora i tasti che il layout desktop di Steam continua a mandare. Il menù iniziale mostra il controller rilevato e se i suoi pulsanti sono riconosciuti.
-
-Consiglio: con l'app di itch.io (https://itch.io/app) il gioco si aggiorna da solo all'ultima build.
 ```
