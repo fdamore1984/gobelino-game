@@ -74,7 +74,7 @@ func _draw() -> void:
 	# Stamina: attaccare, schivare, saltare, parare e correre la consumano.
 	var stamina_rect := Rect2(BAR_X + 24, 41, BAR_WIDTH - 24, 11)
 	_draw_bolt(Vector2(BAR_X + 9, 46))
-	_draw_bar(stamina_rect, player.stamina / Player.MAX_STAMINA, COLOR_STAMINA)
+	_draw_bar(stamina_rect, player.stamina / player.max_stamina, COLOR_STAMINA)
 	if player.stamina < Player.STAMINA_ATTACK and int(Time.get_ticks_msec() / 150) % 2 == 0:
 		draw_rect(stamina_rect, COLOR_STAMINA_EMPTY, false, 2.0)
 

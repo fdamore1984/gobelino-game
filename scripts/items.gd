@@ -81,14 +81,19 @@ static func _random_kind(item: Dictionary) -> bool:
 	return not item.get("shop_only", false) and not item.get("boss_only", false)
 
 
-## Quello che lascia un nemico abbattuto: ogni tanto monete, di rado un
-## oggetto e molto di rado un oggetto raro dei mercanti.
+## Quello che lascia un nemico abbattuto: ogni tanto monete o una pozione
+## (di vita o di mana), di rado un oggetto e molto di rado un oggetto raro
+## dei mercanti.
 static func enemy_drops(level: int) -> Array[Array]:
 	var data: Dictionary = DATA.data["enemy_drop"]
 	var drops: Array[Array] = []
 	if randf() < float(data["gold_chance"]):
 		var gold: Array = data["gold"]
 		drops.append(["gold", randi_range(gold[0], gold[1]) + int(data["gold_per_level"]) * (level - 1)])
+	if randf() < float(data.get("potion_chance", 0.0)):
+		drops.append(["potion_health", 1])
+	elif randf() < float(data.get("mana_potion_chance", 0.0)):
+		drops.append(["potion_mana", 1])
 	if randf() < float(data["rare_chance"]):
 		var rare := shop_items()
 		drops.append([rare[randi() % rare.size()], 1])

@@ -3,7 +3,7 @@
 		"health": 20, "xp": 15, "damage": 2,
 		"guard_chance": 0.25, "guard_time": [0.5, 0.9], "max_strikes": 2,
 		"radius": 18, "speed": 124, "mass": 0.7, "aggro_range": 420, "orbit_distance": 150,
-		"windup": [0.68, 1.22], "lunge_speed": 358, "strike_reach": 55, "strike_arc": 140,
+		"windup": [0.44, 0.79], "lunge_speed": 358, "strike_reach": 55, "strike_arc": 140,
 		"color": [0.85, 0.5, 0.75], "shape": "triangle",
 		"spawn_weight": [30, 0]
 	},
@@ -11,23 +11,23 @@
 		"health": 35, "xp": 30, "damage": 2,
 		"guard_chance": 0.45, "guard_time": [0.5, 0.9], "max_strikes": 3,
 		"radius": 24, "speed": 94, "mass": 1.0, "aggro_range": 380, "orbit_distance": 175,
-		"windup": [0.81, 1.76], "lunge_speed": 330, "strike_reach": 65, "strike_arc": 150,
+		"windup": [0.53, 1.14], "lunge_speed": 330, "strike_reach": 65, "strike_arc": 150,
 		"color": [0.7, 0.3, 0.55], "shape": "diamond",
-		"spawn_weight": [40, 0]
+		"slam": {"chance": 0.2, "range": 240, "radius": 85, "windup": 0.6, "air_time": 0.45, "height": 60, "damage_bonus": 0}, "spawn_weight": [40, 0]
 	},
 	"brute": {
 		"health": 80, "xp": 70, "damage": 3,
 		"guard_chance": 0.35, "guard_time": [0.5, 0.9], "max_strikes": 2,
 		"radius": 34, "speed": 64, "mass": 2.5, "aggro_range": 360, "orbit_distance": 200,
-		"windup": [1.49, 2.29], "lunge_speed": 286, "strike_reach": 85, "strike_arc": 180,
+		"windup": [0.97, 1.49], "lunge_speed": 286, "strike_reach": 85, "strike_arc": 180,
 		"color": [0.55, 0.2, 0.25], "shape": "square",
-		"spawn_weight": [5, 4]
+		"slam": {"chance": 0.35, "range": 260, "radius": 120, "windup": 0.75, "air_time": 0.55, "height": 70, "damage_bonus": 1}, "spawn_weight": [5, 4]
 	},
 	"summoner": {
 		"health": 40, "xp": 50, "damage": 2,
 		"guard_chance": 0.15, "guard_time": [0.5, 0.9], "max_strikes": 1,
 		"radius": 22, "speed": 82, "mass": 1.0, "aggro_range": 520, "orbit_distance": 330,
-		"windup": [1.08, 1.62], "lunge_speed": 275, "strike_reach": 55, "strike_arc": 140,
+		"windup": [0.7, 1.05], "lunge_speed": 275, "strike_reach": 55, "strike_arc": 140,
 		"color": [0.25, 0.6, 0.6], "shape": "hexagon",
 		"spawn_weight": [6, 3],
 		"summon": {
@@ -39,7 +39,7 @@
 		"health": 30, "xp": 35, "damage": 2,
 		"guard_chance": 0.4, "guard_time": [0.5, 0.9], "max_strikes": 2,
 		"radius": 21, "speed": 105, "mass": 0.9, "aggro_range": 440, "orbit_distance": 210,
-		"windup": [0.9, 1.4], "lunge_speed": 520, "strike_reach": 70, "strike_arc": 50,
+		"windup": [0.59, 0.91], "lunge_speed": 520, "strike_reach": 70, "strike_arc": 50,
 		"color": [0.85, 0.65, 0.25], "shape": "pentagon",
 		"spawn_weight": [8, 3]
 	},
@@ -47,7 +47,7 @@
 		"health": 40, "xp": 40, "damage": 2,
 		"guard_chance": 0.3, "guard_time": [0.5, 0.9], "max_strikes": 2,
 		"radius": 23, "speed": 88, "mass": 1.2, "aggro_range": 380, "orbit_distance": 140,
-		"windup": [1.0, 1.5], "lunge_speed": 60, "strike_reach": 60, "strike_arc": 360,
+		"windup": [0.65, 0.98], "lunge_speed": 60, "strike_reach": 60, "strike_arc": 360,
 		"color": [0.35, 0.75, 0.4], "shape": "star",
 		"spawn_weight": [3, 3]
 	},
@@ -55,18 +55,18 @@
 		"health": 120, "xp": 110, "damage": 3,
 		"guard_chance": 0.4, "guard_time": [0.5, 0.9], "max_strikes": 2,
 		"radius": 40, "speed": 50, "mass": 4.0, "aggro_range": 340, "orbit_distance": 180,
-		"windup": [1.8, 2.6], "lunge_speed": 200, "strike_reach": 100, "strike_arc": 200,
+		"windup": [1.17, 1.69], "lunge_speed": 200, "strike_reach": 100, "strike_arc": 200,
 		"color": [0.5, 0.48, 0.55], "shape": "octagon",
-		"spawn_weight": [0, 2]
+		"slam": {"chance": 0.35, "range": 240, "radius": 140, "windup": 0.85, "air_time": 0.6, "height": 60, "damage_bonus": 1}, "spawn_weight": [0, 2]
 	},
 	"caster": {
 		"health": 25, "xp": 40, "damage": 2,
 		"guard_chance": 0.15, "guard_time": [0.5, 0.9], "max_strikes": 2,
 		"radius": 20, "speed": 85, "mass": 0.8, "aggro_range": 520, "orbit_distance": 320,
-		"windup": [1.0, 1.6], "lunge_speed": 0, "strike_reach": 40, "strike_arc": 60,
+		"windup": [0.65, 1.04], "lunge_speed": 0, "strike_reach": 40, "strike_arc": 60,
 		"color": [0.6, 0.35, 0.85], "shape": "cross",
 		"spawn_weight": [4, 3],
 		"ranged": {"range": 400, "bolt_speed": 250}
 	},
-	"guardian": {"health": 600, "guard_chance": 0.5, "guard_time": [0.5, 0.9], "max_strikes": 3, "xp": 600, "damage": 3, "radius": 50, "speed": 72, "mass": 6.0, "aggro_range": 520, "orbit_distance": 150, "windup": [0.9, 1.5], "lunge_speed": 260, "strike_reach": 110, "strike_arc": 240, "color": [0.6, 0.2, 0.25], "shape": "octagon", "spawn_weight": [0, 0], "boss": true, "summon": {"type": "scout", "count": 2, "max_minions": 3, "cooldown": [7.0, 11.0], "channel_time": 1.4, "minion_xp": 5}}
+	"guardian": {"health": 600, "guard_chance": 0.5, "guard_time": [0.5, 0.9], "max_strikes": 3, "xp": 600, "damage": 3, "radius": 50, "speed": 72, "mass": 6.0, "aggro_range": 520, "orbit_distance": 150, "windup": [0.59, 0.98], "lunge_speed": 260, "strike_reach": 110, "strike_arc": 240, "color": [0.6, 0.2, 0.25], "shape": "octagon", "slam": {"chance": 0.35, "range": 300, "radius": 140, "windup": 0.7, "air_time": 0.55, "height": 80, "damage_bonus": 1}, "spawn_weight": [0, 0], "boss": true, "summon": {"type": "scout", "count": 2, "max_minions": 3, "cooldown": [7.0, 11.0], "channel_time": 1.4, "minion_xp": 5}}
 }

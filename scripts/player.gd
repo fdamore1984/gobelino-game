@@ -152,9 +152,9 @@ const DODGE_STICK_DEADZONE := 0.2
 const DODGE_COOLDOWN := 0.4
 
 ## Corsa tenendo premuto R2: più veloce del passo normale. Ogni
-## potenziamento aggiunge il 2% alla velocità di corsa.
+## potenziamento aggiunge il 5% alla velocità di corsa.
 const RUN_SPEED_FACTOR := 1.6
-const RUN_SPEED_UPGRADE := 0.02
+const RUN_SPEED_UPGRADE := 0.05
 
 ## Scivolata: schivando mentre si corre si scivola in avanti, rallentando.
 const SLIDE_TIME := 0.55
@@ -218,9 +218,9 @@ const TORCH_SCALE := 1.9
 const POTION_HEAL := 3
 const START_POTIONS := 2
 ## Lo scudo assorbe un colpo; poi va ricaricato. Ogni potenziamento
-## riduce la ricarica del 2%.
+## riduce la ricarica del 5%.
 const SHIELD_COOLDOWN := 30.0
-const SHIELD_COOLDOWN_UPGRADE := 0.98
+const SHIELD_COOLDOWN_UPGRADE := 0.95
 
 ## I rovi pungono a intervalli (data/world.json); la prima volta poco dopo
 ## esserci entrati.
@@ -245,6 +245,8 @@ const COLOR_GUARD_SPARK := Color(0.8, 0.9, 1.0)
 ## di pausa (più piano mentre si para). Senza vigore non si agisce e un
 ## colpo parato rompe la guardia.
 const MAX_STAMINA := 100.0
+## Ogni potenziamento della stamina aggiunge il 5% della stamina di partenza.
+const STAMINA_UPGRADE := 0.05
 const STAMINA_REGEN := 45.0
 const STAMINA_REGEN_DELAY := 0.55
 const STAMINA_PARRY_REGEN_FACTOR := 0.35
@@ -346,6 +348,8 @@ var _attack_resolved := false
 ## Velocità dell'attacco in corso: resta quella con cui è iniziato.
 var _attack_speed := 1.0
 var stamina := MAX_STAMINA
+## Stamina massima: si ricalcola dai potenziamenti presi (non si salva).
+var max_stamina := MAX_STAMINA
 var _stamina_delay := 0.0
 ## Si sta correndo (consuma vigore).
 var _running := false
@@ -444,7 +448,7 @@ func _physics_process(delta: float) -> void:
 	_stamina_delay = maxf(_stamina_delay - delta, 0.0)
 	if _stamina_delay == 0.0 and not _running and _state != State.DEAD:
 		var regen := STAMINA_REGEN * (STAMINA_PARRY_REGEN_FACTOR if _state == State.PARRY else 1.0)
-		stamina = minf(stamina + regen * delta, MAX_STAMINA)
+		stamina = minf(stamina + regen * delta, max_stamina)
 	if _state != State.DEAD:
 		mana = minf(mana + MANA_REGEN * delta, max_mana)
 
@@ -1049,6 +1053,8 @@ func load_state(data: Dictionary) -> void:
 	# potenziamenti scelti, se il salvataggio li ha.
 	if data.has("upgrades_taken"):
 		max_chained_dodges = START_CHAINED_DODGES + int(upgrades_taken.get("dodge", 0))
+	_refresh_stamina()
+	stamina = max_stamina
 	# Oggetti che questa versione non conosce più vengono scartati.
 	inventory.items.clear()
 	var known: Dictionary = Items.DATA.data["items"]
@@ -1160,6 +1166,14 @@ func apply_upgrade(upgrade: String) -> void:
 			_refresh_stats()
 		"spell":
 			spell_bonus += SPELL_UPGRADE
+		"stamina":
+			_refresh_stamina()
+			stamina = max_stamina
+
+
+func _refresh_stamina() -> void:
+	max_stamina = MAX_STAMINA * (1.0 + STAMINA_UPGRADE * int(upgrades_taken.get("stamina", 0)))
+	stamina = minf(stamina, max_stamina)
 
 
 func _change_state(new_state: State) -> void:

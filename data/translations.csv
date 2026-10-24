@@ -22,40 +22,29 @@ HUD_SHIELD_READY,Shield: ready
 HUD_SHIELD_ACTIVE,Shield: active
 HUD_SHIELD_COOLDOWN,Shield: %d s
 UPGRADE_HEAVY,Chained power strikes +1
-UPGRADE_SHIELD,Shield recharge -2%
+UPGRADE_SHIELD,Shield recharge -5%
 TOUCH_HEAVY,Power
 TOUCH_POTION,Potion
 TOUCH_SHIELD,Shield
 HUD_STATS,Combo %d · Power strikes %d · Dodges %d · Jumps %d · Run %d%%
 UPGRADE_JUMP,Chained jumps +1
-UPGRADE_RUN,Run speed +2%
+UPGRADE_RUN,Run speed +5%
 TOUCH_JUMP,Jump
 TOUCH_RUN,Run
 DECK_HINT,"Steam Deck: to use the built-in controls as a controller hold the Menu (Start) button for 1 second, or launch the game from Steam"
 UPGRADE_VALUE,%d → %d
 UPGRADE_VALUE_SECONDS,%.1f s → %.1f s
 UPGRADE_VALUE_PERCENT,%d%% → %d%%
-POWERUPS_TITLE,Active power-ups
-POWERUP_UPGRADE,%s %s  (×%d)
-POWERUP_COMBO,Combo hits
-POWERUP_HEAVY,Power strikes
-POWERUP_DODGE,Dodges
-POWERUP_JUMP,Jumps
-POWERUP_HEALTH,Max health
-POWERUP_SHIELD,Shield recharge
-POWERUP_RUN,Run speed
-POWERUP_EMPOWERED,Perfect parry: empowered attacks %d s
-POWERUP_SHIELD_ACTIVE,Shield active
+POWERUP_UPGRADE,×%d
+POWERUP_EMPOWERED,%d s
 CHALLENGE_HINT,Interact with the totem to start a survival challenge
 CHALLENGE_STATUS,Survive! %d s · Enemies: %d
 CHALLENGE_WON,Challenge complete! +%d XP and a potion
 HUD_MANA,Mana %d/%d · Mana potions %d/%d
 HUD_GOLD,Gold %d
-POWERUP_TORCH,Torch lit
-POWERUP_MANA,Max mana
-POWERUP_SPELL,Fireball
 UPGRADE_MANA,Max mana +20
 UPGRADE_SPELL,Spell power +20%
+UPGRADE_STAMINA,Stamina +5%
 INVENTORY_TITLE,Inventory
 INVENTORY_EQUIPPED,"Equipment: weapon, armor, boots, amulet, ring"
 INVENTORY_EMPTY,Nothing yet: open chests to find items
