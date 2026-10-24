@@ -24,7 +24,7 @@ func _ready() -> void:
 	_quit.pressed.connect(_on_quit_pressed)
 	_controls.pressed.connect(_on_controls_pressed)
 	add_child(_controls_panel)
-	_controls_panel.closed.connect(_controls.grab_focus)
+	_controls_panel.closed.connect(_on_controls_closed)
 	add_child(_slot_panel)
 	_slot_panel.chosen.connect(_on_slot_chosen)
 	_slot_panel.closed.connect(_on_slot_panel_closed)
@@ -62,12 +62,22 @@ func _update_info() -> void:
 
 func _on_start_pressed() -> void:
 	Sfx.play_ui("ui_confirm")
+	_set_buttons_active(false)
 	_slot_panel.open(true)
 
 
 func _on_continue_pressed() -> void:
 	Sfx.play_ui("ui_confirm")
+	_set_buttons_active(false)
 	_slot_panel.open(false)
+
+
+## Con un pannello aperto i pulsanti del menù sotto non si possono
+## selezionare né premere: la navigazione resta dentro il pannello.
+func _set_buttons_active(active: bool) -> void:
+	for button: Button in [_continue, _start, _controls, _quit]:
+		button.focus_mode = Control.FOCUS_ALL if active else Control.FOCUS_NONE
+		button.disabled = not active
 
 
 ## Nuova partita: lo slot scelto si svuota e la partita si salverà lì.
@@ -86,6 +96,7 @@ func _on_slot_chosen(slot: int) -> void:
 
 
 func _on_slot_panel_closed() -> void:
+	_set_buttons_active(true)
 	(_start if _slot_panel.new_game or not _continue.visible else _continue).grab_focus()
 
 
@@ -95,4 +106,10 @@ func _on_quit_pressed() -> void:
 
 func _on_controls_pressed() -> void:
 	Sfx.play_ui("ui_confirm")
+	_set_buttons_active(false)
 	_controls_panel.open()
+
+
+func _on_controls_closed() -> void:
+	_set_buttons_active(true)
+	_controls.grab_focus()

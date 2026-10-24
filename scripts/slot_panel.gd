@@ -56,6 +56,15 @@ func _ready() -> void:
 	_back.pressed.connect(close)
 	_back.focus_entered.connect(Sfx.play_ui.bind("ui_move"))
 	box.add_child(_back)
+	# Su e giù girano solo tra gli slot e Indietro (dall'ultimo si torna al primo).
+	var items: Array[Control] = []
+	items.append_array(_buttons)
+	items.append(_back)
+	for k in items.size():
+		items[k].focus_neighbor_top = items[k - 1].get_path()
+		items[k].focus_neighbor_bottom = items[(k + 1) % items.size()].get_path()
+		items[k].focus_neighbor_left = items[k].get_path()
+		items[k].focus_neighbor_right = items[k].get_path()
 
 
 func open(for_new_game: bool) -> void:
@@ -126,4 +135,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		close()
 	elif not UiNav.handle(event, get_viewport(), _first()):
 		return
-	get_viewport().set_input_as_handled()
+	# Scegliendo uno slot la scena cambia subito: questo pannello non c'è più.
+	if is_inside_tree():
+		get_viewport().set_input_as_handled()
