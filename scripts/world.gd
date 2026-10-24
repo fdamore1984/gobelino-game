@@ -71,8 +71,6 @@ const LINE_STEP := 20.0
 const LINE_RADIUS := 6.0
 const LINE_CLEARANCE := 30.0
 const PROJECTILE_HEIGHT_REACH := 70.0
-## La luce dell'urto è all'altezza del corpo, sopra il punto toccato.
-const CONTACT_LIFT := 14.0
 ## Coordinate (u, v) dei vertici dentro il rombo: alto, destra, basso, sinistra.
 const CORNERS := [Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)]
 ## Direzioni in cui può salire una rampa (verso il rombo vicino più alto).
@@ -770,37 +768,36 @@ func _push_out(point: Vector2, radius: float) -> Vector2:
 	return point
 
 
-## Illumina con una luce bianca il punto in cui chi si muove in point
-## (all'altezza altitude) tocca gli ostacoli solidi e il blocco di terreno
-## troppo alto incontrato dall'ultima chiamata a move: solo lì, non tutto
-## l'oggetto. Da chiamare subito dopo move.
+## Segna con un bordo bianco il tratto degli ostacoli solidi e del blocco
+## di terreno troppo alto (incontrato dall'ultima chiamata a move) che chi
+## si muove in point (all'altezza altitude) sta toccando: solo lì, non
+## tutto l'oggetto. Da chiamare subito dopo move.
 func highlight_contacts(point: Vector2, radius: float, altitude: float) -> void:
-	var lift := Vector2(0, altitude + CONTACT_LIFT)
+	if entities == null:
+		return
 	for obstacle: Dictionary in obstacles_close(point):
 		var center: Vector2 = obstacle["position"]
 		if obstacle["solid"] and point.distance_to(center) <= radius + obstacle["collision"] + 1.5:
-			_flash_contact(center + (point - center).normalized() * float(obstacle["collision"]) - lift)
+			_show_contacts()
+			_contact_glow.touch_obstacle(center - Vector2(0, float(obstacle["elevation"])), float(obstacle["collision"]),
+					(point - center).angle())
 	if _has_blocking_cell:
-		_flash_contact(_closest_on_cell(_blocking_cell, point) - lift)
+		var corners := cell_corners(_blocking_cell)
+		var best := 0
+		var best_distance := INF
+		for k in 4:
+			var distance := Geometry2D.get_closest_point_to_segment(point, corners[k], corners[(k + 1) % 4]).distance_to(point)
+			if distance < best_distance:
+				best = k
+				best_distance = distance
+		var top := elevation_at(cell_center(_blocking_cell))
+		_show_contacts()
+		_contact_glow.touch_wall(corners[best], corners[(best + 1) % 4], point, altitude, top)
 
 
-func _flash_contact(at: Vector2) -> void:
-	if entities == null:
-		return
+func _show_contacts() -> void:
 	if not _contact_glow.is_inside_tree():
 		entities.add_child(_contact_glow)
-	_contact_glow.flash(at)
-
-
-## Punto del bordo del rombo più vicino a point (sul terreno, sullo schermo).
-func _closest_on_cell(cell: Vector2i, point: Vector2) -> Vector2:
-	var corners := cell_corners(cell)
-	var best := corners[0]
-	for k in 4:
-		var candidate := Geometry2D.get_closest_point_to_segment(point, corners[k], corners[(k + 1) % 4])
-		if candidate.distance_to(point) < best.distance_to(point):
-			best = candidate
-	return best
 
 
 ## Ostacoli dei pezzi di mondo attorno al punto (entro 60 pixel), da non
@@ -1574,54 +1571,82 @@ class TerrainBlock:
 		world.draw_cell(self, cell, -position)
 
 
-## Luce bianca nei punti in cui il giocatore sbatte contro ostacoli e
-## pareti (vedi highlight_contacts): svanisce in un attimo.
+## Bordo bianco sul tratto di ostacolo o di parete contro cui il giocatore
+## sbatte (vedi highlight_contacts): dura un attimo e svanisce.
 class ContactGlow:
 	extends Node2D
 
-	const HOLD := 0.25
-	const SIZE := Vector2(30, 24)
-	## Punti vicini si uniscono in uno solo.
-	const MERGE_DISTANCE := 10.0
+	const HOLD := 0.3
+	## Ostacoli: arco del bordo attorno al punto toccato, all'altezza della base
+	## e del corpo, uniti dai due lati.
+	const ARC_HALF := 0.75
+	const BAND_HEIGHT := 26.0
+	## Pareti: tratto del bordo del blocco attorno al punto toccato.
+	const EDGE_HALF := 26.0
+	const WIDTH := 3.0
+	const COLOR_EDGE := Color(1, 1, 1)
+	const COLOR_SHADOW := Color(0, 0, 0, 0.35)
 
-	## Punto illuminato (sullo schermo) -> tempo rimasto.
-	var _spots := {}
-	var _texture := GradientTexture2D.new()
+	## Chiave (ostacolo o tratto di parete) -> {tempo rimasto e forma}.
+	var _marks := {}
 
 	func _ready() -> void:
 		z_index = 10
 		physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
-		# Si somma ai colori sotto, come una luce.
-		var additive := CanvasItemMaterial.new()
-		additive.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-		material = additive
-		var gradient := Gradient.new()
-		gradient.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0)])
-		_texture.gradient = gradient
-		_texture.fill = GradientTexture2D.FILL_RADIAL
-		_texture.fill_from = Vector2(0.5, 0.5)
-		_texture.fill_to = Vector2(1.0, 0.5)
 		set_process(false)
 
-	func flash(at: Vector2) -> void:
-		for spot: Vector2 in _spots.keys():
-			if spot.distance_to(at) < MERGE_DISTANCE:
-				_spots.erase(spot)
-		_spots[at] = HOLD
+	## base: centro della base dell'ostacolo sullo schermo; angle: da dove arriva il giocatore.
+	func touch_obstacle(base: Vector2, radius: float, angle: float) -> void:
+		_marks[base] = {"time": HOLD, "kind": "arc", "base": base, "radius": radius, "angle": angle}
+		_start()
+
+	## Tratto del lato da a a b (sul terreno) vicino a point, tra la quota
+	## del giocatore (altitude) e la cima del blocco (top).
+	func touch_wall(a: Vector2, b: Vector2, point: Vector2, altitude: float, top: float) -> void:
+		var side := (b - a).normalized()
+		var at := Geometry2D.get_closest_point_to_segment(point, a, b)
+		var from := at - side * minf(EDGE_HALF, at.distance_to(a))
+		var to := at + side * minf(EDGE_HALF, at.distance_to(b))
+		var key := Vector4(a.x, a.y, b.x, b.y)
+		_marks[key] = {"time": HOLD, "kind": "edge", "from": from, "to": to, "low": altitude, "high": maxf(top, altitude + BAND_HEIGHT)}
+		_start()
+
+	func _start() -> void:
 		set_process(true)
 		queue_redraw()
 
 	func _process(delta: float) -> void:
-		for spot: Vector2 in _spots.keys():
-			_spots[spot] -= delta
-			if _spots[spot] <= 0.0:
-				_spots.erase(spot)
+		for key: Variant in _marks.keys():
+			_marks[key]["time"] -= delta
+			if _marks[key]["time"] <= 0.0:
+				_marks.erase(key)
 		queue_redraw()
-		if _spots.is_empty():
+		if _marks.is_empty():
 			set_process(false)
 
 	func _draw() -> void:
-		for spot: Vector2 in _spots:
-			var alpha := clampf(_spots[spot] / HOLD, 0.0, 1.0)
-			draw_texture_rect(_texture, Rect2(spot - SIZE, SIZE * 2.0), false, Color(1, 1, 1, 0.7 * alpha))
-			draw_texture_rect(_texture, Rect2(spot - SIZE * 0.35, SIZE * 0.7), false, Color(1, 1, 1, alpha))
+		for mark: Dictionary in _marks.values():
+			var alpha := clampf(mark["time"] / HOLD, 0.0, 1.0)
+			var lines: Array[PackedVector2Array] = []
+			if mark["kind"] == "arc":
+				var base: Vector2 = mark["base"]
+				var radius: float = mark["radius"]
+				var low := PackedVector2Array()
+				var high := PackedVector2Array()
+				for k in 13:
+					var angle: float = mark["angle"] - ARC_HALF + 2.0 * ARC_HALF * k / 12.0
+					var at := base + Vector2.from_angle(angle) * radius
+					low.append(at)
+					high.append(at - Vector2(0, BAND_HEIGHT))
+				lines = [low, high, PackedVector2Array([low[0], high[0]]), PackedVector2Array([low[12], high[12]])]
+			else:
+				var down := Vector2(0, mark["low"])
+				var up := Vector2(0, mark["high"])
+				var from: Vector2 = mark["from"]
+				var to: Vector2 = mark["to"]
+				lines = [PackedVector2Array([from - down, to - down]), PackedVector2Array([from - up, to - up]),
+						PackedVector2Array([from - down, from - up]), PackedVector2Array([to - down, to - up])]
+			for line in lines:
+				draw_polyline(line, Color(COLOR_SHADOW, COLOR_SHADOW.a * alpha), WIDTH + 2.0)
+			for line in lines:
+				draw_polyline(line, Color(COLOR_EDGE, alpha), WIDTH)

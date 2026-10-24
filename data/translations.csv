@@ -141,6 +141,11 @@ CONTROLS_SPECIAL_DASH,Power strike during an air dash: dash strike that smashes 
 CONTROLS_TOUCH,On touch screens use the on-screen buttons
 CONTROLS_BACK,Back
 MENU_CONTINUE,Continue
+SLOTS_NEW_TITLE,New game: choose a save slot
+SLOTS_LOAD_TITLE,Continue: choose a save slot
+SLOT_EMPTY,Slot %d   —   Empty
+SLOT_SAVED,Slot %d   —   Level %d   —   %s
+SLOT_OVERWRITE,Slot %d   —   Press again to replace this save
 PAUSE_TITLE,Paused
 PAUSE_RESUME,Resume
 PAUSE_SAVE,Save game
