@@ -36,7 +36,7 @@ Poi apri la cartella da Godot (Importa progetto → `project.godot`) e premi F5.
 
 | Piattaforma | Come | Note |
 |---|---|---|
-| Windows | export "Windows Desktop" | Distribuzione su Steam |
+| Windows | export "Windows Desktop" | Pubblicato su itch.io (canale `windows`); pensato anche per i portatili da gioco come l'MSI Claw 8 (16:10, controller XInput, schermo touch): lì parte a schermo intero e disegna con ANGLE (Direct3D 11) |
 | Linux / SteamOS | export "Linux" | La build Linux gira nativa sullo Steam Deck (16:10, controller) |
 | Android | export "Android" | Distribuzione su Google Play, non su Steam |
 
@@ -52,7 +52,7 @@ Regole di progetto per restare multipiattaforma:
 
 - `main`: ramo unico, sempre in stato funzionante
 - Lavoro in branch di feature (`feature/nome`) con Pull Request verso `main`
-- Ogni push su `main` genera la build Linux (SteamOS / Steam Deck) e la carica su itch.io (per ora Windows e Android non vengono pubblicati: i preset restano in `export_presets.cfg` per quando si riattiveranno); sulle Pull Request la CI verifica solo che l'export riesca
+- Ogni push su `main` genera le build Linux (SteamOS / Steam Deck) e Windows e le carica su itch.io (canali `linux` e `windows`; Android non viene pubblicato: il preset resta in `export_presets.cfg` per quando si riattiverà); sulle Pull Request la CI verifica solo che l'export riesca
 
 ## Livello di test
 
@@ -124,4 +124,6 @@ Per ora il gioco è solo in inglese. I testi sono comunque in `data/translations
 
 Le build vengono prodotte da GitHub Actions (`.github/workflows/build.yml`).
 Windows e Linux sono un unico eseguibile con i dati incorporati (PCK incorporato), così l'app di itch.io ha un solo file da avviare.
+
+Portatili da gioco con Windows (`scripts/platform.gd`): se il modello contiene "Claw" o c'è uno schermo touch, il gioco parte a schermo intero. Su Windows il renderer Compatibility usa ANGLE (Direct3D 11, `rendering/gl_compatibility/driver.windows`), più affidabile dei driver OpenGL delle GPU integrate Intel come quella dell'MSI Claw 8. Sui PC con schermo touch i controlli a schermo compaiono solo dopo aver toccato lo schermo e spariscono appena si usa il controller o la tastiera (tornando alla barra delle azioni); sui telefoni restano sempre.
 Per una build locale: Progetto → Esporta, usando i preset in `export_presets.cfg`.

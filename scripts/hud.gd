@@ -132,6 +132,7 @@ func _process(delta: float) -> void:
 	# Sparisce appena il gioco vede un controller (per esempio dopo aver
 	# tenuto premuto Menu sullo Steam Deck).
 	_deck_hint.visible = Platform.needs_deck_controller_hint()
+	_actions.visible = not Platform.use_touch_controls()
 	if player == null:
 		return
 	_inventory_panel.player = player

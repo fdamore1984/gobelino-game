@@ -7,6 +7,9 @@ extends Node
 var is_mobile: bool = false
 var is_desktop: bool = false
 var is_steam_deck: bool = false
+## PC portatile da gioco con Windows (MSI Claw, ROG Ally, Legion Go...):
+## si riconosce dal modello o dallo schermo touch.
+var is_handheld_pc: bool = false
 var steam_available: bool = false
 
 ## Controller virtuale creato da Steam Input (anche sullo Steam Deck).
@@ -22,6 +25,9 @@ const STEAM_DECK_LAYOUT := "a:b3,b:b4,x:b5,y:b6,leftshoulder:b7,rightshoulder:b8
 ## Tasti e clic tolti dalle azioni mentre sullo Steam Deck c'è un
 ## controller, da rimettere quando il controller sparisce.
 var _removed_desktop_events := {}
+## Sui PC con schermo touch i controlli a schermo compaiono solo dopo aver
+## toccato lo schermo e spariscono appena si usa il controller o la tastiera.
+var _touch_active := false
 
 
 func _ready() -> void:
@@ -34,7 +40,9 @@ func _ready() -> void:
 	# Sullo Steam Deck si gioca sempre a schermo intero, anche in modalità
 	# desktop (in modalità gioco lo schermo è già tutto del gioco). Va fatto
 	# a finestra pronta: qui all'avvio sarebbe troppo presto.
-	if is_steam_deck and DisplayServer.get_name() != "headless":
+	is_handheld_pc = OS.has_feature("windows") and ("Claw" in OS.get_model_name() or DisplayServer.is_touchscreen_available())
+	# Sui portatili da gioco con Windows (per esempio l'MSI Claw 8) lo stesso.
+	if (is_steam_deck or is_handheld_pc) and DisplayServer.get_name() != "headless":
 		DisplayServer.window_set_mode.call_deferred(DisplayServer.WINDOW_MODE_FULLSCREEN)
 	# Verrà aggiornato quando integreremo GodotSteam (solo desktop).
 	steam_available = false
@@ -124,6 +132,17 @@ func _read_first_line(path: String) -> String:
 	return file.get_line().strip_edges()
 
 
-## True se vanno mostrati i controlli touch a schermo.
+func _input(event: InputEvent) -> void:
+	if is_mobile:
+		return
+	if event is InputEventScreenTouch:
+		_touch_active = true
+	elif event is InputEventJoypadButton or event is InputEventKey \
+			or (event is InputEventJoypadMotion and absf((event as InputEventJoypadMotion).axis_value) > 0.5):
+		_touch_active = false
+
+
+## True se vanno mostrati i controlli touch a schermo: sempre sui telefoni,
+## sui PC con schermo touch solo dopo averlo toccato (vedi _input).
 func use_touch_controls() -> bool:
-	return is_mobile or DisplayServer.is_touchscreen_available()
+	return is_mobile or (_touch_active and DisplayServer.is_touchscreen_available())
