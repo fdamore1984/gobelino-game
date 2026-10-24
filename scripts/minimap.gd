@@ -1,7 +1,9 @@
+class_name Minimap
 extends Control
 ## Minimappa in alto a destra: il terreno attorno al giocatore (livelli
 ## d'altezza e sentieri), i nemici come puntini rossi, casse, totem,
-## mercanti e oggetti a terra; il giocatore è la freccia bianca al centro.
+## mercanti, ingressi delle caverne, scale, uscite e oggetti a terra; il
+## giocatore è la freccia bianca al centro.
 
 ## Metà del lato dell'area mostrata, in pixel del mondo.
 const RANGE := 1100.0
@@ -21,6 +23,9 @@ const COLOR_TOTEM_ACTIVE := Color(1.0, 0.4, 0.2)
 const COLOR_USED := Color(0.5, 0.5, 0.5)
 const COLOR_LOOT := Color(1, 1, 1)
 const COLOR_MERCHANT := Color(1.0, 0.6, 0.85)
+## Ingressi delle caverne e scale (in giù), uscite verso la superficie.
+const COLOR_CAVE := Color(0.95, 0.55, 0.2)
+const COLOR_EXIT := Color(1.0, 0.85, 0.45)
 
 ## Righe campionate a ogni frame: l'immagine nuova si prepara in più
 ## frame e sostituisce la vecchia quando è pronta, così non ci sono scatti.
@@ -102,25 +107,7 @@ func _draw() -> void:
 			var at := _to_map(point["position"])
 			if not _inside(at):
 				continue
-			match point["type"]:
-				"chest":
-					var opened: bool = world.is_chest_opened(point["position"])
-					draw_rect(Rect2(at - Vector2(5, 5), Vector2(10, 10)), COLOR_OUTLINE)
-					draw_rect(Rect2(at - Vector2(4, 4), Vector2(8, 8)), COLOR_OPENED if opened else COLOR_CHEST)
-				"totem":
-					var state := world.totem_state(point["position"])
-					var color := COLOR_TOTEM
-					if state == "active":
-						color = COLOR_TOTEM_ACTIVE
-					elif state == "used":
-						color = COLOR_USED
-					draw_colored_polygon(PackedVector2Array([at + Vector2(0, -9), at + Vector2(7, 0), at + Vector2(0, 9), at + Vector2(-7, 0)]), COLOR_OUTLINE)
-					draw_colored_polygon(PackedVector2Array([at + Vector2(0, -7), at + Vector2(5.5, 0), at + Vector2(0, 7), at + Vector2(-5.5, 0)]), color)
-				"merchant":
-					# Una tenda: tetto a triangolo sopra il banco.
-					draw_rect(Rect2(at + Vector2(-8, -10), Vector2(16, 17)), COLOR_OUTLINE)
-					draw_colored_polygon(PackedVector2Array([at + Vector2(-7, -1), at + Vector2(7, -1), at + Vector2(0, -9)]), COLOR_MERCHANT)
-					draw_rect(Rect2(at + Vector2(-5, -1), Vector2(10, 6)), COLOR_MERCHANT.darkened(0.3))
+			draw_point(self, world, point, at)
 	for node in get_tree().get_nodes_in_group("loot"):
 		var at := _to_map((node as Node2D).global_position)
 		if _inside(at):
@@ -149,3 +136,41 @@ func _to_map(point: Vector2) -> Vector2:
 
 func _inside(at: Vector2) -> bool:
 	return Rect2(Vector2.ZERO, size).has_point(at)
+
+
+## Segno di un punto d'interesse (cassa, totem, mercante, caverna, scala,
+## uscita) in at, con un bordo scuro; usato anche dalla mappa completa.
+static func draw_point(canvas: CanvasItem, world: World, point: Dictionary, at: Vector2) -> void:
+	match point["type"]:
+		"chest":
+			var opened: bool = world.is_chest_opened(point["position"])
+			canvas.draw_rect(Rect2(at - Vector2(5, 5), Vector2(10, 10)), COLOR_OUTLINE)
+			canvas.draw_rect(Rect2(at - Vector2(4, 4), Vector2(8, 8)), COLOR_OPENED if opened else COLOR_CHEST)
+		"totem":
+			var state := world.totem_state(point["position"])
+			var color := COLOR_TOTEM
+			if state == "active":
+				color = COLOR_TOTEM_ACTIVE
+			elif state == "used":
+				color = COLOR_USED
+			canvas.draw_colored_polygon(PackedVector2Array([at + Vector2(0, -9), at + Vector2(7, 0), at + Vector2(0, 9), at + Vector2(-7, 0)]), COLOR_OUTLINE)
+			canvas.draw_colored_polygon(PackedVector2Array([at + Vector2(0, -7), at + Vector2(5.5, 0), at + Vector2(0, 7), at + Vector2(-5.5, 0)]), color)
+		"merchant":
+			# Una tenda: tetto a triangolo sopra il banco.
+			canvas.draw_rect(Rect2(at + Vector2(-8, -10), Vector2(16, 17)), COLOR_OUTLINE)
+			canvas.draw_colored_polygon(PackedVector2Array([at + Vector2(-7, -1), at + Vector2(7, -1), at + Vector2(0, -9)]), COLOR_MERCHANT)
+			canvas.draw_rect(Rect2(at + Vector2(-5, -1), Vector2(10, 6)), COLOR_MERCHANT.darkened(0.3))
+		"cave":
+			# Un arco buio nella roccia (grigio se la caverna è già stata completata).
+			var cleared := world.is_cave_cleared(point["position"])
+			canvas.draw_circle(at, 8.0, COLOR_OUTLINE)
+			canvas.draw_circle(at, 6.5, COLOR_USED if cleared else COLOR_CAVE)
+			canvas.draw_circle(at + Vector2(0, 1.5), 3.5, Color(0.05, 0.04, 0.04))
+		"stairs":
+			# Una freccia in giù: si scende.
+			canvas.draw_colored_polygon(PackedVector2Array([at + Vector2(-8, -6), at + Vector2(8, -6), at + Vector2(0, 8)]), COLOR_OUTLINE)
+			canvas.draw_colored_polygon(PackedVector2Array([at + Vector2(-6, -4.5), at + Vector2(6, -4.5), at + Vector2(0, 5.5)]), COLOR_CAVE)
+		"exit":
+			# Una freccia in su, luce calda: si torna in superficie.
+			canvas.draw_colored_polygon(PackedVector2Array([at + Vector2(-8, 6), at + Vector2(8, 6), at + Vector2(0, -8)]), COLOR_OUTLINE)
+			canvas.draw_colored_polygon(PackedVector2Array([at + Vector2(-6, 4.5), at + Vector2(6, 4.5), at + Vector2(0, -5.5)]), COLOR_EXIT)

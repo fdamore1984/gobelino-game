@@ -36,6 +36,12 @@ const HEAVY_KNOCKBACK_FACTOR := 1.6
 ## Ogni tanto cambia verso di rotazione o fa uno scatto laterale.
 const DECISION_INTERVAL := Vector2(0.5, 1.6)
 const DASH_CHANCE := 0.4
+## Se il giocatore beve una pozione o si allontana entro questa distanza, il
+## nemico gli corre addosso più veloce e attacca subito.
+const PUNISH_RANGE := 460.0
+const PUNISH_SPEED_FACTOR := 1.4
+## Velocità con cui il giocatore si allontana perché conti come ritirata.
+const RETREAT_SPEED := 120.0
 const DASH_SPEED_FACTOR := 3.0
 const DASH_TIME := 0.18
 
@@ -45,7 +51,8 @@ const ATTACK_TRIGGER_GAP := 64.0
 ## poi la direzione resta bloccata: è il momento di schivare.
 const WINDUP_TRACKING := Vector2(0.4, 0.75)
 ## Probabilità che la carica sia una finta, interrotta a metà con uno scatto.
-const FEINT_CHANCE := 0.2
+## Niente finte: ogni attacco ha una carica chiara e arriva sempre.
+const FEINT_CHANCE := 0.0
 ## Probabilità di un altro attacco subito dopo il precedente, con carica più
 ## breve, fino a "max_strikes" di fila (data/enemies.json).
 const COMBO_CHANCE := 0.5
@@ -183,6 +190,13 @@ func setup(id: String) -> void:
 		_summon_cooldown = randf_range(1.0, 2.5)
 
 
+## Il giocatore si cura o si ritira a portata: è il momento di attaccare.
+func _punishing(to_player: Vector2, distance: float) -> bool:
+	if distance > PUNISH_RANGE or _type.has("summon") or _is_ranged():
+		return false
+	return player.is_healing() or player.ground_velocity().dot(to_player.normalized()) > RETREAT_SPEED
+
+
 func _ready() -> void:
 	if _type.is_empty():
 		setup(type_id)
@@ -232,6 +246,13 @@ func _physics_process(delta: float) -> void:
 		State.CHASE:
 			if not player_active or distance > LEASH_RANGE:
 				_change_state(State.WANDER)
+			elif _punishing(to_player, distance):
+				_attack_cooldown = 0.0
+				if distance <= _attack_trigger_range():
+					_strikes = 0
+					_begin_windup(_type["windup"][0], _type["windup"][1], true)
+				else:
+					target_velocity = to_player.normalized() * _speed * PUNISH_SPEED_FACTOR
 			elif _should_guard(distance):
 				_begin_guard()
 			elif _can_summon(distance):

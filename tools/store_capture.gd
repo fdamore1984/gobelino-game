@@ -294,6 +294,12 @@ func _capture_cave(language: String) -> void:
 	hud.show_interact(cave["position"] - Vector2(0, world.elevation_at(cave["position"]) + 96.0))
 	await _frames(2)
 	await _save("%s_11_cave.png" % language)
+	# Mappa completa aperta lì: montagne, caverne, casse, mercanti.
+	hud.hide_interact()
+	hud._world_map.open()
+	await _frames(20)
+	await _save("%s_13_map.png" % language)
+	hud._world_map.close()
 	_end_game()
 
 

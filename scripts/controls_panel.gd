@@ -10,7 +10,7 @@ signal closed
 const ROWS := [
 	"CONTROLS_MOVE", "CONTROLS_ATTACK", "CONTROLS_HEAVY", "CONTROLS_PARRY", "CONTROLS_DODGE",
 	"CONTROLS_JUMP", "CONTROLS_RUN", "CONTROLS_SPELL", "CONTROLS_SHIELD", "CONTROLS_POTION",
-	"CONTROLS_MANA", "CONTROLS_TORCH", "CONTROLS_INVENTORY", "CONTROLS_LOCK", "CONTROLS_MENU",
+	"CONTROLS_MANA", "CONTROLS_TORCH", "CONTROLS_INVENTORY", "CONTROLS_MAP", "CONTROLS_LOCK", "CONTROLS_MENU",
 ]
 const SPECIALS := ["CONTROLS_SPECIAL_LEAP", "CONTROLS_SPECIAL_AIR", "CONTROLS_SPECIAL_PLUNGE", "CONTROLS_SPECIAL_DASH"]
 const COLOR_TITLE := Color(0.85, 0.75, 0.4)
@@ -32,25 +32,29 @@ func _ready() -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
+	box.add_theme_constant_override("separation", 6)
 	center.add_child(box)
-	box.add_child(_label("CONTROLS_TITLE", 40, COLOR_TITLE, true))
+	box.add_child(_label("CONTROLS_TITLE", 34, COLOR_TITLE, true))
 	var grid := GridContainer.new()
 	grid.columns = 3
 	grid.add_theme_constant_override("h_separation", 40)
-	grid.add_theme_constant_override("v_separation", 2)
+	grid.add_theme_constant_override("v_separation", 0)
 	grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(grid)
 	_add_row(grid, "CONTROLS_HEADER", true)
 	for key: String in ROWS:
 		_add_row(grid, key, false)
 	box.add_child(_label("CONTROLS_SPECIAL_TITLE", 22, COLOR_HEADER, true))
+	# Righe fitte, perché tutto stia anche a 720 pixel di altezza.
+	var specials := VBoxContainer.new()
+	specials.add_theme_constant_override("separation", 0)
+	box.add_child(specials)
 	for key: String in SPECIALS:
-		box.add_child(_label(key, 17, COLOR_TEXT, true))
+		specials.add_child(_label(key, 17, COLOR_TEXT, true))
 	if Platform.use_touch_controls():
-		box.add_child(_label("CONTROLS_TOUCH", 17, COLOR_KEY, true))
+		specials.add_child(_label("CONTROLS_TOUCH", 17, COLOR_KEY, true))
 	_back.text = "CONTROLS_BACK"
-	_back.custom_minimum_size = Vector2(220, 48)
+	_back.custom_minimum_size = Vector2(220, 44)
 	_back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_back.add_theme_font_size_override("font_size", 24)
 	_back.pressed.connect(close)
