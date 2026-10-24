@@ -43,6 +43,18 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
+func _process(_delta: float) -> void:
+	# Sui PC con schermo touch compaiono e spariscono secondo l'ultimo input.
+	var show := Platform.use_touch_controls()
+	if visible and not show:
+		for action: String in _held.values():
+			Input.action_release(action)
+		_held.clear()
+		_stick_touch = -1
+		_set_stick(Vector2.ZERO)
+	visible = show
+
+
 func _exit_tree() -> void:
 	for action: String in _held.values():
 		Input.action_release(action)
