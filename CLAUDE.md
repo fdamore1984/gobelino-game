@@ -22,6 +22,6 @@
   salvataggi delle versioni precedenti (campi nuovi letti con un valore
   predefinito, niente campi rinominati o tolti senza conversione).
 - **Merge automatico**: ogni modifica passa da una Pull Request verso `main`;
-  quando la CI della PR è verde (export Linux: per ora si pubblica solo per Linux / SteamOS; Windows è sospeso) si fa il
+  quando la CI della PR è verde (export Linux e Windows: si pubblica per Linux / SteamOS e per Windows, anche portatili come l'MSI Claw 8) si fa il
   merge senza chiedere conferma, poi si verifica il caricamento su itch.io
   del build su `main`. Se la CI è rossa, niente merge: si corregge prima.
