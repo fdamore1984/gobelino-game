@@ -29,6 +29,7 @@ const BUTTONS := [
 	{"action": "inventory", "label": "TOUCH_INVENTORY", "offset": Vector2(-450, -300), "radius": SMALL_BUTTON_RADIUS},
 	{"action": "lock_on", "label": "TOUCH_LOCK", "offset": Vector2(-335, -420), "radius": SMALL_BUTTON_RADIUS},
 	{"action": "map", "label": "TOUCH_MAP", "offset": Vector2(-450, -420), "radius": SMALL_BUTTON_RADIUS},
+	{"action": "focus", "label": "TOUCH_FOCUS", "offset": Vector2(-90, -440), "radius": SMALL_BUTTON_RADIUS},
 ]
 
 var _stick_touch := -1

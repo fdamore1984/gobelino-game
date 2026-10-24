@@ -221,6 +221,12 @@ const TORCH_SCALE := 1.9
 
 ## Ogni pozione cura questi punti vita.
 const POTION_HEAL := 3
+## Pozioni di vita (e di mana) che si possono portare; ogni potenziamento
+## "potion_slots" ne aggiunge una di ciascun tipo.
+const MAX_POTIONS := 10
+## Potenziamenti delle pozioni: +1 punto vita curato, +5% di mana ridato.
+const POTION_HEAL_UPGRADE := 1
+const MANA_RESTORE_UPGRADE := 0.05
 const START_POTIONS := 2
 ## Lo scudo assorbe un colpo; poi va ricaricato. Ogni potenziamento
 ## riduce la ricarica del 5%.
@@ -264,8 +270,8 @@ const STAMINA_RUN := 16.0
 ## Guardia rotta: si resta storditi per questo tempo.
 const GUARD_BREAK_TIME := 0.8
 ## Bere una pozione richiede tempo: ci si muove piano e non si può fare
-## altro; l'effetto arriva a DRINK_EFFECT_TIME (se colpiti prima, la
-## pozione è persa).
+## altro. L'effetto arriva subito, all'inizio del sorso; la fiaschetta
+## sale alla bocca in DRINK_EFFECT_TIME.
 const DRINK_TIME := 0.95
 const DRINK_EFFECT_TIME := 0.6
 const DRINK_SPEED_FACTOR := 0.3
@@ -360,7 +366,8 @@ var _stamina_delay := 0.0
 var _running := false
 ## Pozione che si sta bevendo ("potion" o "mana_potion") e se ha già fatto effetto.
 var _drinking := ""
-var _drink_done := false
+## Corsa accesa (si alterna premendo "run").
+var _run_on := false
 ## Stordimento dopo una guardia rotta (si usa lo stato HURT, più lungo).
 var _hurt_time := HURT_TIME
 ## C'è un elemento con cui interagire qui vicino (lo decide Game).
@@ -486,7 +493,13 @@ func _physics_process(delta: float) -> void:
 			if input != Vector2.ZERO:
 				_target_facing = input.normalized()
 			_face_lock()
-			var running := Input.is_action_pressed("run") and input != Vector2.ZERO and stamina > 0.0 and not is_airborne()
+			# La corsa si accende e si spegne con L3 (o Maiusc); si spegne da
+			# sola fermandosi.
+			if Input.is_action_just_pressed("run"):
+				_run_on = not _run_on
+			if input == Vector2.ZERO:
+				_run_on = false
+			var running := _run_on and stamina > 0.0 and not is_airborne()
 			_running = running
 			if running:
 				stamina = maxf(stamina - STAMINA_RUN * delta, 0.0)
@@ -614,9 +627,6 @@ func _physics_process(delta: float) -> void:
 			if input != Vector2.ZERO:
 				_target_facing = input.normalized()
 			_velocity = _accelerate(_velocity, input * walk_speed() * DRINK_SPEED_FACTOR, delta)
-			if not _drink_done and _state_time >= DRINK_EFFECT_TIME:
-				_drink_done = true
-				_apply_drink()
 			if _state_time >= DRINK_TIME:
 				_drinking = ""
 				_change_state(State.NORMAL)
@@ -1486,18 +1496,18 @@ func _start_drink(kind: String) -> void:
 			return
 		mana_potions -= 1
 	_drinking = kind
-	_drink_done = false
 	_end_combo()
 	_change_state(State.DRINK)
+	_apply_drink()
 
 
 func _apply_drink() -> void:
 	if _drinking == "potion":
-		health = mini(health + POTION_HEAL, max_health)
+		health = mini(health + potion_heal(), max_health)
 		health_changed.emit(health, max_health)
 		Sfx.play("potion", global_position)
 	else:
-		mana = minf(mana + MANA_POTION_RESTORE, max_mana)
+		mana = minf(mana + mana_potion_restore(), max_mana)
 		Sfx.play("mana_potion", global_position)
 
 
@@ -1543,25 +1553,51 @@ func _cast_fireball(input: Vector2) -> void:
 	Sfx.play("fireball", global_position)
 
 
+## Pozioni di ciascun tipo che si possono portare.
+func potion_capacity() -> int:
+	return MAX_POTIONS + int(upgrades_taken.get("potion_slots", 0))
+
+
+func potion_heal() -> int:
+	return POTION_HEAL + POTION_HEAL_UPGRADE * int(upgrades_taken.get("potion_heal", 0))
+
+
+func mana_potion_restore() -> float:
+	return MANA_POTION_RESTORE * (1.0 + MANA_RESTORE_UPGRADE * int(upgrades_taken.get("mana_restore", 0)))
+
+
+## Si può prendere l'oggetto: le pozioni solo finché la cintura non è piena.
+func can_pick_up(id: String) -> bool:
+	match id:
+		"potion_health":
+			return potions < potion_capacity()
+		"potion_mana":
+			return mana_potions < potion_capacity()
+	return true
+
+
 ## Raccoglie un oggetto: le monete vanno nel borsello, le pozioni di vita e
-## di mana nella cintura (senza limite, mai nell'inventario), il resto
-## nell'inventario.
-func pickup(id: String, amount := 1) -> void:
+## di mana nella cintura (fino a potion_capacity, mai nell'inventario), il
+## resto nell'inventario. Restituisce false se la cintura è piena.
+func pickup(id: String, amount := 1) -> bool:
+	if not can_pick_up(id):
+		return false
 	match id:
 		"gold":
 			inventory.gold += amount
 			Sfx.play("coin", global_position)
-			return
+			return true
 		"potion_health":
-			potions += amount
+			potions = mini(potions + amount, potion_capacity())
 			Sfx.play("pickup", global_position)
-			return
+			return true
 		"potion_mana":
-			mana_potions += amount
+			mana_potions = mini(mana_potions + amount, potion_capacity())
 			Sfx.play("pickup", global_position)
-			return
+			return true
 	inventory.add(id)
 	Sfx.play("pickup", global_position)
+	return true
 
 
 ## Usa un oggetto dell'inventario: indossa o toglie l'equipaggiamento,

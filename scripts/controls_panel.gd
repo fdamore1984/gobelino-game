@@ -9,7 +9,7 @@ signal closed
 
 const ROWS := [
 	"CONTROLS_MOVE", "CONTROLS_ATTACK", "CONTROLS_HEAVY", "CONTROLS_PARRY", "CONTROLS_DODGE",
-	"CONTROLS_JUMP", "CONTROLS_RUN", "CONTROLS_SPELL", "CONTROLS_SHIELD", "CONTROLS_POTION",
+	"CONTROLS_JUMP", "CONTROLS_RUN", "CONTROLS_FOCUS", "CONTROLS_SPELL", "CONTROLS_SHIELD", "CONTROLS_POTION",
 	"CONTROLS_MANA", "CONTROLS_TORCH", "CONTROLS_INVENTORY", "CONTROLS_MAP", "CONTROLS_LOCK", "CONTROLS_MENU",
 ]
 const SPECIALS := ["CONTROLS_SPECIAL_LEAP", "CONTROLS_SPECIAL_AIR", "CONTROLS_SPECIAL_PLUNGE", "CONTROLS_SPECIAL_DASH"]
@@ -67,7 +67,7 @@ func _add_row(grid: GridContainer, key: String, header: bool) -> void:
 	for i in 3:
 		var text := cells[i].strip_edges() if i < cells.size() else ""
 		var color := COLOR_HEADER if header else (COLOR_TEXT if i == 0 else COLOR_KEY)
-		var label := _label(text, 18 if header else 17, color, false)
+		var label := _label(text, 18 if header else 16, color, false)
 		label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 		grid.add_child(label)
 
