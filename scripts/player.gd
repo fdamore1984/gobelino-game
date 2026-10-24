@@ -243,6 +243,12 @@ const THORNS_INVULNERABLE_TIME := 0.4
 const BOUNCE_MIN_SPEED := 200.0
 const BOUNCE_FACTOR := 0.45
 const BOUNCE_MAX_SPEED := 180.0
+## I nemici sono solidi: non ci si passa attraverso (si salta sopra solo
+## più in alto di JUMP_EVADE_HEIGHT). Andandoci addosso più veloci di
+## ENEMY_BUMP_SPEED si rimbalza indietro e si perde ENEMY_BUMP_DAMAGE.
+const ENEMY_BUMP_SPEED := 60.0
+const ENEMY_BUMP_DAMAGE := 1
+const ENEMY_BUMP_KNOCKBACK := 360.0
 
 ## Colpo parato dalla guardia di un nemico: la combo si interrompe e si
 ## viene respinti indietro per REPEL_TIME secondi (schivata e parata restano
@@ -687,6 +693,7 @@ func _move(delta: float) -> void:
 	# sbattendoci contro, un piccolo rimbalzo.
 	world.highlight_contacts(position, RADIUS * 0.8, altitude)
 	_bounce(motion - (position - start), delta)
+	_collide_enemies(world)
 	# L'altezza dal terreno cambia con il terreno sotto: scendendo da un
 	# gradino si cade, salendo su un blocco si atterra sopra.
 	_height = altitude - ground_elevation
@@ -724,6 +731,49 @@ func _bounce(blocked: Vector2, delta: float) -> void:
 		return
 	var away := -blocked / blocked.length()
 	_velocity += away * (maxf(_velocity.dot(-away), 0.0) + minf(impact * BOUNCE_FACTOR, BOUNCE_MAX_SPEED))
+
+
+## Spinge fuori dai nemici vivi alla stessa quota; se ci si andava addosso
+## si rimbalza indietro e si perde un punto vita (non durante
+## l'invulnerabilità, per esempio all'inizio della schivata o dopo un colpo).
+func _collide_enemies(world: World) -> void:
+	if _state in [State.DEAD, State.FALL]:
+		return
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as Enemy
+		if enemy == null or enemy.is_dead() or absf(enemy.ground_elevation - ground_elevation) > HIT_HEIGHT_REACH \
+				or altitude() - enemy.ground_elevation > JUMP_EVADE_HEIGHT:
+			continue
+		var offset := position - enemy.position
+		var minimum := RADIUS + enemy.radius
+		var distance := offset.length()
+		if distance >= minimum:
+			continue
+		var away := offset / distance if distance > 0.01 else -facing
+		var into := _velocity.dot(-away)
+		position = world.move(position, away * (minimum - distance), RADIUS * 0.8)
+		if into <= ENEMY_BUMP_SPEED:
+			continue
+		_velocity += away * into
+		_bump_enemy(away)
+
+
+func _bump_enemy(away: Vector2) -> void:
+	var dodging := (_state == State.DODGE and _state_time <= DODGE_INVULNERABLE_TIME) \
+			or (_state == State.SLIDE and _state_time <= SLIDE_INVULNERABLE_TIME)
+	if _invulnerable_time > 0.0 or dodging:
+		return
+	health = maxi(health - ENEMY_BUMP_DAMAGE, 0)
+	health_changed.emit(health, max_health)
+	if health == 0:
+		_change_state(State.DEAD)
+		Sfx.play("death", global_position)
+		died.emit()
+		return
+	_change_state(State.HURT)
+	_velocity = away * ENEMY_BUMP_KNOCKBACK
+	_invulnerable_time = HURT_INVULNERABLE_TIME
+	Sfx.play("hurt", global_position)
 
 
 ## Spinta senza passare attraverso dirupi e ostacoli.

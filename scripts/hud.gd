@@ -180,7 +180,9 @@ func _update_power_ups() -> void:
 	if rows == _power_ups_shown:
 		return
 	_power_ups_shown = rows
+	# Tolte subito, così la misura del pannello conta solo le icone nuove.
 	for child in _power_ups.get_children():
+		_power_ups.remove_child(child)
 		child.queue_free()
 	_power_ups_panel.visible = not rows.is_empty()
 	for row: Array in rows:
@@ -199,8 +201,7 @@ func _update_power_ups() -> void:
 		label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
 		tile.add_child(label)
 		_power_ups.add_child(tile)
-	# Il pannello si restringe quando le icone diminuiscono.
-	_power_ups_panel.reset_size.call_deferred()
+	_fit_power_ups.call_deferred()
 
 
 ## In basso a destra; con i controlli touch lì ci sono i pulsanti, quindi
@@ -214,11 +215,22 @@ func _place_power_ups() -> void:
 	_power_ups_panel.set_anchors_preset(preset)
 	_power_ups_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	_power_ups_panel.grow_vertical = Control.GROW_DIRECTION_END if touch else Control.GROW_DIRECTION_BEGIN
-	var y := POWER_UPS_TOUCH_TOP if touch else -POWER_UPS_MARGIN
+	_fit_power_ups()
+
+
+## Il bordo destro (e quello in basso, o in alto con il touch) resta fermo:
+## con più icone il pannello si allarga verso sinistra, con meno si stringe.
+func _fit_power_ups() -> void:
+	var touch := _power_ups_preset == Control.PRESET_TOP_RIGHT
+	var needed := _power_ups_panel.get_combined_minimum_size()
 	_power_ups_panel.offset_right = -POWER_UPS_MARGIN
-	_power_ups_panel.offset_left = -POWER_UPS_MARGIN
-	_power_ups_panel.offset_top = y
-	_power_ups_panel.offset_bottom = y
+	_power_ups_panel.offset_left = -POWER_UPS_MARGIN - needed.x
+	if touch:
+		_power_ups_panel.offset_top = POWER_UPS_TOUCH_TOP
+		_power_ups_panel.offset_bottom = POWER_UPS_TOUCH_TOP + needed.y
+	else:
+		_power_ups_panel.offset_bottom = -POWER_UPS_MARGIN
+		_power_ups_panel.offset_top = -POWER_UPS_MARGIN - needed.y
 
 
 ## Mette la riga dei potenziamenti attivi su un pannello scuro, perché si
