@@ -23,8 +23,11 @@ const POWER_UPS_TOUCH_TOP := 234.0
 const COLOR_POWER_UPS_PANEL := Color(0.05, 0.07, 0.05, 0.8)
 ## Per quanto resta il messaggio di fine sfida.
 const CHALLENGE_FLASH_TIME := 3.5
-## A ogni livello si sceglie tra questi potenziamenti, presi a caso.
+## A ogni livello si sceglie tra questi potenziamenti, presi a caso; ogni
+## potenziamento "choice" ne aggiunge uno dal livello successivo. Le schede
+## stanno su righe di al massimo UPGRADE_COLUMNS.
 const UPGRADE_CHOICES := 3
+const UPGRADE_COLUMNS := 5
 
 ## Nome di ogni potenziamento (chiave di traduzione), nell'ordine della griglia.
 const UPGRADE_NAMES := {
@@ -38,6 +41,10 @@ const UPGRADE_NAMES := {
 	"mana": "UPGRADE_MANA",
 	"spell": "UPGRADE_SPELL",
 	"stamina": "UPGRADE_STAMINA",
+	"potion_slots": "UPGRADE_POTION_SLOTS",
+	"potion_heal": "UPGRADE_POTION_HEAL",
+	"mana_restore": "UPGRADE_MANA_RESTORE",
+	"choice": "UPGRADE_CHOICE",
 }
 
 @onready var _deck_hint: Label = %DeckHint
@@ -70,6 +77,10 @@ var pause_menu := PauseMenu.new()
 	"mana": %UpgradeMana as Button,
 	"spell": %UpgradeSpell as Button,
 	"stamina": %UpgradeStamina as Button,
+	"potion_slots": %UpgradePotionSlots as Button,
+	"potion_heal": %UpgradePotionHeal as Button,
+	"mana_restore": %UpgradeManaRestore as Button,
+	"choice": %UpgradeChoice as Button,
 }
 ## Potenziamenti proposti in questo passaggio di livello.
 var _offered: Array[String] = []
@@ -251,7 +262,20 @@ func _upgrade_value(upgrade: String) -> String:
 			return str(player.spell_damage())
 		"stamina":
 			return str(roundi(player.max_stamina))
+		"potion_slots":
+			return str(player.potion_capacity())
+		"potion_heal":
+			return str(player.potion_heal())
+		"mana_restore":
+			return str(roundi(player.mana_potion_restore()))
+		"choice":
+			return str(upgrade_choices())
 	return ""
+
+
+## Schede proposte a ogni passaggio di livello.
+func upgrade_choices() -> int:
+	return mini(UPGRADE_CHOICES + int(player.upgrades_taken.get("choice", 0)), UPGRADE_NAMES.size())
 
 
 ## Scheda di un potenziamento: icona, nome e valore prima → dopo.
@@ -401,10 +425,19 @@ func show_level_up(level: int, damage_before: int, damage_after: int) -> void:
 	var spell_bonus := player.spell_bonus + player.inventory.bonus("spell")
 	_card_values["spell"].text = tr("UPGRADE_VALUE") % [player.spell_damage(), roundi(player.spell_damage() * (1.0 + spell_bonus + Player.SPELL_UPGRADE) / (1.0 + spell_bonus))]
 	_card_values["stamina"].text = tr("UPGRADE_VALUE") % [roundi(player.max_stamina), roundi(player.max_stamina + Player.MAX_STAMINA * Player.STAMINA_UPGRADE)]
+	_card_values["potion_slots"].text = tr("UPGRADE_VALUE") % [player.potion_capacity(), player.potion_capacity() + 1]
+	_card_values["potion_heal"].text = tr("UPGRADE_VALUE") % [player.potion_heal(), player.potion_heal() + Player.POTION_HEAL_UPGRADE]
+	_card_values["mana_restore"].text = tr("UPGRADE_VALUE") % [roundi(player.mana_potion_restore()), roundi(player.mana_potion_restore() + Player.MANA_POTION_RESTORE * Player.MANA_RESTORE_UPGRADE)]
+	_card_values["choice"].text = tr("UPGRADE_VALUE") % [upgrade_choices(), mini(upgrade_choices() + 1, UPGRADE_NAMES.size())]
 	# Solo alcuni potenziamenti, presi a caso, nell'ordine della griglia.
+	var choices := upgrade_choices()
 	var picks: Array = _upgrade_buttons.keys()
+	# Con tutte le schede già proposte, "una scheda in più" non serve più.
+	if choices >= UPGRADE_NAMES.size() - 1:
+		picks.erase("choice")
 	picks.shuffle()
-	picks = picks.slice(0, UPGRADE_CHOICES)
+	picks = picks.slice(0, choices)
+	(_upgrade_buttons["combo"].get_parent() as GridContainer).columns = mini(picks.size(), UPGRADE_COLUMNS)
 	_offered.clear()
 	for upgrade: String in _upgrade_buttons:
 		_upgrade_buttons[upgrade].visible = upgrade in picks

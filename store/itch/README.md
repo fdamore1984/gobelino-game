@@ -70,8 +70,9 @@ IN THIS PROTOTYPE
 - Parry with your sword across your body: the enemy's strike is cut short and the enemy is pushed back. Time it right before the hit for a perfect parry: the enemy is stunned and your attacks are empowered for a few seconds (double damage, faster swings)
 - Dodge with a roll on the ground or an air dash mid-jump, steer it while dodging, and unlock upgrades to chain more dodges in a row. You can dodge or parry between the hits of a combo; attacking during an air dash turns it into an immediate strike. You can keep moving while attacking: every strike is different from the last (slash, backhand, overhead chop, thrust) and always hits the same area in front of you
 - Jump over enemy attacks (unlock multiple jumps in mid-air) and combine jumps with dodges
-- Hold R2 to run; dodge while running to slide, and attack, dodge, jump or parry out of the slide
-- Healing and mana potions with no limit: the ones you find or buy go straight to your belt (you start with 2 healing potions) and a magic shield that absorbs one hit, recharging in 30 seconds
+- Press L3 to start or stop running (it stops by itself when you stand still); dodge while running to slide, and attack, dodge, jump or parry out of the slide
+- Hold R2 for focus mode: items to pick up glow with a beam of light, so you never miss them
+- Healing and mana potions: carry up to 10 of each (more with upgrades); the ones you find or buy go straight to your belt (you start with 2 healing potions) and drinking restores you right away and a magic shield that absorbs one hit, recharging in 30 seconds
 - Eight kinds of enemies: quick scouts, warriors, heavy brutes, summoners that call in reinforcements (hit them while they summon to interrupt them), lancers with long thrusts, whirlers that strike all around, huge golems and casters that hurl magic bolts from afar
 - Enemies circle around you with quick sidesteps; watch them wind up (they light up and pull back their weapon): the wind-up is short, so react fast, and beware of chains of strikes. Warriors, brutes, golems and the boss can also leap at you and slam the ground: a red circle marks where they will land, so get out, dodge or jump. They know how to defend: when they raise their guard your strike bounces off with a flash, your combo breaks and you are pushed back, often into a counterattack. Strike them from the side or from behind, or use ground attacks and fireballs to get through
 - Walk up to chests, merchants, totems, caves and stairs and an "Interact" prompt appears: press A (or E) to use them. Loading screens cover every change of place, so the game never freezes
@@ -90,7 +91,7 @@ IN THIS PROTOTYPE
 - Lock on to the nearest enemy in sight with R3 and press again to switch target: you always face it, your strikes and fireballs go its way and the camera keeps it in view
 - Tall walls, mountains and cliffs that hide your character turn fully transparent around you, so you always see what is happening
 - Stone totems stand in the middle of wide open arenas: interact with one to start a 30-second survival challenge with waves of enemies matched to your level, and earn experience and a potion
-- Earn experience to level up: every level raises your base damage and lets you choose an upgrade: one more combo hit, one more chained power strike, one more chained dodge, one more jump, one more health point, a faster shield recharge (5%), a faster run (5%), more stamina (5%), more mana or a stronger spell: three of them, picked at random, are offered on cards with icons. Your skill levels are always shown on screen, and the active power-ups are shown as small icons in the bottom-right corner
+- Earn experience to level up: every level raises your base damage and lets you choose an upgrade: one more combo hit, one more chained power strike, one more chained dodge, one more jump, one more health point, a faster shield recharge (5%), a faster run (5%), more stamina (5%), more mana, a stronger spell, one more potion of each kind carried, stronger healing potions, stronger mana potions (5%) or one more card to choose from at the next level-ups: three of them (more with that upgrade), picked at random, are offered on cards with icons. Your skill levels are always shown on screen, and the active power-ups are shown as small icons in the bottom-right corner
 
 CONTROLS
 - Move: left stick / WASD / on-screen stick
@@ -99,7 +100,8 @@ CONTROLS
 - Parry (hold): L1 / K
 - Dodge (press again to chain): B / Space
 - Jump: A / F
-- Run (hold; dodge while running = slide): R2 / Shift
+- Run on/off (dodge while running = slide): L3 / Shift
+- Focus (hold: highlights items to pick up): R2 / V
 - Fireball: X / U
 - Shield: Y / R
 - Potion: D-pad left / Q

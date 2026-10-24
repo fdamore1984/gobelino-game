@@ -186,6 +186,10 @@ func _buy(id: String, button_index: int) -> void:
 		Sfx.play_ui("block")
 		_details.text = "%s\n%s" % [InventoryPanel.describe(id), tr("SHOP_NOT_ENOUGH")]
 		return
+	if not player.can_pick_up(id):
+		Sfx.play_ui("block")
+		_details.text = "%s\n%s" % [InventoryPanel.describe(id), tr("SHOP_BELT_FULL")]
+		return
 	player.inventory.gold -= price
 	World.current.merchant_stock(_merchant).erase(id)
 	player.pickup(id)

@@ -31,6 +31,7 @@ UPGRADE_JUMP,Chained jumps +1
 UPGRADE_RUN,Run speed +5%
 TOUCH_JUMP,Jump
 TOUCH_RUN,Run
+TOUCH_FOCUS,Focus
 DECK_HINT,"Steam Deck: to use the built-in controls as a controller hold the Menu (Start) button for 1 second, or launch the game from Steam"
 UPGRADE_VALUE,%d → %d
 UPGRADE_VALUE_SECONDS,%.1f s → %.1f s
@@ -45,6 +46,10 @@ HUD_GOLD,Gold %d
 UPGRADE_MANA,Max mana +20
 UPGRADE_SPELL,Spell power +20%
 UPGRADE_STAMINA,Stamina +5%
+UPGRADE_POTION_SLOTS,Potions carried +1
+UPGRADE_POTION_HEAL,Health potion heals +1
+UPGRADE_MANA_RESTORE,Mana potion restores +5%
+UPGRADE_CHOICE,One more upgrade to choose
 INVENTORY_TITLE,Inventory
 INVENTORY_EQUIPPED,"Equipment: weapon, armor, boots, amulet, ring"
 INVENTORY_EMPTY,Nothing yet: open chests to find items
@@ -98,6 +103,7 @@ SHOP_PRICE,%d gold
 SHOP_BUY_ACTION,A: buy for %d gold
 SHOP_SELL_ACTION,A: sell for %d gold
 SHOP_NOT_ENOUGH,You don't have enough gold
+SHOP_BELT_FULL,Your potion belt is full
 SHOP_NOTHING_TO_SELL,Nothing to sell: collect items from chests
 SHOP_HINT,A / Enter: buy or sell · B / Esc / I: close
 SHOP_CLOSE,Close
@@ -118,7 +124,8 @@ CONTROLS_HEAVY,Power strike (hold to charge) | L | L2
 CONTROLS_PARRY,Parry | K | L1
 CONTROLS_DODGE,"Dodge (roll, air dash while jumping) | Space | B"
 CONTROLS_JUMP,"Jump (near chests, merchants, caves: interact) | F / E | A"
-CONTROLS_RUN,Run (dodge while running to slide) | Shift | R2
+CONTROLS_RUN,Run on/off (dodge while running to slide) | Shift | L3
+CONTROLS_FOCUS,Focus (hold: highlights items to pick up) | V | R2
 CONTROLS_SPELL,Fireball | U | X
 CONTROLS_SHIELD,Shield | R | Y
 CONTROLS_POTION,Health potion | Q | D-pad left
