@@ -1,7 +1,7 @@
 class_name HudStatus
 extends Control
 ## Pannello di stato in alto a sinistra: ritratto con il livello, barre di
-## vita (a segmenti), mana ed esperienza, livelli delle abilità, monete e
+## vita (a segmenti), stamina, mana ed esperienza, livelli delle abilità, monete e
 ## nemici sconfitti. Tutto disegnato con forme geometriche.
 
 const PANEL_SIZE := Vector2(460, 146)
@@ -20,6 +20,9 @@ const COLOR_BORDER := Color(1, 1, 1, 0.14)
 const COLOR_BAR_BACK := Color(0, 0, 0, 0.45)
 const COLOR_HEALTH := Color(0.9, 0.25, 0.25)
 const COLOR_HEALTH_LOW := Color(1.0, 0.45, 0.2)
+const COLOR_STAMINA := Color(0.4, 0.85, 0.35)
+## Stamina finita: la barra vuota lampeggia finché non si ricarica un po'.
+const COLOR_STAMINA_EMPTY := Color(1.0, 0.3, 0.2)
 const COLOR_MANA := Color(0.35, 0.55, 1.0)
 const COLOR_XP := Color(1.0, 0.8, 0.3)
 const COLOR_TEXT := Color(1, 1, 1, 0.92)
@@ -68,16 +71,23 @@ func _draw() -> void:
 	_draw_segments(Rect2(BAR_X + 24, 16, BAR_WIDTH - 24, 20), player.health, player.max_health, COLOR_HEALTH_LOW if low else COLOR_HEALTH)
 	_text(font, "%d / %d" % [player.health, player.max_health], Vector2(BAR_X + BAR_WIDTH - 6, 31), FONT_SIZE, COLOR_TEXT, HORIZONTAL_ALIGNMENT_RIGHT)
 
+	# Stamina: attaccare, schivare, saltare, parare e correre la consumano.
+	var stamina_rect := Rect2(BAR_X + 24, 41, BAR_WIDTH - 24, 11)
+	_draw_bolt(Vector2(BAR_X + 9, 46))
+	_draw_bar(stamina_rect, player.stamina / Player.MAX_STAMINA, COLOR_STAMINA)
+	if player.stamina < Player.STAMINA_ATTACK and int(Time.get_ticks_msec() / 150) % 2 == 0:
+		draw_rect(stamina_rect, COLOR_STAMINA_EMPTY, false, 2.0)
+
 	# Mana.
-	UpgradeIcon.draw_icon(self, Vector2(BAR_X + 9, 50), 18.0, "mana", false)
+	UpgradeIcon.draw_icon(self, Vector2(BAR_X + 9, 63), 18.0, "mana", false)
 	draw_set_transform(Vector2.ZERO)
-	_draw_bar(Rect2(BAR_X + 24, 43, BAR_WIDTH - 24, 14), player.mana / player.max_mana, COLOR_MANA)
-	_text(font, "%d / %d" % [floori(player.mana), roundi(player.max_mana)], Vector2(BAR_X + BAR_WIDTH - 6, 55), SMALL_FONT_SIZE, COLOR_TEXT, HORIZONTAL_ALIGNMENT_RIGHT)
+	_draw_bar(Rect2(BAR_X + 24, 57, BAR_WIDTH - 24, 13), player.mana / player.max_mana, COLOR_MANA)
+	_text(font, "%d / %d" % [floori(player.mana), roundi(player.max_mana)], Vector2(BAR_X + BAR_WIDTH - 6, 68), SMALL_FONT_SIZE, COLOR_TEXT, HORIZONTAL_ALIGNMENT_RIGHT)
 
 	# Esperienza verso il livello successivo.
 	var needed := player.experience_needed()
-	_draw_bar(Rect2(BAR_X + 24, 66, BAR_WIDTH - 24, 8), float(player.experience) / needed, COLOR_XP)
-	_text(font, tr("HUD_XP") % [player.experience, needed], Vector2(BAR_X + 24, 92), SMALL_FONT_SIZE, COLOR_DIM_TEXT)
+	_draw_bar(Rect2(BAR_X + 24, 76, BAR_WIDTH - 24, 6), float(player.experience) / needed, COLOR_XP)
+	_text(font, tr("HUD_XP") % [player.experience, needed], Vector2(BAR_X + 24, 99), SMALL_FONT_SIZE, COLOR_DIM_TEXT)
 
 	# Abilità (si leggono anche nell'elenco dei potenziamenti a destra).
 	var x := 18.0
@@ -111,6 +121,17 @@ func _draw_portrait(font: Font) -> void:
 	draw_circle(badge, 15.0, Color(0.2, 0.15, 0.05))
 	draw_circle(badge, 13.0, COLOR_XP)
 	_text(font, str(player.level), badge + Vector2(0, 6), FONT_SIZE, Color(0.15, 0.1, 0.0), HORIZONTAL_ALIGNMENT_CENTER)
+
+
+## Fulmine verde accanto alla barra della stamina.
+func _draw_bolt(center: Vector2) -> void:
+	var points := PackedVector2Array([center + Vector2(2, -8), center + Vector2(-5, 1), center + Vector2(0, 1),
+			center + Vector2(-2, 8), center + Vector2(5, -1), center + Vector2(0, -1)])
+	var outline := PackedVector2Array()
+	for point in points:
+		outline.append(center + (point - center) * 1.3)
+	draw_colored_polygon(outline, COLOR_OUTLINE)
+	draw_colored_polygon(points, COLOR_STAMINA)
 
 
 func _draw_heart(center: Vector2, radius: float) -> void:

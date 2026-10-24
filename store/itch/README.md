@@ -30,7 +30,7 @@ godot --path . --resolution 1260x1000 res://tools/store_capture.tscn -- cover
 | Languages | English |
 | Inputs | Keyboard, Xbox controller, Playstation controller |
 | Cover image | `cover_en.png` (630×500) |
-| Screenshots | `en_1_combat.png`, `en_2_parry.png`, `en_5_challenge.png`, `en_6_inventory.png`, `en_9_slam.png`, `en_11_cave.png`, `en_12_dungeon.png`, `en_7_merchant.png`, `en_8_shop.png`, `en_3_level_up.png`, `en_4_menu.png`, `en_10_controls.png` (per ora il gioco è solo in inglese) |
+| Screenshots | `en_1_combat.png`, `en_2_parry.png`, `en_5_challenge.png`, `en_6_inventory.png`, `en_9_slam.png`, `en_11_cave.png`, `en_13_map.png`, `en_12_dungeon.png`, `en_7_merchant.png`, `en_8_shop.png`, `en_3_level_up.png`, `en_4_menu.png`, `en_10_controls.png` (per ora il gioco è solo in inglese) |
 
 ### Tags
 
@@ -45,7 +45,7 @@ action-rpg, fantasy, medieval, goblins, isometric, 2d, controller, singleplayer,
 ## Short description or tagline
 
 ```
-A feral goblin, a world to explore, real-time combat.
+A feral goblin, a world to explore, deadly Souls-like combat.
 ```
 
 ---
@@ -64,9 +64,11 @@ You are a lone goblin with no past, living in a den like a wild animal. Starting
 
 IN THIS PROTOTYPE
 - A boundless, randomly generated 3D isometric world made of blocks: grassy platforms stacked in steps at different heights, sloping ramps and dirt paths. Jump to climb onto higher blocks (multiple jumps reach the tallest ones) and drop down to lower ground. Here and there trees, rocks, bushes and thorny brambles (bushes and brambles slow you down, brambles prick)
+- Souls-like combat, fast and deadly for both sides: enemies hit hard (two or three mistakes and you're dead) but don't soak up endless damage. Every enemy attack has a clear wind-up, so when you get hit it's on you. Attacks are committed: once a swing starts, yours or theirs, it can't be cancelled
+- Stamina: attacking, dodging, jumping, blocking and running all drain it. Empty it and you can't swing or roll, and a block can break your guard. Drinking a potion takes a moment, and enemies rush in to punish you when you heal or back away
 - Real-time combat: chain up to 3 attacks in a combo, each hit stronger than the last, and finish it with a power strike for a big bonus. Hold the attack button to keep swinging
 - Parry with your sword across your body: the enemy's strike is cut short and the enemy is pushed back. Time it right before the hit for a perfect parry: the enemy is stunned and your attacks are empowered for a few seconds (double damage, faster swings)
-- Dodge with a roll on the ground or an air dash mid-jump, steer it while dodging, and unlock upgrades to chain more dodges in a row. Dodge and parry are always available and cancel your combo; attacking cancels a dodge into an immediate strike. You can keep moving while attacking: every strike is different from the last (slash, backhand, overhead chop, thrust) and always hits the same area in front of you
+- Dodge with a roll on the ground or an air dash mid-jump, steer it while dodging, and unlock upgrades to chain more dodges in a row. You can dodge or parry between the hits of a combo; attacking during an air dash turns it into an immediate strike. You can keep moving while attacking: every strike is different from the last (slash, backhand, overhead chop, thrust) and always hits the same area in front of you
 - Jump over enemy attacks (unlock multiple jumps in mid-air) and combine jumps with dodges
 - Hold R2 to run; dodge while running to slide, and attack, dodge, jump or parry out of the slide
 - Healing and mana potions with no limit: the ones you find or buy go straight to your belt (you start with 2 healing potions) and a magic shield that absorbs one hit, recharging in 30 seconds
@@ -79,7 +81,7 @@ IN THIS PROTOTYPE
 - Hold the power strike to charge it up to double damage; every hit you land freezes the action for an instant, throws sparks, knocks the enemy back and spills blood that stays on the ground; fallen enemies lie on the ground for a while. Bump into whatever blocks your way (rocks, trees, chests, walls too high to climb) and a white light flashes right where you hit it, bouncing you back a little
 - Cast fireballs that seek out and chase the nearest enemy (they cost mana: drink mana potions to refill); they crash into trees, rocks and walls
 - Defeated enemies sometimes drop gold or items, and once in a while a rare one
-- Day slowly turns to night (a dial next to the minimap shows the sun and the moon crossing the sky): light your torch to see a wide area in the dark. A minimap shows the area around you, enemies as red dots, chests, totems and merchants
+- Day slowly turns to night (a dial next to the minimap shows the sun and the moon crossing the sky): light your torch to see a wide area in the dark. A minimap shows the area around you, enemies as red dots, chests, totems, merchants, cave entrances, stairs and exits. Press Select for the full map
 - Open chests to find gold, weapons, armor, boots, amulets, rings, spell books and potions; equip the gear and read the books from your inventory, a scrolling grid you can sort by power or value, which compares each piece of gear with the one you are wearing
 - Travelling merchants are scattered around the world: walk up to their stall and interact to sell the items you don't use and to buy potions and rare gear you won't find in chests (dragon sword, plate armor, wind boots, archmage amulet, inferno ring, meteor and vigor tomes, elixirs)
 - Long mountain ranges and deep ravines cut across the land: mountains can't be crossed, ravines can swallow you, but a running jump and a couple of air dashes can carry you over the narrow ones. Caves open in the mountain walls
@@ -105,6 +107,7 @@ CONTROLS
 - Torch: D-pad down / G
 - Interact (chests, merchants, totems, caves, stairs): A / E
 - Inventory: D-pad up / I (R3 / C to sort)
+- Map: Select / M
 - Lock on the nearest enemy (press again to switch target): R3 / C
 - Pause menu (save, controls, quit): Start / Esc
 - Special attacks: power strike right after a combo = leap and slam; attack in mid-air = aerial slashes; power strike in mid-air = plunge; power strike during an air dash = dash strike

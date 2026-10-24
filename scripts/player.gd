@@ -34,7 +34,7 @@ signal experience_changed(current: int, needed: int, level: int)
 signal leveled_up(level: int)
 signal died
 
-enum State { NORMAL, ATTACK, PARRY, DODGE, SLIDE, HURT, DEAD, SLAM, FALL, RECOIL }
+enum State { NORMAL, ATTACK, PARRY, DODGE, SLIDE, HURT, DEAD, SLAM, FALL, RECOIL, DRINK }
 
 const RADIUS := 22.0
 const START_HEALTH := 5
@@ -240,6 +240,29 @@ const REPEL_SPEED := 420.0
 const REPEL_TIME := 0.35
 const COLOR_GUARD_SPARK := Color(0.8, 0.9, 1.0)
 
+## Vigore (stamina): attacchi, schivate, scivolate, salti e colpi parati lo
+## consumano, la corsa lo consuma finché dura; si ricarica dopo un attimo
+## di pausa (più piano mentre si para). Senza vigore non si agisce e un
+## colpo parato rompe la guardia.
+const MAX_STAMINA := 100.0
+const STAMINA_REGEN := 45.0
+const STAMINA_REGEN_DELAY := 0.55
+const STAMINA_PARRY_REGEN_FACTOR := 0.35
+const STAMINA_ATTACK := 20.0
+const STAMINA_HEAVY := 32.0
+const STAMINA_DODGE := 28.0
+const STAMINA_JUMP := 12.0
+const STAMINA_BLOCK := 30.0
+const STAMINA_RUN := 16.0
+## Guardia rotta: si resta storditi per questo tempo.
+const GUARD_BREAK_TIME := 0.8
+## Bere una pozione richiede tempo: ci si muove piano e non si può fare
+## altro; l'effetto arriva a DRINK_EFFECT_TIME (se colpiti prima, la
+## pozione è persa).
+const DRINK_TIME := 0.95
+const DRINK_EFFECT_TIME := 0.6
+const DRINK_SPEED_FACTOR := 0.3
+
 const HURT_TIME := 0.25
 const HURT_KNOCKBACK := 420.0
 const HURT_INVULNERABLE_TIME := 0.8
@@ -269,6 +292,8 @@ const COLOR_HEAL := Color(0.5, 1.0, 0.5)
 const COLOR_BUBBLE := Color(0.55, 0.85, 1.0)
 const COLOR_MANA := Color(0.45, 0.65, 1.0)
 const COLOR_FLAME := Color(1.0, 0.6, 0.2)
+const COLOR_HEALTH_FLASK := Color(0.9, 0.2, 0.25)
+const COLOR_MANA_FLASK := Color(0.3, 0.5, 1.0)
 
 var max_health := START_HEALTH
 ## Vita massima senza l'equipaggiamento (cresce con i potenziamenti).
@@ -320,6 +345,15 @@ var _queued_attack := ""
 var _attack_resolved := false
 ## Velocità dell'attacco in corso: resta quella con cui è iniziato.
 var _attack_speed := 1.0
+var stamina := MAX_STAMINA
+var _stamina_delay := 0.0
+## Si sta correndo (consuma vigore).
+var _running := false
+## Pozione che si sta bevendo ("potion" o "mana_potion") e se ha già fatto effetto.
+var _drinking := ""
+var _drink_done := false
+## Stordimento dopo una guardia rotta (si usa lo stato HURT, più lungo).
+var _hurt_time := HURT_TIME
 ## C'è un elemento con cui interagire qui vicino (lo decide Game).
 var can_interact := false
 ## Cresce a ogni attacco di spada (non gli attacchi a terra): i nemici lo
@@ -407,6 +441,10 @@ func _physics_process(delta: float) -> void:
 	_combo_timer = maxf(_combo_timer - delta, 0.0)
 	shield_cooldown = maxf(shield_cooldown - delta, 0.0)
 	_spell_cooldown = maxf(_spell_cooldown - delta, 0.0)
+	_stamina_delay = maxf(_stamina_delay - delta, 0.0)
+	if _stamina_delay == 0.0 and not _running and _state != State.DEAD:
+		var regen := STAMINA_REGEN * (STAMINA_PARRY_REGEN_FACTOR if _state == State.PARRY else 1.0)
+		stamina = minf(stamina + regen * delta, MAX_STAMINA)
 	if _state != State.DEAD:
 		mana = minf(mana + MANA_REGEN * delta, max_mana)
 
@@ -415,11 +453,11 @@ func _physics_process(delta: float) -> void:
 
 	if _state not in [State.DEAD, State.HURT]:
 		if Input.is_action_just_pressed("potion"):
-			_drink_potion()
+			_start_drink("potion")
 		if Input.is_action_just_pressed("shield"):
 			_raise_shield()
 		if Input.is_action_just_pressed("mana_potion"):
-			_drink_mana_potion()
+			_start_drink("mana_potion")
 		if Input.is_action_just_pressed("spell"):
 			_cast_fireball(input)
 	if _state != State.DEAD:
@@ -436,7 +474,11 @@ func _physics_process(delta: float) -> void:
 			if input != Vector2.ZERO:
 				_target_facing = input.normalized()
 			_face_lock()
-			var running := Input.is_action_pressed("run") and input != Vector2.ZERO
+			var running := Input.is_action_pressed("run") and input != Vector2.ZERO and stamina > 0.0 and not is_airborne()
+			_running = running
+			if running:
+				stamina = maxf(stamina - STAMINA_RUN * delta, 0.0)
+				_stamina_delay = STAMINA_REGEN_DELAY
 			# In aria si avanza un po' più piano: il salto porta meno lontano.
 			var air := AIR_SPEED_FACTOR if is_airborne() else 1.0
 			_velocity = _accelerate(_velocity, input * (run_speed() if running else walk_speed()) * air, delta)
@@ -459,14 +501,9 @@ func _physics_process(delta: float) -> void:
 				_change_state(State.PARRY)
 
 		State.ATTACK:
-			# Schivata e parata sono sempre possibili e interrompono la combo.
-			if Input.is_action_just_pressed("dodge") and _dodge_cooldown == 0.0:
-				_start_dodge(dodge_input)
-			elif Input.is_action_just_pressed("parry"):
-				_end_combo()
-				_change_state(State.PARRY)
-			else:
-				_update_attack(input, delta)
+			# Un attacco iniziato non si interrompe: si può solo concatenare il successivo.
+			_running = false
+			_update_attack(input, delta)
 
 		State.PARRY:
 			if input != Vector2.ZERO:
@@ -479,20 +516,16 @@ func _physics_process(delta: float) -> void:
 				_change_state(State.NORMAL)
 
 		State.DODGE:
-			# Attaccare o parare interrompe subito la schivata; il colpo
-			# potente durante lo scatto in aria fa piombare a terra con un
-			# colpo ampio, quello normale è un attacco aereo.
-			if Input.is_action_just_pressed("heavy_attack"):
+			# A terra la schivata non si interrompe. Durante lo scatto in aria il
+			# colpo potente fa piombare a terra con un colpo ampio, quello
+			# normale è un attacco aereo.
+			_running = false
+			if is_airborne() and _air_dash and Input.is_action_just_pressed("heavy_attack"):
 				_end_combo()
-				if is_airborne() and _air_dash:
-					_start_slam("dash", input)
-				else:
-					_start_heavy(input)
-			elif Input.is_action_just_pressed("attack"):
+				_start_slam("dash", input)
+			elif is_airborne() and Input.is_action_just_pressed("attack"):
 				_end_combo()
 				_start_attack(1, input)
-			elif Input.is_action_just_pressed("parry"):
-				_change_state(State.PARRY)
 			elif Input.is_action_just_pressed("dodge") and _dodges_used < max_chained_dodges \
 					and _state_time >= DODGE_CHAIN_MIN_TIME:
 				_chain_dodge(dodge_input)
@@ -559,7 +592,21 @@ func _physics_process(delta: float) -> void:
 
 		State.HURT:
 			_velocity = _velocity.move_toward(Vector2.ZERO, HURT_KNOCKBACK * 4.0 * delta)
-			if _state_time >= HURT_TIME:
+			if _state_time >= _hurt_time:
+				_hurt_time = HURT_TIME
+				_change_state(State.NORMAL)
+
+		State.DRINK:
+			# Si beve: ci si muove piano e non si fa altro finché non si finisce.
+			_running = false
+			if input != Vector2.ZERO:
+				_target_facing = input.normalized()
+			_velocity = _accelerate(_velocity, input * walk_speed() * DRINK_SPEED_FACTOR, delta)
+			if not _drink_done and _state_time >= DRINK_EFFECT_TIME:
+				_drink_done = true
+				_apply_drink()
+			if _state_time >= DRINK_TIME:
+				_drinking = ""
 				_change_state(State.NORMAL)
 
 		State.DEAD:
@@ -790,6 +837,16 @@ func receive_hit(from: Vector2, damage: int) -> String:
 			_empowered_time = EMPOWER_TIME
 			Sfx.play("perfect", global_position)
 			return "parried"
+		stamina -= STAMINA_BLOCK
+		_stamina_delay = STAMINA_REGEN_DELAY
+		if stamina < 0.0:
+			# Senza vigore la guardia si rompe: si resta storditi, esposti.
+			stamina = 0.0
+			_hurt_time = GUARD_BREAK_TIME
+			_change_state(State.HURT)
+			_velocity = -to_attacker * HURT_KNOCKBACK * 0.6
+			Sfx.play("shield_break", global_position)
+			return "broken"
 		_push(-to_attacker * 12.0)
 		Sfx.play("block", global_position)
 		return "blocked"
@@ -1144,6 +1201,8 @@ func _attack_recovery() -> float:
 
 
 func _start_attack(step: int, input: Vector2) -> void:
+	if not _use_stamina(STAMINA_ATTACK):
+		return
 	_combo_step = clampi(step, 1, max_combo_hits)
 	_heavy_step = 0
 	_attack_heavy = false
@@ -1152,6 +1211,8 @@ func _start_attack(step: int, input: Vector2) -> void:
 
 
 func _start_heavy(input: Vector2) -> void:
+	if not _use_stamina(STAMINA_HEAVY):
+		return
 	# In aria il colpo potente fa piombare a terra.
 	if is_airborne():
 		_start_slam("plunge", input)
@@ -1214,6 +1275,9 @@ func _next_combo_step() -> int:
 ## Inizia un attacco a terra: salto (leap) o sosta in aria prima di
 ## piombare giù (plunge, dash).
 func _start_slam(kind: String, input: Vector2) -> void:
+	# Il colpo dallo scatto in aria paga qui; gli altri lo pagano come colpo potente.
+	if kind == "dash" and not _use_stamina(STAMINA_HEAVY):
+		return
 	_slam_kind = kind
 	_slam_landed = false
 	_attack_heavy = kind == "leap"
@@ -1309,7 +1373,7 @@ func _slam_damage() -> int:
 
 
 func _jump() -> void:
-	if _jumps_used >= max_jumps:
+	if _jumps_used >= max_jumps or not _use_stamina(STAMINA_JUMP):
 		return
 	_jumps_used += 1
 	_height_velocity = JUMP_SPEED
@@ -1319,6 +1383,8 @@ func _jump() -> void:
 ## La scivolata parte almeno alla velocità di corsa, così funziona anche
 ## subito dopo un attacco, quando non si è ancora ripresa velocità.
 func _start_slide(input: Vector2) -> void:
+	if not _use_stamina(STAMINA_DODGE):
+		return
 	_slide_direction = input.normalized()
 	_slide_speed = maxf(_velocity.length(), run_speed()) * SLIDE_SPEED_FACTOR
 	_target_facing = _slide_direction
@@ -1327,6 +1393,8 @@ func _start_slide(input: Vector2) -> void:
 
 
 func _start_dodge(input: Vector2) -> void:
+	if not _use_stamina(STAMINA_DODGE):
+		return
 	# Senza direzione a terra si rotola all'indietro; in aria si scatta in avanti.
 	_set_air_dash()
 	_dodge_direction = input.normalized() if input != Vector2.ZERO else (facing if _air_dash else -facing)
@@ -1347,6 +1415,8 @@ func _set_air_dash() -> void:
 
 ## Schivata concatenata: riparte a piena velocità, nella nuova direzione.
 func _chain_dodge(input: Vector2) -> void:
+	if not _use_stamina(STAMINA_DODGE):
+		return
 	_dodges_used += 1
 	_set_air_dash()
 	if input != Vector2.ZERO:
@@ -1356,22 +1426,53 @@ func _chain_dodge(input: Vector2) -> void:
 	_change_state(State.DODGE)
 
 
-func _drink_potion() -> void:
-	if potions == 0 or health >= max_health:
+## Inizia a bere una pozione (solo fermi a terra, senza fare altro): la
+## pozione si consuma subito, l'effetto arriva dopo un attimo (vedi DRINK).
+func _start_drink(kind: String) -> void:
+	if _state != State.NORMAL or is_airborne():
 		return
-	var healed := mini(POTION_HEAL, max_health - health)
-	potions -= 1
-	health += healed
-	health_changed.emit(health, max_health)
-	Sfx.play("potion", global_position)
+	if kind == "potion":
+		if potions == 0 or health >= max_health:
+			return
+		potions -= 1
+	else:
+		if mana_potions == 0 or mana >= max_mana:
+			return
+		mana_potions -= 1
+	_drinking = kind
+	_drink_done = false
+	_end_combo()
+	_change_state(State.DRINK)
 
 
-func _drink_mana_potion() -> void:
-	if mana_potions == 0 or mana >= max_mana:
-		return
-	mana_potions -= 1
-	mana = minf(mana + MANA_POTION_RESTORE, max_mana)
-	Sfx.play("mana_potion", global_position)
+func _apply_drink() -> void:
+	if _drinking == "potion":
+		health = mini(health + POTION_HEAL, max_health)
+		health_changed.emit(health, max_health)
+		Sfx.play("potion", global_position)
+	else:
+		mana = minf(mana + MANA_POTION_RESTORE, max_mana)
+		Sfx.play("mana_potion", global_position)
+
+
+## Velocità attuale sul terreno (i nemici la usano per capire se ci si ritira).
+func ground_velocity() -> Vector2:
+	return _velocity
+
+
+## Sta bevendo una pozione (i nemici ne approfittano).
+func is_healing() -> bool:
+	return _state == State.DRINK
+
+
+## Consuma vigore per un'azione; senza vigore l'azione non parte.
+func _use_stamina(cost: float) -> bool:
+	if stamina <= 0.0:
+		_queued_attack = ""
+		return false
+	stamina = maxf(stamina - cost, 0.0)
+	_stamina_delay = STAMINA_REGEN_DELAY
+	return true
 
 
 ## Palla di fuoco verso dove si guarda (o si punta la levetta): poi
@@ -1598,6 +1699,8 @@ func _draw() -> void:
 
 	if _state != State.DEAD:
 		_draw_sword()
+		if _state == State.DRINK:
+			_draw_flask()
 		if torch_on:
 			_draw_torch()
 
@@ -1606,6 +1709,18 @@ func _draw() -> void:
 		Shapes.disc(self, Vector2.ZERO, RADIUS + 16.0, Color(COLOR_BUBBLE, 0.15))
 		draw_arc(Vector2.ZERO, RADIUS + 16.0, 0.0, TAU, 40, Color(COLOR_BUBBLE, 0.7), 2.5)
 	draw_set_transform(Vector2.ZERO)
+
+
+## Bevendo: la fiaschetta (rossa o blu) sale alla bocca e si inclina.
+func _draw_flask() -> void:
+	var color := COLOR_HEALTH_FLASK if _drinking == "potion" else COLOR_MANA_FLASK
+	var t := clampf(_state_time / DRINK_EFFECT_TIME, 0.0, 1.0)
+	var at := facing * RADIUS * lerpf(1.2, 0.7, t) + Vector2(0, lerpf(4.0, -8.0, t))
+	var neck := Vector2.from_angle(-PI / 2.0 + facing.x * 1.2 * t) * 10.0
+	draw_line(at, at + neck, Color(0.85, 0.8, 0.7), 4.0)
+	Shapes.disc(self, at, 7.5, Color(0, 0, 0, 0.6))
+	Shapes.disc(self, at, 6.0, color)
+	Shapes.disc(self, at + Vector2(-2, -2), 2.0, Color(1, 1, 1, 0.6))
 
 
 ## Spada: a riposo è tenuta di lato; nell'attacco si porta indietro durante

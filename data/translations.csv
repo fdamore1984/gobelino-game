@@ -171,6 +171,10 @@ BOSS_DEFEATED,Guardian defeated! The way out is open
 MENU_CREDITS,Created by fdamore1984 with Claude Code
 CONTROLS_LOCK,Lock on the nearest enemy (press again to switch) | C | R3
 TOUCH_LOCK,Lock
+TOUCH_MAP,Map
+MAP_TITLE,Map
+MAP_HINT,Select / M / B: close
+CONTROLS_MAP,Map | M | Select
 ITEM_BLADE_GUARDIAN,Guardian's blade
 ITEM_ARMOR_GUARDIAN,Guardian's armor
 ITEM_BOOTS_GUARDIAN,Guardian's boots

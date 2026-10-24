@@ -28,6 +28,7 @@ const BUTTONS := [
 	{"action": "torch", "label": "TOUCH_TORCH", "offset": Vector2(-450, -180), "radius": SMALL_BUTTON_RADIUS},
 	{"action": "inventory", "label": "TOUCH_INVENTORY", "offset": Vector2(-450, -300), "radius": SMALL_BUTTON_RADIUS},
 	{"action": "lock_on", "label": "TOUCH_LOCK", "offset": Vector2(-335, -420), "radius": SMALL_BUTTON_RADIUS},
+	{"action": "map", "label": "TOUCH_MAP", "offset": Vector2(-450, -420), "radius": SMALL_BUTTON_RADIUS},
 ]
 
 var _stick_touch := -1
@@ -58,8 +59,8 @@ func _input(event: InputEvent) -> void:
 			if action != "":
 				_held[touch.index] = action
 				Input.action_press(action)
-				if action == "inventory":
-					# L'inventario si apre e si chiude con un evento, come da tastiera.
+				if action in ["inventory", "map"]:
+					# Inventario e mappa si aprono e si chiudono con un evento, come da tastiera.
 					var open_event := InputEventAction.new()
 					open_event.action = action
 					open_event.pressed = true

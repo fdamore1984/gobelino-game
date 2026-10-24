@@ -49,6 +49,7 @@ var _loading := LoadingOverlay.new()
 var _clock := DayClock.new()
 var _vignette := LowHealthVignette.new()
 var _interact := InteractPrompt.new()
+var _world_map := WorldMap.new()
 ## Menù di pausa: Game si collega ai suoi segnali (salva, esci).
 var pause_menu := PauseMenu.new()
 @onready var _message: Label = %Message
@@ -92,6 +93,7 @@ func _ready() -> void:
 	_message.visible = false
 	_challenge.visible = false
 	add_child(_inventory_panel)
+	add_child(_world_map)
 	add_child(_shop_panel)
 	add_child(pause_menu)
 	add_child(_loading)
@@ -133,6 +135,7 @@ func _process(delta: float) -> void:
 	if player == null:
 		return
 	_inventory_panel.player = player
+	_world_map.player = player
 	_shop_panel.player = player
 	_status.player = player
 	_actions.player = player
@@ -283,6 +286,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		_inventory_panel.open()
 		get_viewport().set_input_as_handled()
 		return
+	# Mappa completa: come l'inventario.
+	if event.is_action_pressed("map") and not get_tree().paused and player and not player.is_dead() \
+			and not _world_map.is_open():
+		_world_map.open()
+		get_viewport().set_input_as_handled()
+		return
 	if _level_up.visible and not _offered.is_empty() and UiNav.handle(event, get_viewport(), _upgrade_buttons[_offered[0]]) and is_inside_tree():
 		get_viewport().set_input_as_handled()
 
@@ -325,7 +334,7 @@ func show_boss(boss: Enemy) -> void:
 
 
 func is_menu_open() -> bool:
-	return pause_menu.is_open() or _inventory_panel.is_open() or _shop_panel.is_open()
+	return pause_menu.is_open() or _inventory_panel.is_open() or _shop_panel.is_open() or _world_map.is_open()
 
 
 ## Apre il negozio del mercante in quella posizione.
