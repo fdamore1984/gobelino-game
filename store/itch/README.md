@@ -23,7 +23,7 @@ godot --path . --resolution 1260x1000 res://tools/store_capture.tscn -- cover
 | Kind of project | Downloadable |
 | Release status | Prototype |
 | Pricing | No payments (oppure "Donate" se vuoi accettare offerte) |
-| Uploads | Caricato dalla CI con butler solo il canale `linux`: in *Edit game → Uploads* spunta la piattaforma Linux. I caricamenti `windows` e `android` vanno eliminati (o nascosti) dalla stessa pagina: per ora Windows non viene aggiornato |
+| Uploads | Caricati dalla CI con butler i canali `linux` e `windows`: in *Edit game → Uploads* spunta la piattaforma Linux sul primo e Windows sul secondo (e rendi di nuovo visibile `windows` se l'avevi nascosto). I vecchi caricamenti `android` vanno eliminati dalla stessa pagina |
 | Genre | Role Playing |
 | Tags | vedi sotto |
 | AI generation disclosure | Sì: codice, testi e grafica provvisoria sono stati prodotti con l'aiuto di un'IA (Claude) |
@@ -114,10 +114,10 @@ CONTROLS
 - Pause menu (save, controls, quit): Start / Esc
 - Special attacks: power strike right after a combo = leap and slam; attack in mid-air = aerial slashes; power strike in mid-air = plunge; power strike during an air dash = dash strike
 
-Play with a controller (Steam Deck built-in controls included) or keyboard. The full list of controls is in the main menu. English only for now.
+Play with a controller (Steam Deck and MSI Claw built-in controls included), keyboard or touch screen. The full list of controls is in the main menu. English only for now.
 
 PLATFORMS
-Linux and SteamOS (Steam Deck).
+Windows (handheld gaming PCs like the MSI Claw 8 included), Linux and SteamOS (Steam Deck).
 ```
 
 ---
@@ -130,6 +130,8 @@ Campo *Download & install instructions* (sotto la sezione Uploads).
 HOW TO INSTALL
 
 Linux / Steam Deck: download the Linux file, extract it and run Gobelino.x86_64 (if needed, make it executable first: right click → Properties → Allow executing, or chmod +x Gobelino.x86_64). On Steam Deck the game always starts in fullscreen, in Desktop Mode too. Do this in Desktop Mode, then add it to Steam as a non-Steam game (Steam → Games → Add a Non-Steam Game) and always launch it from Steam: this way the built-in controller works as a gamepad, both in Game Mode and in Desktop Mode. If you launch it from the itch.io app in Desktop Mode instead, hold the Menu (Start) button for 1 second to switch the built-in controls to controller mode: while a controller is connected the game ignores the keys Steam's desktop layout keeps sending. The main menu shows the detected controller and whether its buttons are recognized.
+
+Windows / MSI Claw 8: download the Windows file, extract it and run Gobelino.exe (if Windows SmartScreen warns you, click More info → Run anyway). On handheld gaming PCs like the MSI Claw 8 the game starts in fullscreen; play with the built-in controller (XInput mode) or touch the screen to show the on-screen controls. You can also add it to Steam as a non-Steam game.
 
 Tip: with the itch.io app (https://itch.io/app) the game updates automatically to the latest build.
 ```

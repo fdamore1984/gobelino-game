@@ -15,15 +15,19 @@ jobs:
       image: barichello/godot-ci:4.4.1
     strategy:
       fail-fast: false
-      # Per ora si pubblica solo la build Linux (SteamOS / Steam Deck). I
-      # preset "Windows Desktop" (pronto anche per l'MSI Claw 8) e "Android"
-      # restano in export_presets.cfg: per riattivarli basta aggiungerli qui
-      # (Android con --export-debug, firmato con la chiave di debug).
+      # Si pubblicano Linux (SteamOS / Steam Deck) e Windows (anche portatili
+      # come l'MSI Claw 8). Il preset "Android" resta in export_presets.cfg:
+      # per riattivarlo basta aggiungerlo qui (con --export-debug, firmato
+      # con la chiave di debug).
       matrix:
         include:
           - preset: "Linux"
             dir: linux
             channel: linux
+            mode: --export-release
+          - preset: "Windows Desktop"
+            dir: windows
+            channel: windows
             mode: --export-release
     steps:
       - uses: actions/checkout@v4
