@@ -9,8 +9,8 @@
 		"gold_chance": 0.25,
 		"gold": [2, 6],
 		"gold_per_level": 1,
-		"item_chance": 0.07,
-		"rare_chance": 0.012
+		"potion_chance": 0.2, "mana_potion_chance": 0.1, "item_chance": 0.03,
+		"rare_chance": 0.005
 	},
 	"items": {
 		"gold": {"category": "gold", "value": 0, "weight": 30, "color": [1.0, 0.82, 0.25]},

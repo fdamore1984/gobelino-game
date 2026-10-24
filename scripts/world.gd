@@ -64,6 +64,13 @@ const STEP_TOLERANCE := 8.0
 const CLOSE_SQUARE := 64.0
 const CLOSE_REACH := 48.0
 const CLOSE_COLLISION_MAX := 48.0
+## Linea di vista (vedi clear_line): passo dei controlli lungo la linea,
+## raggio del colpo, quota sopra cui una parete ferma il colpo e differenza
+## d'altezza entro cui un ostacolo lo ferma.
+const LINE_STEP := 20.0
+const LINE_RADIUS := 6.0
+const LINE_CLEARANCE := 30.0
+const PROJECTILE_HEIGHT_REACH := 70.0
 ## La luce dell'urto è all'altezza del corpo, sopra il punto toccato.
 const CONTACT_LIFT := 14.0
 ## Coordinate (u, v) dei vertici dentro il rombo: alto, destra, basso, sinistra.
@@ -844,6 +851,36 @@ func obstacles_close(point: Vector2) -> Array:
 					result.append(obstacle)
 	_close_cache[key] = result
 	return result
+
+
+## Un colpo che vola a quota altitude (altezza del terreno da cui parte)
+## si ferma in point: montagna o roccia, un terreno più alto di altitude +
+## clearance (una parete), o un ostacolo solido a quella quota.
+func blocks_projectile(point: Vector2, altitude: float, clearance: float, radius: float) -> bool:
+	var kind := kind_of(cell_at(point))
+	if kind == Kind.MOUNTAIN or kind == Kind.ROCK:
+		return true
+	if elevation_at(point) > altitude + clearance:
+		return true
+	for obstacle: Dictionary in obstacles_close(point):
+		if obstacle["solid"] and point.distance_to(obstacle["position"]) < radius + float(obstacle["collision"]) \
+				and absf(float(obstacle["elevation"]) - altitude) < PROJECTILE_HEIGHT_REACH:
+			return true
+	return false
+
+
+## Da from si vede to (niente pareti, montagne, roccia o ostacoli solidi in
+## mezzo) per un colpo a quota altitude: serve per mirare, agganciare e
+## cercare bersagli solo dove un colpo potrebbe arrivare. I due estremi
+## sono esclusi (chi tira e chi è bersaglio).
+func clear_line(from: Vector2, to: Vector2, altitude: float, clearance := LINE_CLEARANCE) -> bool:
+	var length := from.distance_to(to)
+	var steps := int(length / LINE_STEP)
+	for k in range(1, steps):
+		var point := from.lerp(to, float(k) / steps)
+		if blocks_projectile(point, altitude, clearance, LINE_RADIUS):
+			return false
+	return true
 
 
 ## Ostacolo non solido (cespuglio, rovi) su cui si trova il punto, quello

@@ -20,6 +20,7 @@ const COLORS := {
 	"spell": Color(1.0, 0.5, 0.15),
 	"torch": Color(1.0, 0.75, 0.35),
 	"bag": Color(0.8, 0.6, 0.35),
+	"stamina": Color(0.4, 0.85, 0.35),
 }
 
 @export var kind := "":
@@ -87,6 +88,10 @@ static func draw_icon(canvas: CanvasItem, center: Vector2, side: float, icon_kin
 			# Scudo con una freccia che gira: ricarica più rapida.
 			canvas.draw_colored_polygon(PackedVector2Array([Vector2(-0.5, -0.55), Vector2(0.5, -0.55), Vector2(0.5, 0.0), Vector2(0, 0.65), Vector2(-0.5, 0.0)]), color)
 			canvas.draw_arc(Vector2(0, -0.05), 0.25, -PI * 0.8, PI * 0.6, 12, Color(0.1, 0.15, 0.3), 0.08)
+		"stamina":
+			# Fulmine verde, come accanto alla barra della stamina.
+			canvas.draw_colored_polygon(PackedVector2Array([Vector2(0.15, -0.65), Vector2(-0.4, 0.08), Vector2(0.0, 0.08),
+					Vector2(-0.15, 0.65), Vector2(0.4, -0.08), Vector2(0.0, -0.08)]), color)
 		"run":
 			# Freccia con le linee della velocità.
 			canvas.draw_colored_polygon(PackedVector2Array([Vector2(0.6, 0), Vector2(0.1, -0.4), Vector2(0.1, 0.4)]), color)

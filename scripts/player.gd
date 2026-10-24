@@ -115,6 +115,11 @@ const DASH_SLAM_DAMAGE_FACTOR := 2.4
 ## della distanza, fino a LOCK_CAMERA_MAX.
 const LOCK_RANGE := 650.0
 const LOCK_BREAK_RANGE := 900.0
+## Si agganciano solo i nemici in vista (nessuna parete, montagna o
+## ostacolo solido in mezzo, vedi World.clear_line); se il bersaglio resta
+## nascosto per questo tempo si sgancia (o si passa a un altro in vista).
+const LOCK_HIDDEN_TIME := 0.6
+const LOCK_SIGHT_INTERVAL := 0.15
 const LOCK_CAMERA_SHARE := 0.3
 const LOCK_CAMERA_MAX := 170.0
 ## All'impatto la telecamera trema, sempre meno.
@@ -152,9 +157,9 @@ const DODGE_STICK_DEADZONE := 0.2
 const DODGE_COOLDOWN := 0.4
 
 ## Corsa tenendo premuto R2: più veloce del passo normale. Ogni
-## potenziamento aggiunge il 2% alla velocità di corsa.
+## potenziamento aggiunge il 5% alla velocità di corsa.
 const RUN_SPEED_FACTOR := 1.6
-const RUN_SPEED_UPGRADE := 0.02
+const RUN_SPEED_UPGRADE := 0.05
 
 ## Scivolata: schivando mentre si corre si scivola in avanti, rallentando.
 const SLIDE_TIME := 0.55
@@ -218,9 +223,9 @@ const TORCH_SCALE := 1.9
 const POTION_HEAL := 3
 const START_POTIONS := 2
 ## Lo scudo assorbe un colpo; poi va ricaricato. Ogni potenziamento
-## riduce la ricarica del 2%.
+## riduce la ricarica del 5%.
 const SHIELD_COOLDOWN := 30.0
-const SHIELD_COOLDOWN_UPGRADE := 0.98
+const SHIELD_COOLDOWN_UPGRADE := 0.95
 
 ## I rovi pungono a intervalli (data/world.json); la prima volta poco dopo
 ## esserci entrati.
@@ -245,6 +250,8 @@ const COLOR_GUARD_SPARK := Color(0.8, 0.9, 1.0)
 ## di pausa (più piano mentre si para). Senza vigore non si agisce e un
 ## colpo parato rompe la guardia.
 const MAX_STAMINA := 100.0
+## Ogni potenziamento della stamina aggiunge il 5% della stamina di partenza.
+const STAMINA_UPGRADE := 0.05
 const STAMINA_REGEN := 45.0
 const STAMINA_REGEN_DELAY := 0.55
 const STAMINA_PARRY_REGEN_FACTOR := 0.35
@@ -346,6 +353,8 @@ var _attack_resolved := false
 ## Velocità dell'attacco in corso: resta quella con cui è iniziato.
 var _attack_speed := 1.0
 var stamina := MAX_STAMINA
+## Stamina massima: si ricalcola dai potenziamenti presi (non si salva).
+var max_stamina := MAX_STAMINA
 var _stamina_delay := 0.0
 ## Si sta correndo (consuma vigore).
 var _running := false
@@ -396,6 +405,9 @@ var _safe_position := Vector2.ZERO
 var _safe_altitude := 0.0
 ## Nemico agganciato (null se nessuno) e il suo mirino.
 var lock_target: Enemy
+var _lock_hidden := 0.0
+var _lock_sight_check := 0.0
+var _lock_visible := true
 var _lock_marker := LockMarker.new()
 ## Carica del colpo potente (0-1) e se il tasto è ancora tenuto premuto.
 var _charge := 0.0
@@ -444,7 +456,7 @@ func _physics_process(delta: float) -> void:
 	_stamina_delay = maxf(_stamina_delay - delta, 0.0)
 	if _stamina_delay == 0.0 and not _running and _state != State.DEAD:
 		var regen := STAMINA_REGEN * (STAMINA_PARRY_REGEN_FACTOR if _state == State.PARRY else 1.0)
-		stamina = minf(stamina + regen * delta, MAX_STAMINA)
+		stamina = minf(stamina + regen * delta, max_stamina)
 	if _state != State.DEAD:
 		mana = minf(mana + MANA_REGEN * delta, max_mana)
 
@@ -975,27 +987,51 @@ func _cycle_lock() -> void:
 	Sfx.play_ui("ui_move" if lock_target else "ui_confirm")
 
 
-## Nemici vivi entro LOCK_RANGE, dal più vicino.
+## Nemici vivi in vista entro LOCK_RANGE, dal più vicino.
 func _lock_candidates() -> Array[Enemy]:
 	var result: Array[Enemy] = []
 	for node in get_tree().get_nodes_in_group("enemies"):
 		var enemy := node as Enemy
-		if enemy and not enemy.is_dead() and enemy.global_position.distance_to(global_position) <= LOCK_RANGE:
+		if enemy and not enemy.is_dead() and enemy.global_position.distance_to(global_position) <= LOCK_RANGE \
+				and _in_sight(enemy):
 			result.append(enemy)
 	result.sort_custom(func(a: Enemy, b: Enemy) -> bool:
 		return a.global_position.distance_squared_to(global_position) < b.global_position.distance_squared_to(global_position))
 	return result
 
 
-## Se il bersaglio muore si passa al più vicino; se si allontana troppo si sgancia.
+## Il nemico si vede da qui: guardando verso l'alto o verso il basso conta
+## il più alto dei due terreni, così un nemico su un gradino si vede.
+func _in_sight(enemy: Enemy) -> bool:
+	if World.current == null:
+		return true
+	var altitude := maxf(ground_elevation, enemy.ground_elevation)
+	return World.current.clear_line(global_position, enemy.global_position, altitude)
+
+
+## Se il bersaglio muore si passa al più vicino; se si allontana troppo o
+## resta nascosto dietro un ostacolo si sgancia (o si passa a un altro in vista).
 func _update_lock() -> void:
 	if lock_target == null:
 		return
 	if not is_instance_valid(lock_target) or lock_target.is_dead():
 		var candidates := _lock_candidates()
 		lock_target = candidates[0] if not candidates.is_empty() else null
+		_lock_hidden = 0.0
 	elif lock_target.global_position.distance_to(global_position) > LOCK_BREAK_RANGE:
 		lock_target = null
+	else:
+		var delta := get_physics_process_delta_time()
+		_lock_sight_check -= delta
+		if _lock_sight_check <= 0.0:
+			_lock_sight_check = LOCK_SIGHT_INTERVAL
+			_lock_visible = _in_sight(lock_target)
+		_lock_hidden = 0.0 if _lock_visible else _lock_hidden + delta
+		if _lock_hidden >= LOCK_HIDDEN_TIME:
+			var candidates := _lock_candidates()
+			lock_target = candidates[0] if not candidates.is_empty() else null
+			_lock_hidden = 0.0
+			_lock_visible = true
 	_lock_marker.target = lock_target
 
 
@@ -1049,6 +1085,8 @@ func load_state(data: Dictionary) -> void:
 	# potenziamenti scelti, se il salvataggio li ha.
 	if data.has("upgrades_taken"):
 		max_chained_dodges = START_CHAINED_DODGES + int(upgrades_taken.get("dodge", 0))
+	_refresh_stamina()
+	stamina = max_stamina
 	# Oggetti che questa versione non conosce più vengono scartati.
 	inventory.items.clear()
 	var known: Dictionary = Items.DATA.data["items"]
@@ -1160,6 +1198,14 @@ func apply_upgrade(upgrade: String) -> void:
 			_refresh_stats()
 		"spell":
 			spell_bonus += SPELL_UPGRADE
+		"stamina":
+			_refresh_stamina()
+			stamina = max_stamina
+
+
+func _refresh_stamina() -> void:
+	max_stamina = MAX_STAMINA * (1.0 + STAMINA_UPGRADE * int(upgrades_taken.get("stamina", 0)))
+	stamina = minf(stamina, max_stamina)
 
 
 func _change_state(new_state: State) -> void:
@@ -1487,7 +1533,7 @@ func _cast_fireball(input: Vector2) -> void:
 	_spell_cooldown = SPELL_COOLDOWN
 	var fireball := Fireball.new()
 	fireball.direction = input.normalized() if input != Vector2.ZERO else facing
-	if lock_target:
+	if lock_target and _lock_visible:
 		fireball.target = lock_target
 		fireball.direction = (lock_target.global_position - global_position).normalized()
 	fireball.damage = spell_damage()

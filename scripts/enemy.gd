@@ -23,7 +23,7 @@ signal died(enemy: Enemy)
 ## Chiede alla scena di gioco di creare i nemici evocati.
 signal summon_requested(summoner: Enemy, type_id: String, positions: Array[Vector2])
 
-enum State { WANDER, CHASE, DASH, WINDUP, STRIKE, RECOVER, STUNNED, SUMMON, DEAD, GUARD }
+enum State { WANDER, CHASE, DASH, WINDUP, STRIKE, RECOVER, STUNNED, SUMMON, DEAD, GUARD, SLAM }
 
 const ACCELERATION := 750.0
 ## Lo sguardo ruota con continuità invece che a scatti.
@@ -74,6 +74,15 @@ const COUNTER_CHANCE := 0.6
 const REPELLED_KNOCKBACK := 380.0
 const COLOR_GUARD := Color(0.75, 0.88, 1.0)
 const STUN_TIME := 1.6
+## Attacco speciale (voce "slam" del tipo in data/enemies.json): si
+## accuccia, salta sul punto dove sta il giocatore e colpisce il terreno
+## tutto attorno. La zona d'impatto è segnata a terra durante la carica.
+## Se il tiro non riesce si riprova dopo un po'; dopo l'impatto il nemico
+## resta scoperto più a lungo.
+const SLAM_RETRY := Vector2(1.2, 2.5)
+const SLAM_RECOVER_EXTRA := 0.6
+## Parte della carica in cui la zona d'impatto segue ancora il giocatore.
+const SLAM_TRACKING := 0.7
 ## Alla morte il corpo cade a terra in questo tempo, poi resta steso (lo
 ## disegna GroundFx) e il nodo sparisce.
 const DEATH_FALL_TIME := 0.35
@@ -143,6 +152,13 @@ var _guard_cooldown := 0.0
 var _seen_attack := -1
 var _guard_flash := 0.0
 var _strike_resolved := false
+## Salto con colpo a terra: punto di partenza e d'arrivo, attesa prima di
+## riprovarlo e altezza attuale del salto.
+var _slam_from := Vector2.ZERO
+var _slam_target := Vector2.ZERO
+var _slam_cooldown := 0.0
+var _slam_landed := false
+var _air := 0.0
 var _knockback := Vector2.ZERO
 var _hit_flash := 0.0
 ## Lato verso cui cade il corpo (+1 destra, -1 sinistra).
@@ -226,6 +242,7 @@ func _physics_process(delta: float) -> void:
 	_hit_flash = maxf(_hit_flash - delta, 0.0)
 	_guard_cooldown = maxf(_guard_cooldown - delta, 0.0)
 	_guard_flash = maxf(_guard_flash - delta, 0.0)
+	_slam_cooldown = maxf(_slam_cooldown - delta, 0.0)
 
 	var target_velocity := Vector2.ZERO
 	var to_player := player.global_position - global_position if player else Vector2.INF
@@ -255,9 +272,11 @@ func _physics_process(delta: float) -> void:
 					target_velocity = to_player.normalized() * _speed * PUNISH_SPEED_FACTOR
 			elif _should_guard(distance):
 				_begin_guard()
+			elif _can_slam(distance):
+				_begin_slam()
 			elif _can_summon(distance):
 				_begin_summon()
-			elif _attack_cooldown == 0.0 and distance <= _attack_trigger_range():
+			elif _attack_cooldown == 0.0 and distance <= _attack_trigger_range() and _can_shoot_player():
 				_strikes = 0
 				_begin_windup(_type["windup"][0], _type["windup"][1], true)
 			else:
@@ -309,13 +328,18 @@ func _physics_process(delta: float) -> void:
 				_velocity = Vector2.ZERO
 				if not _strike_resolved:
 					_strike_resolved = true
-					_shoot_bolt()
+					# Se intanto il giocatore è finito dietro un ostacolo, niente dardo.
+					if _can_shoot_player():
+						_shoot_bolt()
 			if _state == State.STRIKE and _state_time >= STRIKE_TIME:
 				_velocity = _velocity * 0.2
 				if _strikes < int(_type["max_strikes"]) and player_active and randf() < COMBO_CHANCE:
 					_begin_windup(_type["windup"][0] * COMBO_WINDUP_FACTOR, _type["windup"][1] * COMBO_WINDUP_FACTOR, false)
 				else:
 					_change_state(State.RECOVER)
+
+		State.SLAM:
+			_update_slam(player_active)
 
 		State.RECOVER:
 			if _state_time >= RECOVER_TIME:
@@ -358,13 +382,15 @@ func _physics_process(delta: float) -> void:
 		if target_velocity != Vector2.ZERO:
 			target_velocity += _separation() * _speed
 		_velocity = _velocity.move_toward(target_velocity, ACCELERATION * delta)
-	elif _state in [State.WINDUP, State.RECOVER, State.STUNNED, State.SUMMON, State.GUARD]:
+	elif _state in [State.WINDUP, State.RECOVER, State.STUNNED, State.SUMMON, State.GUARD, State.SLAM]:
 		_velocity = _velocity.move_toward(Vector2.ZERO, ACCELERATION * delta)
 
 	if _state == State.STRIKE:
 		_facing = _attack_direction
 	elif _state == State.WINDUP:
 		_turn_toward(_attack_direction, delta)
+	elif _state == State.SLAM and _slam_target != global_position:
+		_turn_toward(_slam_target - global_position, delta * 2.0)
 	elif _state == State.GUARD and player_active:
 		_turn_toward(to_player, delta * 2.0)
 	elif _state in [State.CHASE, State.DASH, State.SUMMON] and player_active:
@@ -386,8 +412,8 @@ func _physics_process(delta: float) -> void:
 	_walk_phase += _velocity.length() * delta * WALK_CYCLE
 	if _on_screen():
 		queue_redraw()
-	if _state == State.SUMMON or _telegraph_shown:
-		_telegraph_shown = _state == State.SUMMON
+	if _state in [State.SUMMON, State.SLAM] or _telegraph_shown:
+		_telegraph_shown = _state in [State.SUMMON, State.SLAM]
 		_telegraph.queue_redraw()
 
 
@@ -462,6 +488,14 @@ func _turn_toward(direction: Vector2, delta: float) -> void:
 
 func _is_ranged() -> bool:
 	return _type.has("ranged")
+
+
+## I lanciatori tirano solo se il dardo può arrivare al giocatore (niente
+## pareti, montagne, roccia o ostacoli solidi in mezzo); gli altri sempre.
+func _can_shoot_player() -> bool:
+	if not _is_ranged() or player == null or World.current == null:
+		return true
+	return World.current.clear_line(global_position, player.global_position, ground_elevation, EnemyBolt.FLIGHT_HEIGHT)
 
 
 ## Dardo magico verso la direzione dell'attacco.
@@ -565,6 +599,68 @@ func _begin_windup(min_time: float, max_time: float, can_feint: bool) -> void:
 	_change_state(State.WINDUP)
 
 
+func _can_slam(distance: float) -> bool:
+	if not _type.has("slam") or _slam_cooldown > 0.0 or _attack_cooldown > 0.0:
+		return false
+	var slam: Dictionary = _type["slam"]
+	if distance > float(slam["range"]) or distance < radius + Player.RADIUS:
+		return false
+	if randf() >= float(slam["chance"]):
+		_slam_cooldown = randf_range(SLAM_RETRY.x, SLAM_RETRY.y)
+		return false
+	return true
+
+
+func _begin_slam() -> void:
+	_slam_from = global_position
+	_slam_target = player.global_position
+	_slam_landed = false
+	_air = 0.0
+	_velocity = Vector2.ZERO
+	Sfx.play("enemy_windup", global_position, 0.8 / sqrt(_type["mass"]), -2.0)
+	_change_state(State.SLAM)
+
+
+## Carica accucciati (la zona d'impatto segue il giocatore per un po'),
+## salto ad arco verso la zona e colpo a terra all'arrivo.
+func _update_slam(player_active: bool) -> void:
+	var slam: Dictionary = _type["slam"]
+	var windup := float(slam["windup"])
+	var air_time := float(slam["air_time"])
+	_velocity = Vector2.ZERO
+	if _state_time < windup:
+		if player_active and _state_time <= windup * SLAM_TRACKING:
+			var reach := (player.global_position - _slam_from).limit_length(float(slam["range"]))
+			_slam_target = _slam_from + reach
+		return
+	var t := clampf((_state_time - windup) / air_time, 0.0, 1.0)
+	_air = sin(PI * t) * float(slam["height"])
+	var world := World.current
+	var goal := _slam_from.lerp(_slam_target, ease(t, 0.8))
+	if world:
+		position = world.move(position, goal - position, radius * 0.8)
+	else:
+		position = goal
+	if t >= 1.0 and not _slam_landed:
+		_land_slam(player_active, slam)
+	if _state_time >= windup + air_time + 0.05:
+		_air = 0.0
+		_change_state(State.RECOVER)
+		_state_time = -SLAM_RECOVER_EXTRA
+		_slam_cooldown = randf_range(SLAM_RETRY.x, SLAM_RETRY.y) * 2.0
+		_attack_cooldown = randf_range(ATTACK_COOLDOWN.x, ATTACK_COOLDOWN.y)
+
+
+func _land_slam(player_active: bool, slam: Dictionary) -> void:
+	_slam_landed = true
+	_air = 0.0
+	var impact_radius := float(slam["radius"])
+	GroundFx.shockwave(global_position, ground_elevation, impact_radius)
+	Sfx.play("fireball_hit", global_position, 0.5 / sqrt(_type["mass"]))
+	if player_active and player.global_position.distance_to(global_position) <= impact_radius + Player.RADIUS:
+		player.receive_hit(global_position, damage + int(slam["damage_bonus"]))
+
+
 func _can_summon(distance: float) -> bool:
 	if not _type.has("summon") or _summon_cooldown > 0.0 or distance > LEASH_RANGE:
 		return false
@@ -654,6 +750,15 @@ func _on_screen() -> bool:
 ## più una zona a terra: si riconosce dal corpo che si accende e dalla spada
 ## (o dal bastone) portata indietro.
 func _draw_telegraph() -> void:
+	if _state == State.SLAM and not _slam_landed:
+		# Zona d'impatto del salto: si riempie man mano che arriva il colpo.
+		var slam: Dictionary = _type["slam"]
+		var total := float(slam["windup"]) + float(slam["air_time"])
+		var at := _slam_target - global_position
+		var impact_radius := float(slam["radius"])
+		Shapes.disc(_telegraph, at, impact_radius, Color(COLOR_DANGER, 0.12))
+		Shapes.disc(_telegraph, at, impact_radius * clampf(_state_time / total, 0.0, 1.0), Color(COLOR_DANGER, 0.22))
+		_telegraph.draw_arc(at, impact_radius, 0.0, TAU, 40, Color(COLOR_DANGER, 0.7), 2.5)
 	if _state == State.SUMMON:
 		var progress: float = _state_time / _type["summon"]["channel_time"]
 		for offset in _summon_positions:
@@ -673,6 +778,9 @@ func _draw() -> void:
 			body = COLOR_STUNNED
 		State.SUMMON:
 			body = _color.lerp(COLOR_SUMMON, 0.5 + 0.5 * sin(_state_time * 20.0))
+		State.SLAM:
+			var windup := float(_type["slam"]["windup"])
+			body = _color.lerp(COLOR_WINDUP, _state_time / windup) if _state_time < windup else COLOR_DANGER
 	if _hit_flash > 0.0:
 		body = Color.WHITE
 	if _state == State.DEAD:
@@ -682,14 +790,20 @@ func _draw() -> void:
 
 	# Ombra, gambe, corpo con la forma del tipo sopra le gambe e un
 	# "occhio" che indica la direzione.
-	Shapes.disc(self, Vector2(0, radius * 0.8), radius * 0.9, Color(0, 0, 0, 0.25))
+	Shapes.disc(self, Vector2(0, radius * 0.8), radius * 0.9 * (1.0 - _air / 200.0), Color(0, 0, 0, 0.25))
+	# Il salto dell'attacco speciale solleva tutto tranne l'ombra.
+	draw_set_transform(Vector2(0, -ground_elevation - _air))
 	var leg := radius * LEG_FACTOR
 	var walking := _velocity.length() > 15.0 and _state != State.DEAD
 	BodyParts.draw_legs(self, -leg + radius * 0.55, radius * 0.85, radius * 0.35, maxf(4.0, radius * 0.22),
 			_walk_phase, _velocity.normalized(), radius * 0.3 if walking else 0.0, _color.darkened(0.4))
 	# Camminando il corpo ondeggia un poco su e giù.
 	var bob := absf(sin(_walk_phase)) * radius * 0.1 if walking else 0.0
-	draw_set_transform(Vector2(0, -ground_elevation - leg - bob))
+	# Accucciati durante la carica del salto.
+	var crouch := 0.0
+	if _state == State.SLAM and _state_time < float(_type["slam"]["windup"]):
+		crouch = leg * 0.5 * minf(_state_time / float(_type["slam"]["windup"]) * 3.0, 1.0)
+	draw_set_transform(Vector2(0, -ground_elevation - _air - leg - bob + crouch))
 	if _shape_radius != radius:
 		_shape_radius = radius
 		var key := "%s:%s" % [_type["shape"], radius]

@@ -1,7 +1,9 @@
 class_name Fireball
 extends Node2D
-## Palla di fuoco lanciata dal giocatore: cerca il nemico più vicino, lo
-## insegue curvando e lo colpisce. Senza nemici vola dritta e si spegne.
+## Palla di fuoco lanciata dal giocatore: cerca il nemico più vicino che
+## può raggiungere (niente pareti o ostacoli in mezzo, vedi
+## World.clear_line), lo insegue curvando e lo colpisce; se il bersaglio
+## finisce dietro un ostacolo lo lascia e prosegue dritta. Senza nemici vola dritta e si spegne.
 ## Non attraversa niente: si schianta contro alberi, sassi, casse e gli altri
 ## ostacoli solidi, contro le pareti più alte del suo volo, le montagne e la
 ## roccia del sotterraneo.
@@ -14,6 +16,7 @@ const LIFETIME := 2.6
 ## Cerca bersagli entro questa distanza.
 const SEEK_RANGE := 650.0
 const RADIUS := 10.0
+const SIGHT_INTERVAL := 0.1
 ## Volando, resta sopra il terreno a questa altezza.
 const FLIGHT_HEIGHT := 30.0
 ## Colpisce solo nemici più o meno alla sua altezza.
@@ -31,6 +34,8 @@ var altitude := 0.0
 var target: Enemy
 var _target: Enemy
 var _age := 0.0
+## La linea di vista verso il bersaglio si ricontrolla a intervalli.
+var _sight_check := 0.0
 var _exploding := 0.0
 var _trail: Array[Vector2] = []
 var _light := PointLight2D.new()
@@ -43,7 +48,7 @@ func _ready() -> void:
 	_light.energy = 0.9
 	_light.texture_scale = 0.7
 	add_child(_light)
-	_target = target if target and is_instance_valid(target) and not target.is_dead() else _find_target()
+	_target = target if target and is_instance_valid(target) and not target.is_dead() and _can_reach(target) else _find_target()
 
 
 func _physics_process(delta: float) -> void:
@@ -55,8 +60,14 @@ func _physics_process(delta: float) -> void:
 		if _exploding >= EXPLOSION_TIME:
 			queue_free()
 		return
+	_sight_check -= delta
 	if _target == null or not is_instance_valid(_target) or _target.is_dead():
-		_target = _find_target()
+		_target = _find_target() if _sight_check <= 0.0 else null
+		_sight_check = SIGHT_INTERVAL
+	elif _sight_check <= 0.0:
+		_sight_check = SIGHT_INTERVAL
+		if not _can_reach(_target):
+			_target = _find_target()
 	if _target:
 		var wanted := (_target.global_position - global_position).normalized()
 		direction = Vector2.from_angle(rotate_toward(direction.angle(), wanted.angle(), TURN_RATE * delta))
@@ -85,19 +96,15 @@ func _physics_process(delta: float) -> void:
 ## montagna o la roccia: lì la palla si schianta.
 func _hits_scenery() -> bool:
 	var world := World.current
-	if world == null:
+	return world != null and world.blocks_projectile(global_position, altitude, FLIGHT_HEIGHT, RADIUS)
+
+
+## Il nemico è alla quota della palla e nessun ostacolo sta in mezzo.
+func _can_reach(enemy: Enemy) -> bool:
+	if absf(enemy.ground_elevation - altitude) > HIT_HEIGHT_REACH:
 		return false
-	var cell := World.cell_at(global_position)
-	var kind := world.kind_of(cell)
-	if kind == World.Kind.MOUNTAIN or kind == World.Kind.ROCK:
-		return true
-	if world.elevation_at(global_position) > altitude + FLIGHT_HEIGHT:
-		return true
-	for obstacle: Dictionary in world.obstacles_near(global_position):
-		if obstacle["solid"] and global_position.distance_to(obstacle["position"]) < RADIUS + obstacle["collision"] \
-				and absf(obstacle["elevation"] - altitude) < HIT_HEIGHT_REACH:
-			return true
-	return false
+	var world := World.current
+	return world == null or world.clear_line(global_position, enemy.global_position, altitude, FLIGHT_HEIGHT)
 
 
 func _find_target() -> Enemy:
@@ -105,10 +112,10 @@ func _find_target() -> Enemy:
 	var best_distance := SEEK_RANGE
 	for node in get_tree().get_nodes_in_group("enemies"):
 		var enemy := node as Enemy
-		if enemy == null or enemy.is_dead() or absf(enemy.ground_elevation - altitude) > HIT_HEIGHT_REACH:
+		if enemy == null or enemy.is_dead():
 			continue
 		var distance := global_position.distance_to(enemy.global_position)
-		if distance < best_distance:
+		if distance < best_distance and _can_reach(enemy):
 			best = enemy
 			best_distance = distance
 	return best

@@ -2,7 +2,7 @@ class_name Hud
 extends CanvasLayer
 ## Interfaccia del livello di test: pannello di stato in alto a sinistra
 ## (HudStatus), ciclo del giorno accanto alla minimappa (DayClock), bordi
-## rossi con poca vita (LowHealthVignette), barra delle azioni in basso a sinistra (HudActions), comandi, sfida del totem in corso, potenziamenti attivi (lista a destra),
+## rossi con poca vita (LowHealthVignette), barra delle azioni in basso a sinistra (HudActions), comandi, sfida del totem in corso, potenziamenti attivi (riga di icone in basso a destra),
 ## scelta del potenziamento salendo di livello (tre schede con icone, prese
 ## a caso) e messaggio di fine partita.
 
@@ -14,10 +14,12 @@ signal interact_pressed
 ## Appena compare il pannello i pulsanti restano disattivati per un
 ## attimo, così chi sta premendo i tasti di attacco non sceglie per sbaglio.
 const LEVEL_UP_INPUT_DELAY := 0.5
-const POWER_UP_ICON_SIZE := 32.0
+const POWER_UP_ICON_SIZE := 28.0
 const CARD_ICON_SIZE := 64.0
-const COLOR_POWER_UPS_TITLE := Color(1, 1, 1, 0.85)
-const POWER_UPS_FONT_SIZE := 19
+const POWER_UPS_FONT_SIZE := 14
+const POWER_UPS_MARGIN := 16.0
+## Con i controlli touch la riga sta sotto la minimappa.
+const POWER_UPS_TOUCH_TOP := 234.0
 const COLOR_POWER_UPS_PANEL := Color(0.05, 0.07, 0.05, 0.8)
 ## Per quanto resta il messaggio di fine sfida.
 const CHALLENGE_FLASH_TIME := 3.5
@@ -35,10 +37,11 @@ const UPGRADE_NAMES := {
 	"run": "UPGRADE_RUN",
 	"mana": "UPGRADE_MANA",
 	"spell": "UPGRADE_SPELL",
+	"stamina": "UPGRADE_STAMINA",
 }
 
 @onready var _deck_hint: Label = %DeckHint
-@onready var _power_ups: VBoxContainer = %PowerUps
+@onready var _power_ups: HBoxContainer = %PowerUps
 @onready var _challenge: Label = %Challenge
 var _inventory_panel := InventoryPanel.new()
 var _shop_panel := ShopPanel.new()
@@ -66,6 +69,7 @@ var pause_menu := PauseMenu.new()
 	"run": %UpgradeRun as Button,
 	"mana": %UpgradeMana as Button,
 	"spell": %UpgradeSpell as Button,
+	"stamina": %UpgradeStamina as Button,
 }
 ## Potenziamenti proposti in questo passaggio di livello.
 var _offered: Array[String] = []
@@ -84,6 +88,7 @@ var _card_values := {}
 var _power_ups_shown := []
 ## Pannello scuro dietro la lista dei potenziamenti, perché si legga su ogni terreno.
 var _power_ups_panel := PanelContainer.new()
+var _power_ups_preset := -1
 ## Tempo rimasto del messaggio di fine sfida: intanto gli altri testi della sfida aspettano.
 var _challenge_flash := 0.0
 
@@ -144,74 +149,83 @@ func _process(delta: float) -> void:
 	_update_power_ups()
 
 
-## Lista a destra: effetti temporanei (parata perfetta, scudo) e
-## potenziamenti scelti, con quante volte sono stati presi.
+## Riga compatta in basso a destra: un'icona per ogni effetto temporaneo
+## (parata perfetta con i secondi rimasti, scudo, torcia) e per ogni
+## potenziamento scelto, con quante volte è stato preso.
 func _update_power_ups() -> void:
 	var rows := []
 	if player.is_empowered():
 		rows.append(["empowered", tr("POWERUP_EMPOWERED") % ceili(player.empowered_time())])
 	if player.shield_active:
-		rows.append(["bubble", tr("POWERUP_SHIELD_ACTIVE")])
+		rows.append(["bubble", ""])
 	if player.torch_on:
-		rows.append(["torch", tr("POWERUP_TORCH")])
+		rows.append(["torch", ""])
 	for upgrade: String in player.upgrades_taken:
 		# I potenziamenti che non esistono più (per esempio +1 pozione) non si mostrano.
 		if not UPGRADE_NAMES.has(upgrade):
 			continue
-		var name_key := "POWERUP_" + upgrade.to_upper()
-		rows.append([upgrade, tr("POWERUP_UPGRADE") % [tr(name_key), _upgrade_value(upgrade), player.upgrades_taken[upgrade]]])
+		rows.append([upgrade, tr("POWERUP_UPGRADE") % player.upgrades_taken[upgrade]])
+	_place_power_ups()
 	if rows == _power_ups_shown:
 		return
 	_power_ups_shown = rows
 	for child in _power_ups.get_children():
 		child.queue_free()
 	_power_ups_panel.visible = not rows.is_empty()
-	if rows.is_empty():
-		return
-	var title := Label.new()
-	title.text = tr("POWERUPS_TITLE")
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	title.add_theme_font_size_override("font_size", POWER_UPS_FONT_SIZE - 2)
-	title.add_theme_color_override("font_color", COLOR_POWER_UPS_TITLE)
-	_power_ups.add_child(title)
 	for row: Array in rows:
-		var line := HBoxContainer.new()
-		line.alignment = BoxContainer.ALIGNMENT_END
-		var label := Label.new()
-		label.text = row[1]
-		label.add_theme_font_size_override("font_size", POWER_UPS_FONT_SIZE)
-		label.add_theme_color_override("font_color", UpgradeIcon.color_of(row[0]).lerp(Color.WHITE, 0.65))
-		label.add_theme_constant_override("outline_size", 5)
-		label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
-		line.add_child(label)
+		var tile := VBoxContainer.new()
+		tile.add_theme_constant_override("separation", 0)
 		var icon := UpgradeIcon.new()
 		icon.kind = row[0]
 		icon.custom_minimum_size = Vector2(POWER_UP_ICON_SIZE, POWER_UP_ICON_SIZE)
-		line.add_child(icon)
-		_power_ups.add_child(line)
+		tile.add_child(icon)
+		var label := Label.new()
+		label.text = row[1]
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.add_theme_font_size_override("font_size", POWER_UPS_FONT_SIZE)
+		label.add_theme_color_override("font_color", UpgradeIcon.color_of(row[0]).lerp(Color.WHITE, 0.65))
+		label.add_theme_constant_override("outline_size", 4)
+		label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+		tile.add_child(label)
+		_power_ups.add_child(tile)
+	# Il pannello si restringe quando le icone diminuiscono.
+	_power_ups_panel.reset_size.call_deferred()
 
 
-## Mette la lista dei potenziamenti attivi su un pannello scuro, allineato
-## a destra sotto la minimappa, che si allarga verso sinistra con il testo.
+## In basso a destra; con i controlli touch lì ci sono i pulsanti, quindi
+## sotto la minimappa.
+func _place_power_ups() -> void:
+	var touch := Platform.use_touch_controls()
+	var preset := Control.PRESET_TOP_RIGHT if touch else Control.PRESET_BOTTOM_RIGHT
+	if _power_ups_preset == preset:
+		return
+	_power_ups_preset = preset
+	_power_ups_panel.set_anchors_preset(preset)
+	_power_ups_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_power_ups_panel.grow_vertical = Control.GROW_DIRECTION_END if touch else Control.GROW_DIRECTION_BEGIN
+	var y := POWER_UPS_TOUCH_TOP if touch else -POWER_UPS_MARGIN
+	_power_ups_panel.offset_right = -POWER_UPS_MARGIN
+	_power_ups_panel.offset_left = -POWER_UPS_MARGIN
+	_power_ups_panel.offset_top = y
+	_power_ups_panel.offset_bottom = y
+
+
+## Mette la riga dei potenziamenti attivi su un pannello scuro, perché si
+## legga su ogni terreno.
 func _build_power_ups_panel() -> void:
 	var style := StyleBoxFlat.new()
 	style.bg_color = COLOR_POWER_UPS_PANEL
 	style.border_color = Color(1, 1, 1, 0.14)
 	style.set_border_width_all(2)
-	style.set_corner_radius_all(10)
-	style.set_content_margin_all(10)
+	style.set_corner_radius_all(8)
+	style.set_content_margin_all(6)
 	_power_ups_panel.add_theme_stylebox_override("panel", style)
 	_power_ups_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_power_ups_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	_power_ups_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	_power_ups_panel.offset_right = _power_ups.offset_right
-	_power_ups_panel.offset_left = _power_ups.offset_right
-	_power_ups_panel.offset_top = _power_ups.offset_top
-	_power_ups_panel.offset_bottom = _power_ups.offset_top
 	_power_ups_panel.visible = false
 	add_child(_power_ups_panel)
 	move_child(_power_ups_panel, _power_ups.get_index())
 	_power_ups.reparent(_power_ups_panel, false)
+	_place_power_ups()
 
 
 ## Valore attuale dell'abilità migliorata da un potenziamento.
@@ -235,6 +249,8 @@ func _upgrade_value(upgrade: String) -> String:
 			return str(roundi(player.max_mana))
 		"spell":
 			return str(player.spell_damage())
+		"stamina":
+			return str(roundi(player.max_stamina))
 	return ""
 
 
@@ -384,6 +400,7 @@ func show_level_up(level: int, damage_before: int, damage_after: int) -> void:
 	_card_values["mana"].text = tr("UPGRADE_VALUE") % [roundi(player.max_mana), roundi(player.max_mana + Player.MANA_UPGRADE)]
 	var spell_bonus := player.spell_bonus + player.inventory.bonus("spell")
 	_card_values["spell"].text = tr("UPGRADE_VALUE") % [player.spell_damage(), roundi(player.spell_damage() * (1.0 + spell_bonus + Player.SPELL_UPGRADE) / (1.0 + spell_bonus))]
+	_card_values["stamina"].text = tr("UPGRADE_VALUE") % [roundi(player.max_stamina), roundi(player.max_stamina + Player.MAX_STAMINA * Player.STAMINA_UPGRADE)]
 	# Solo alcuni potenziamenti, presi a caso, nell'ordine della griglia.
 	var picks: Array = _upgrade_buttons.keys()
 	picks.shuffle()
