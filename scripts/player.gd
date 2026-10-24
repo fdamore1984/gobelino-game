@@ -115,6 +115,11 @@ const DASH_SLAM_DAMAGE_FACTOR := 2.4
 ## della distanza, fino a LOCK_CAMERA_MAX.
 const LOCK_RANGE := 650.0
 const LOCK_BREAK_RANGE := 900.0
+## Si agganciano solo i nemici in vista (nessuna parete, montagna o
+## ostacolo solido in mezzo, vedi World.clear_line); se il bersaglio resta
+## nascosto per questo tempo si sgancia (o si passa a un altro in vista).
+const LOCK_HIDDEN_TIME := 0.6
+const LOCK_SIGHT_INTERVAL := 0.15
 const LOCK_CAMERA_SHARE := 0.3
 const LOCK_CAMERA_MAX := 170.0
 ## All'impatto la telecamera trema, sempre meno.
@@ -400,6 +405,9 @@ var _safe_position := Vector2.ZERO
 var _safe_altitude := 0.0
 ## Nemico agganciato (null se nessuno) e il suo mirino.
 var lock_target: Enemy
+var _lock_hidden := 0.0
+var _lock_sight_check := 0.0
+var _lock_visible := true
 var _lock_marker := LockMarker.new()
 ## Carica del colpo potente (0-1) e se il tasto è ancora tenuto premuto.
 var _charge := 0.0
@@ -979,27 +987,51 @@ func _cycle_lock() -> void:
 	Sfx.play_ui("ui_move" if lock_target else "ui_confirm")
 
 
-## Nemici vivi entro LOCK_RANGE, dal più vicino.
+## Nemici vivi in vista entro LOCK_RANGE, dal più vicino.
 func _lock_candidates() -> Array[Enemy]:
 	var result: Array[Enemy] = []
 	for node in get_tree().get_nodes_in_group("enemies"):
 		var enemy := node as Enemy
-		if enemy and not enemy.is_dead() and enemy.global_position.distance_to(global_position) <= LOCK_RANGE:
+		if enemy and not enemy.is_dead() and enemy.global_position.distance_to(global_position) <= LOCK_RANGE \
+				and _in_sight(enemy):
 			result.append(enemy)
 	result.sort_custom(func(a: Enemy, b: Enemy) -> bool:
 		return a.global_position.distance_squared_to(global_position) < b.global_position.distance_squared_to(global_position))
 	return result
 
 
-## Se il bersaglio muore si passa al più vicino; se si allontana troppo si sgancia.
+## Il nemico si vede da qui: guardando verso l'alto o verso il basso conta
+## il più alto dei due terreni, così un nemico su un gradino si vede.
+func _in_sight(enemy: Enemy) -> bool:
+	if World.current == null:
+		return true
+	var altitude := maxf(ground_elevation, enemy.ground_elevation)
+	return World.current.clear_line(global_position, enemy.global_position, altitude)
+
+
+## Se il bersaglio muore si passa al più vicino; se si allontana troppo o
+## resta nascosto dietro un ostacolo si sgancia (o si passa a un altro in vista).
 func _update_lock() -> void:
 	if lock_target == null:
 		return
 	if not is_instance_valid(lock_target) or lock_target.is_dead():
 		var candidates := _lock_candidates()
 		lock_target = candidates[0] if not candidates.is_empty() else null
+		_lock_hidden = 0.0
 	elif lock_target.global_position.distance_to(global_position) > LOCK_BREAK_RANGE:
 		lock_target = null
+	else:
+		var delta := get_physics_process_delta_time()
+		_lock_sight_check -= delta
+		if _lock_sight_check <= 0.0:
+			_lock_sight_check = LOCK_SIGHT_INTERVAL
+			_lock_visible = _in_sight(lock_target)
+		_lock_hidden = 0.0 if _lock_visible else _lock_hidden + delta
+		if _lock_hidden >= LOCK_HIDDEN_TIME:
+			var candidates := _lock_candidates()
+			lock_target = candidates[0] if not candidates.is_empty() else null
+			_lock_hidden = 0.0
+			_lock_visible = true
 	_lock_marker.target = lock_target
 
 
@@ -1501,7 +1533,7 @@ func _cast_fireball(input: Vector2) -> void:
 	_spell_cooldown = SPELL_COOLDOWN
 	var fireball := Fireball.new()
 	fireball.direction = input.normalized() if input != Vector2.ZERO else facing
-	if lock_target:
+	if lock_target and _lock_visible:
 		fireball.target = lock_target
 		fireball.direction = (lock_target.global_position - global_position).normalized()
 	fireball.damage = spell_damage()

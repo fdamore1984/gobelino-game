@@ -276,7 +276,7 @@ func _physics_process(delta: float) -> void:
 				_begin_slam()
 			elif _can_summon(distance):
 				_begin_summon()
-			elif _attack_cooldown == 0.0 and distance <= _attack_trigger_range():
+			elif _attack_cooldown == 0.0 and distance <= _attack_trigger_range() and _can_shoot_player():
 				_strikes = 0
 				_begin_windup(_type["windup"][0], _type["windup"][1], true)
 			else:
@@ -328,7 +328,9 @@ func _physics_process(delta: float) -> void:
 				_velocity = Vector2.ZERO
 				if not _strike_resolved:
 					_strike_resolved = true
-					_shoot_bolt()
+					# Se intanto il giocatore è finito dietro un ostacolo, niente dardo.
+					if _can_shoot_player():
+						_shoot_bolt()
 			if _state == State.STRIKE and _state_time >= STRIKE_TIME:
 				_velocity = _velocity * 0.2
 				if _strikes < int(_type["max_strikes"]) and player_active and randf() < COMBO_CHANCE:
@@ -486,6 +488,14 @@ func _turn_toward(direction: Vector2, delta: float) -> void:
 
 func _is_ranged() -> bool:
 	return _type.has("ranged")
+
+
+## I lanciatori tirano solo se il dardo può arrivare al giocatore (niente
+## pareti, montagne, roccia o ostacoli solidi in mezzo); gli altri sempre.
+func _can_shoot_player() -> bool:
+	if not _is_ranged() or player == null or World.current == null:
+		return true
+	return World.current.clear_line(global_position, player.global_position, ground_elevation, EnemyBolt.FLIGHT_HEIGHT)
 
 
 ## Dardo magico verso la direzione dell'attacco.

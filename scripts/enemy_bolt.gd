@@ -2,6 +2,7 @@ class_name EnemyBolt
 extends Node2D
 ## Dardo magico scagliato dai nemici lanciatori: vola dritto e colpisce il
 ## giocatore (si può schivare, saltare o parare come gli altri colpi).
+## Non attraversa pareti, montagne, roccia e ostacoli solidi: lì si spegne.
 
 const RADIUS := 9.0
 const FLIGHT_HEIGHT := 26.0
@@ -34,6 +35,9 @@ func _physics_process(delta: float) -> void:
 		if player.receive_hit(position - direction * 40.0, damage) != "ignored":
 			queue_free()
 			return
+	if World.current and World.current.blocks_projectile(position, altitude, FLIGHT_HEIGHT, RADIUS):
+		queue_free()
+		return
 	if _travelled >= max_distance:
 		queue_free()
 	queue_redraw()
