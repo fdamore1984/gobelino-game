@@ -1,7 +1,7 @@
 class_name HudActions
 extends Control
-## Barra delle azioni in basso a sinistra: pozioni, scudo, palla di fuoco,
-## torcia e inventario, ognuno con la sua icona, il tasto del controller,
+## Barra delle azioni in basso a sinistra: pozioni (vita, mana, vigore),
+## scudo, palla di fuoco e inventario, ognuno con la sua icona, il tasto del controller,
 ## quante ne restano o la ricarica. Sui dispositivi touch non serve: ci
 ## sono già i pulsanti a schermo.
 
@@ -14,7 +14,7 @@ const COLOR_ACTIVE := Color(1.0, 0.85, 0.4)
 const COLOR_KEY := Color(1, 1, 1, 0.85)
 ## Azioni: icona e tasto del controller.
 const ACTIONS := [
-	["potion", "←"], ["mana", "→"], ["shield", "Y"], ["spell", "X"], ["torch", "↓"], ["bag", "↑"],
+	["potion", "←"], ["mana", "→"], ["shield", "Y"], ["spell", "X"], ["stamina_potion", "↓"], ["bag", "↑"],
 ]
 
 var player: Player
@@ -44,7 +44,7 @@ func _draw() -> void:
 		var rect := Rect2(Vector2(i * (SLOT + GAP), 0), Vector2(SLOT, SLOT))
 		var kind: String = ACTIONS[i][0]
 		var available := _is_ready(kind)
-		var highlight := (kind == "torch" and player.torch_on) or (kind == "shield" and player.shield_active)
+		var highlight := kind == "shield" and player.shield_active
 		var style := _style.duplicate() as StyleBoxFlat
 		if highlight:
 			style.border_color = COLOR_ACTIVE
@@ -72,6 +72,8 @@ func _is_ready(kind: String) -> bool:
 			return player.potions > 0 and player.health < player.max_health
 		"mana":
 			return player.mana_potions > 0 and player.mana < player.max_mana
+		"stamina_potion":
+			return player.stamina_potions > 0 and player.stamina < player.max_stamina
 		"shield":
 			return player.shield_active or player.shield_cooldown <= 0.0
 		"spell":
@@ -85,6 +87,8 @@ func _count(kind: String) -> String:
 			return str(player.potions)
 		"mana":
 			return str(player.mana_potions)
+		"stamina_potion":
+			return str(player.stamina_potions)
 		"spell":
 			return str(roundi(Player.SPELL_COST))
 		"bag":

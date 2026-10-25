@@ -258,12 +258,12 @@ func _capture_slam(language: String) -> void:
 		hit.append(enemy)
 	await _frames(50)
 	_player._state = Player.State.SLAM
-	_player._slam_kind = "leap"
+	_player._slam_kind = "dash"
 	_player._slam_landed = true
 	_player._squash = 0.7
 	_player.facing = Vector2(1, 0.2).normalized()
 	_player.queue_redraw()
-	GroundFx.shockwave(origin, _player.ground_elevation, Player.SLAM_RADIUS["leap"])
+	GroundFx.shockwave(origin, _player.ground_elevation, Player.SLAM_RADIUS["dash"])
 	for enemy in hit:
 		var direction := (enemy.position - origin).normalized()
 		GroundFx.bleed(enemy.position, enemy.ground_elevation + enemy.radius, direction, 10)

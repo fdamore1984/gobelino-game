@@ -11,7 +11,8 @@ const COLORS := {
 	"dodge": Color(0.45, 0.85, 1.0),
 	"jump": Color(0.5, 0.95, 0.55),
 	"health": Color(0.95, 0.35, 0.35),
-	"potion": Color(0.5, 1.0, 0.5),
+	"potion": Color(0.95, 0.3, 0.3),
+	"stamina_potion": Color(0.3, 0.85, 0.3),
 	"shield": Color(0.45, 0.7, 1.0),
 	"run": Color(1.0, 0.85, 0.3),
 	"empowered": Color(1.0, 0.8, 0.25),
@@ -83,18 +84,19 @@ static func draw_icon(canvas: CanvasItem, center: Vector2, side: float, icon_kin
 			canvas.draw_circle(Vector2(-0.24, -0.15), 0.28, color)
 			canvas.draw_circle(Vector2(0.24, -0.15), 0.28, color)
 			canvas.draw_colored_polygon(PackedVector2Array([Vector2(-0.5, -0.05), Vector2(0.5, -0.05), Vector2(0, 0.6)]), color)
-		"potion":
+		"potion", "stamina_potion":
 			# Boccetta con il liquido.
 			canvas.draw_rect(Rect2(-0.12, -0.65, 0.24, 0.3), Color(0.85, 0.85, 0.85))
 			canvas.draw_circle(Vector2(0, 0.15), 0.45, Color(0.85, 0.85, 0.85))
 			canvas.draw_circle(Vector2(0, 0.2), 0.36, color)
 		"potion_slots":
-			# Due boccette (vita e mana) e un + sopra: se ne portano di più.
-			for k in 2:
-				var x := -0.3 + k * 0.6
-				canvas.draw_rect(Rect2(x - 0.08, -0.25, 0.16, 0.2), Color(0.85, 0.85, 0.85))
-				canvas.draw_circle(Vector2(x, 0.25), 0.3, Color(0.85, 0.85, 0.85))
-				canvas.draw_circle(Vector2(x, 0.28), 0.23, color_of("potion_heal") if k == 0 else color_of("mana_restore"))
+			# Tre boccette (vita, mana e vigore) e un + sopra: se ne portano di più.
+			var liquids := [color_of("potion_heal"), color_of("mana_restore"), color_of("stamina_potion")]
+			for k in 3:
+				var x := -0.5 + k * 0.5
+				canvas.draw_rect(Rect2(x - 0.06, -0.2, 0.12, 0.18), Color(0.85, 0.85, 0.85))
+				canvas.draw_circle(Vector2(x, 0.25), 0.24, Color(0.85, 0.85, 0.85))
+				canvas.draw_circle(Vector2(x, 0.28), 0.18, liquids[k])
 			_draw_plus(canvas, Vector2(0, -0.55), 0.18, color)
 		"potion_heal", "mana_restore":
 			# Boccetta (rossa o blu) con un + accanto: cura di più.

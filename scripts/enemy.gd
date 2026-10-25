@@ -212,6 +212,15 @@ var _swing_sign := 1.0
 var _walk_phase := 0.0
 ## La zona di pericolo va disegnata sotto i personaggi, non sopra.
 var _telegraph := Node2D.new()
+## Effetti rossi dell'attacco su nodi propri: dietro al corpo il bagliore
+## della carica e le copie della scia, davanti l'arco del fendente. Non
+## prendono luce (come _telegraph), così il buio della notte e del
+## sotterraneo non li spegne, e si ridisegnano anche se il centro del
+## nemico è appena fuori dallo schermo.
+var _danger_back := Node2D.new()
+var _danger_front := Node2D.new()
+## Gli effetti rossi sono disegnati: vanno ancora ridisegnati (per toglierli).
+var _danger_shown := false
 ## Il segnale dell'evocazione è disegnato: va ancora ridisegnato (per toglierlo).
 var _telegraph_shown := false
 ## Scia rossa: posizioni (x, y) con l'altezza del salto (z) e da quanto
@@ -233,6 +242,7 @@ static var _grid_frame := -1
 ## Parte del mondo visibile (con margine) e frame in cui è stata calcolata.
 static var _view := Rect2()
 static var _view_frame := -1
+static var _unshaded: CanvasItemMaterial
 
 
 ## Imposta il tipo prima di aggiungere il nemico alla scena.
@@ -310,6 +320,13 @@ func _ready() -> void:
 	_telegraph.z_index = -5
 	_telegraph.draw.connect(_draw_telegraph)
 	add_child(_telegraph)
+	_danger_back.show_behind_parent = true
+	_danger_back.draw.connect(_draw_danger_back)
+	add_child(_danger_back)
+	_danger_front.draw.connect(_draw_danger_front)
+	add_child(_danger_front)
+	for fx: CanvasItem in [_telegraph, _danger_back, _danger_front]:
+		fx.material = _unshaded_material()
 	if World.current:
 		ground_elevation = World.current.elevation_at(position)
 		_telegraph.position.y = -ground_elevation
@@ -477,6 +494,7 @@ func _physics_process(delta: float) -> void:
 			if _state_time >= DEATH_FALL_TIME:
 				GroundFx.corpse(global_position, ground_elevation, _corpse_points(1.0), _corpse_color())
 				queue_free()
+			_redraw_danger()
 			return
 
 	if _state in [State.WANDER, State.CHASE]:
@@ -528,9 +546,29 @@ func _physics_process(delta: float) -> void:
 	_update_trail(delta)
 	if _on_screen():
 		queue_redraw()
+	_redraw_danger()
 	if _state in [State.SUMMON, State.SLAM] or _telegraph_shown:
 		_telegraph_shown = _state in [State.SUMMON, State.SLAM]
 		_telegraph.queue_redraw()
+
+
+## Ridisegna gli effetti rossi mentre ci sono, e una volta in più per
+## toglierli (anche se nel frattempo il nemico è morto o è uscito dallo schermo).
+func _redraw_danger() -> void:
+	var danger := _state in [State.WINDUP, State.STRIKE] or not _trail.is_empty()
+	if danger or _danger_shown:
+		_danger_shown = danger
+		_danger_back.queue_redraw()
+		_danger_front.queue_redraw()
+
+
+## Materiale senza luci condiviso dagli effetti di pericolo: il colore della
+## notte (CanvasModulate) non li scurisce.
+static func _unshaded_material() -> CanvasItemMaterial:
+	if _unshaded == null:
+		_unshaded = CanvasItemMaterial.new()
+		_unshaded.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+	return _unshaded
 
 
 ## Scia rossa dell'attacco: si lascia una copia del corpo a intervalli
@@ -569,6 +607,7 @@ func take_damage(amount: int, direction: Vector2, heavy := false) -> void:
 	GroundFx.bleed(global_position, ground_elevation + radius * 0.8, direction, BLEED_DROPS_HEAVY if heavy else BLEED_DROPS)
 	if health <= 0:
 		_fall_side = 1.0 if direction.x >= 0.0 else -1.0
+		_trail.clear()
 		GroundFx.pool(global_position, radius * 0.9)
 		_change_state(State.DEAD)
 		remove_from_group("enemies")
@@ -1024,28 +1063,13 @@ func _draw() -> void:
 	var lift := _air + _height
 	Shapes.disc(self, Vector2(0, radius * 0.8), radius * 0.9 * (1.0 - minf(lift, 150.0) / 200.0), Color(0, 0, 0, 0.25))
 	var leg := radius * LEG_FACTOR
-	_draw_trail(leg)
 	# I salti (attacco speciale, gradini) sollevano tutto tranne l'ombra.
 	draw_set_transform(Vector2(0, -ground_elevation - lift))
 	var walking := _velocity.length() > 15.0 and _state != State.DEAD
 	BodyParts.draw_legs(self, -leg + radius * 0.55, radius * 0.85, radius * 0.35, maxf(4.0, radius * 0.22),
 			_walk_phase, _velocity.normalized(), radius * 0.3 if walking else 0.0, _color.darkened(0.4))
-	# Camminando il corpo ondeggia un poco su e giù.
-	var bob := absf(sin(_walk_phase)) * radius * 0.1 if walking else 0.0
-	# Accucciati durante la carica del salto.
-	var crouch := 0.0
-	if _state == State.SLAM and _state_time < float(_type["slam"]["windup"]):
-		crouch = leg * 0.5 * minf(_state_time / float(_type["slam"]["windup"]) * 3.0, 1.0)
-	draw_set_transform(Vector2(0, -ground_elevation - lift - leg - bob + crouch))
-	if _state == State.WINDUP and not _is_ranged():
-		# Carica dell'attacco: bagliore rosso sempre più acceso attorno al corpo.
-		var progress := minf(_state_time / _windup_time, 1.0)
-		Shapes.glow(self, Vector2.ZERO, radius * (1.6 + 0.6 * progress), Color(COLOR_DANGER, WINDUP_GLOW_ALPHA * progress))
-	if _shape_radius != radius:
-		_shape_radius = radius
-		var key := "%s:%s" % [_type["shape"], radius]
-		_body_mesh = Shapes.polygon_mesh(key, _shape_points())
-		_outline_mesh = Shapes.outline_mesh(key + ":outline", _shape_points(), 2.0)
+	draw_set_transform(_body_offset())
+	_prepare_meshes()
 	draw_mesh(_body_mesh, null, Transform2D.IDENTITY, body)
 	draw_mesh(_outline_mesh, null, Transform2D.IDENTITY, body.darkened(0.35))
 	Shapes.disc(self, _facing * radius * 0.5, maxf(radius * 0.2, 4.0), Color(0.1, 0.05, 0.1))
@@ -1071,15 +1095,64 @@ func _draw() -> void:
 		draw_rect(Rect2(origin, Vector2(width * health / max_health, 6)), COLOR_DANGER)
 
 
-## Copie rosse del corpo lasciate dallo scatto dell'attacco (vedi _update_trail).
-func _draw_trail(leg: float) -> void:
-	if _trail.is_empty() or _body_mesh == null:
+## Posizione del corpo sopra le gambe: salto, ondeggiare del passo e
+## accucciata durante la carica del salto.
+func _body_offset() -> Vector2:
+	var leg := radius * LEG_FACTOR
+	var walking := _velocity.length() > 15.0 and _state != State.DEAD
+	# Camminando il corpo ondeggia un poco su e giù.
+	var bob := absf(sin(_walk_phase)) * radius * 0.1 if walking else 0.0
+	var crouch := 0.0
+	if _state == State.SLAM and _state_time < float(_type["slam"]["windup"]):
+		crouch = leg * 0.5 * minf(_state_time / float(_type["slam"]["windup"]) * 3.0, 1.0)
+	return Vector2(0, -ground_elevation - _air - _height - leg - bob + crouch)
+
+
+func _prepare_meshes() -> void:
+	if _shape_radius != radius:
+		_shape_radius = radius
+		var key := "%s:%s" % [_type["shape"], radius]
+		_body_mesh = Shapes.polygon_mesh(key, _shape_points())
+		_outline_mesh = Shapes.outline_mesh(key + ":outline", _shape_points(), 2.0)
+
+
+## Dietro al corpo: bagliore rosso della carica e copie rosse del corpo
+## lasciate dallo scatto dell'attacco (vedi _update_trail).
+func _draw_danger_back() -> void:
+	if _state == State.DEAD:
 		return
+	if _state == State.WINDUP and not _is_ranged():
+		# Carica dell'attacco: bagliore rosso sempre più acceso attorno al corpo.
+		var progress := clampf(_state_time / _windup_time, 0.0, 1.0)
+		_danger_back.draw_set_transform(_body_offset())
+		Shapes.glow(_danger_back, Vector2.ZERO, radius * (1.6 + 0.6 * progress), Color(COLOR_DANGER, WINDUP_GLOW_ALPHA * maxf(progress, 0.1)))
+	if _trail.is_empty():
+		return
+	_prepare_meshes()
+	var leg := radius * LEG_FACTOR
 	for point in _trail:
 		var fade := 1.0 - point.w / TRAIL_FADE
 		var offset := Vector2(point.x, point.y) - global_position
-		draw_set_transform(offset + Vector2(0, -ground_elevation - point.z - leg), 0.0, Vector2.ONE * (0.75 + 0.25 * fade))
-		draw_mesh(_body_mesh, null, Transform2D.IDENTITY, Color(COLOR_DANGER, TRAIL_ALPHA * fade * fade))
+		_danger_back.draw_set_transform(offset + Vector2(0, -ground_elevation - point.z - leg), 0.0, Vector2.ONE * (0.75 + 0.25 * fade))
+		_danger_back.draw_mesh(_body_mesh, null, Transform2D.IDENTITY, Color(COLOR_DANGER, TRAIL_ALPHA * fade * fade))
+
+
+## Davanti al corpo: l'arco rosso lasciato dalla spada che fende.
+func _draw_danger_front() -> void:
+	if _state != State.STRIKE or _is_ranged():
+		return
+	var angles := _sword_angles()
+	_danger_front.draw_set_transform(_body_offset())
+	BodyParts.draw_trail(_danger_front, Vector2.ZERO, angles.x, angles.z, radius * 0.6, radius + float(_type["strike_reach"]), Color(COLOR_DANGER, 0.8))
+
+
+## Angoli della spada nel fendente: inizio, fine e posizione attuale.
+func _sword_angles() -> Vector3:
+	var arc := _strike_arc()
+	var start := _attack_direction.angle() - _swing_sign * arc / 2.0
+	var end := _attack_direction.angle() + _swing_sign * arc / 2.0
+	var angle := lerpf(start, end, ease(minf(_state_time / STRIKE_TIME, 1.0), 0.6))
+	return Vector3(start, end, angle)
 
 
 ## Spada: a riposo di lato; durante la carica si porta indietro, poi
@@ -1088,18 +1161,16 @@ func _draw_trail(leg: float) -> void:
 func _draw_sword() -> void:
 	var length := radius + float(_type["strike_reach"]) * 0.6
 	var width := maxf(4.0, radius * 0.18)
-	var arc := _strike_arc()
-	var start := _attack_direction.angle() - _swing_sign * arc / 2.0
-	var end := _attack_direction.angle() + _swing_sign * arc / 2.0
+	var angles := _sword_angles()
 	var angle: float
 	match _state:
 		State.WINDUP:
-			angle = start - _swing_sign * 0.4 * minf(_state_time / _windup_time, 1.0)
+			angle = angles.x - _swing_sign * 0.4 * minf(_state_time / _windup_time, 1.0)
 		State.STRIKE:
-			angle = lerpf(start, end, ease(minf(_state_time / STRIKE_TIME, 1.0), 0.6))
-			BodyParts.draw_trail(self, Vector2.ZERO, start, angle, radius * 0.6, radius + float(_type["strike_reach"]), Color(COLOR_DANGER, 0.8))
+			# La scia dell'arco è su _danger_front.
+			angle = angles.z
 		State.RECOVER:
-			angle = end
+			angle = angles.y
 		_:
 			angle = _facing.angle() + 0.6
 	var hand := Vector2.from_angle(angle) * radius * 0.8 if _state in [State.WINDUP, State.STRIKE, State.RECOVER] else _facing.orthogonal() * radius * 0.8
