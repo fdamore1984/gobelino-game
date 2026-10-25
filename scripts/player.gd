@@ -8,9 +8,10 @@ extends Node2D
 ## che chiude la combo con un bonus (L2), parata tenendo premuto (L1),
 ## schivate concatenate con cambio di direzione (B), salti anche multipli (A),
 ## corsa tenendo premuto R2, palla di fuoco che insegue i nemici (X, costa
-## mana), scudo che assorbe un colpo (Y), pozioni di vita (croce sinistra)
-## e di mana (croce destra), torcia (croce giù). Il colpo potente si carica
-## tenendo premuto, fino al doppio del danno. Equipaggiamento e libri
+## mana), scudo che assorbe un colpo (Y), pozioni di vita (croce sinistra),
+## di mana (croce destra) e di vigore (croce giù). La torcia si accende da
+## sola al buio e si spegne alla luce (vedi set_torch). Il colpo potente si
+## carica tenendo premuto, fino al doppio del danno. Equipaggiamento e libri
 ## dell'inventario migliorano le caratteristiche (vedi Inventory).
 ## Parata, schivata e salto sono istantanei: annullano subito qualsiasi
 ## altra azione (combo, carica, attacco a terra, rinculo, sorso; non lo
@@ -21,16 +22,18 @@ extends Node2D
 ## secondo.
 ## Con R3 si aggancia il nemico più vicino: il personaggio lo guarda sempre,
 ## gli attacchi e la palla di fuoco vanno verso di lui; premendo di nuovo si
-## sgancia (niente passaggio da un nemico all'altro). Se il bersaglio muore o
-## si perde si passa da soli al più vicino.
+## sgancia (niente passaggio da un nemico all'altro). L'aggancio ignora muri
+## e ostacoli; se il bersaglio muore o si allontana troppo si sgancia, senza
+## passare a un altro nemico.
 ## Tenendo premuto R1 si continua ad attaccare; in aria R1 fa un attacco
 ## aereo. Tenendo premuto il colpo potente il primo colpo si carica e, a
 ## carica piena (o al rilascio), i colpi potenti successivi si concatenano da
-## soli finché si tiene premuto. Attacchi a terra, che colpiscono tutti i
-## nemici attorno: un colpo potente subito dopo una combo di colpi normali fa
-## saltare e colpire il terreno (anche tutti i colpi potenti concatenati
-## dopo); il colpo potente in aria fa piombare a terra, durante uno scatto in
-## aria con un colpo più ampio. Durante gli attacchi a terra si passa
+## soli finché si tiene premuto; se il primo è stato caricato, quelli
+## concatenati dopo fanno danni in più. Un colpo potente subito dopo una
+## combo di colpi normali (combo mista) è un colpo potente con un bonus ai
+## danni. Attacchi a terra, che colpiscono tutti i nemici attorno: il colpo
+## potente in aria fa piombare a terra, durante uno scatto in aria con un
+## colpo più ampio. Durante gli attacchi a terra si passa
 ## attraverso i nemici; all'impatto quelli attorno (non i boss) vengono
 ## respinti lontano.
 ## Sconfiggere nemici dà esperienza; a ogni livello aumentano i danni
@@ -92,23 +95,25 @@ const HEAVY_RECOVERY := 0.35
 const HEAVY_DAMAGE_FACTOR := 2.5
 ## Ogni colpo potente concatenato fa questo in più del precedente.
 const HEAVY_CHAIN_DAMAGE_STEP := 0.5
-const HEAVY_RANGE := 110.0
-const HEAVY_ARC := deg_to_rad(150.0)
+## Il colpo potente copre un'area più ampia dei colpi normali.
+const HEAVY_RANGE := 145.0
+const HEAVY_ARC := deg_to_rad(210.0)
 const HEAVY_LUNGE_SPEED := 220.0
 const START_HEAVY_CHAIN := 1
+## Combo mista: il colpo potente che segue colpi normali fa questo in più.
+const MIXED_COMBO_DAMAGE_FACTOR := 1.5
+## Se il primo colpo potente della combo è stato caricato, i colpi potenti
+## concatenati dopo fanno in più questa parte della carica raggiunta
+## (0.5 = +50% a carica piena).
+const CHARGED_CHAIN_BONUS := 0.5
 ## Attacco aereo: i colpi normali in aria fendono un arco più ampio,
 ## arrivano anche ai nemici sotto di sé fino a AIR_ATTACK_REACH e, mentre si
 ## colpisce, si scende più piano.
 const AIR_ATTACK_ARC := deg_to_rad(200.0)
 const AIR_ATTACK_REACH := 110.0
 const AIR_ATTACK_GRAVITY_FACTOR := 0.45
-## Attacchi a terra: il colpo potente diventa un salto con colpo sul
-## terreno ("leap") dopo almeno SLAM_MIN_COMBO colpi normali; il colpo
-## potente in aria fa piombare a terra ("plunge"), durante uno scatto in
-## aria con un colpo più ampio ("dash").
-const SLAM_MIN_COMBO := 2
-const SLAM_LEAP_SPEED := 620.0
-const SLAM_LEAP_FORWARD := 160.0
+## Attacchi a terra: il colpo potente in aria fa piombare a terra
+## ("plunge"), durante uno scatto in aria con un colpo più ampio ("dash").
 const SLAM_GRAVITY := 2600.0
 ## In picchiata ci si ferma un attimo in aria, poi si scende veloci.
 const SLAM_HANG := 0.1
@@ -116,20 +121,14 @@ const SLAM_DIVE_SPEED := 650.0
 const SLAM_RECOVERY := 0.32
 ## Se per qualche motivo non si tocca terra, l'impatto arriva comunque.
 const SLAM_MAX_TIME := 2.0
-const SLAM_RADIUS := {"leap": 140.0, "plunge": 105.0, "dash": 165.0}
-const SLAM_LEAP_DAMAGE_FACTOR := 0.8
+const SLAM_RADIUS := {"plunge": 105.0, "dash": 165.0}
 const PLUNGE_DAMAGE_FACTOR := 1.6
 const DASH_SLAM_DAMAGE_FACTOR := 2.4
-## Aggancio del bersaglio: nemici entro LOCK_RANGE; oltre LOCK_BREAK_RANGE
-## si sgancia. La telecamera si sposta verso il bersaglio di questa parte
-## della distanza, fino a LOCK_CAMERA_MAX.
+## Aggancio del bersaglio: nemici entro LOCK_RANGE, anche dietro muri e
+## ostacoli; oltre LOCK_BREAK_RANGE si sgancia. La telecamera si sposta
+## verso il bersaglio di questa parte della distanza, fino a LOCK_CAMERA_MAX.
 const LOCK_RANGE := 650.0
 const LOCK_BREAK_RANGE := 900.0
-## Si agganciano solo i nemici in vista (nessuna parete, montagna o
-## ostacolo solido in mezzo, vedi World.clear_line); se il bersaglio resta
-## nascosto per questo tempo si sgancia (o si passa a un altro in vista).
-const LOCK_HIDDEN_TIME := 0.6
-const LOCK_SIGHT_INTERVAL := 0.15
 const LOCK_CAMERA_SHARE := 0.3
 const LOCK_CAMERA_MAX := 170.0
 ## All'impatto la telecamera trema, sempre meno.
@@ -224,20 +223,24 @@ const SPELL_UPGRADE := 0.2
 ## massimo, che raddoppia il danno.
 const HEAVY_CHARGE_TIME := 0.9
 
-## Torcia: luce attorno al personaggio, utile di notte.
+## Torcia: luce attorno al personaggio, che si accende da sola al buio
+## (di notte e nel sotterraneo, vedi Game) e si spegne alla luce.
 const TORCH_COLOR := Color(1.0, 0.78, 0.45)
 const TORCH_ENERGY := 1.15
 const TORCH_SCALE := 1.9
 
 ## Ogni pozione cura questi punti vita.
 const POTION_HEAL := 3
-## Pozioni di vita (e di mana) che si possono portare; ogni potenziamento
-## "potion_slots" ne aggiunge una di ciascun tipo.
+## Pozioni di vita (e di mana e di vigore) che si possono portare; ogni
+## potenziamento "potion_slots" ne aggiunge una di ciascun tipo.
 const MAX_POTIONS := 10
 ## Potenziamenti delle pozioni: +1 punto vita curato, +5% di mana ridato.
 const POTION_HEAL_UPGRADE := 1
 const MANA_RESTORE_UPGRADE := 0.05
 const START_POTIONS := 2
+## Pozioni verdi (vigore) di partenza; quanto vigore ridanno sta in
+## data/items.json ("restore_stamina", parte del vigore massimo).
+const START_STAMINA_POTIONS := 1
 ## Lo scudo assorbe un colpo; poi va ricaricato. Ogni potenziamento
 ## riduce la ricarica del 5%.
 const SHIELD_COOLDOWN := 30.0
@@ -268,8 +271,8 @@ const COLOR_GUARD_SPARK := Color(0.8, 0.9, 1.0)
 ## di pausa (più piano mentre si para). Senza vigore non si agisce e un
 ## colpo parato rompe la guardia.
 const MAX_STAMINA := 100.0
-## Ogni potenziamento della stamina aggiunge il 5% della stamina di partenza.
-const STAMINA_UPGRADE := 0.05
+## Ogni potenziamento della stamina aggiunge il 10% della stamina di partenza.
+const STAMINA_UPGRADE := 0.1
 const STAMINA_REGEN := 45.0
 const STAMINA_REGEN_DELAY := 0.55
 const STAMINA_PARRY_REGEN_FACTOR := 0.35
@@ -332,6 +335,7 @@ const COLOR_MANA := Color(0.45, 0.65, 1.0)
 const COLOR_FLAME := Color(1.0, 0.6, 0.2)
 const COLOR_HEALTH_FLASK := Color(0.9, 0.2, 0.25)
 const COLOR_MANA_FLASK := Color(0.3, 0.5, 1.0)
+const COLOR_STAMINA_FLASK := Color(0.3, 0.85, 0.3)
 
 var max_health := START_HEALTH
 ## Vita massima senza l'equipaggiamento (cresce con i potenziamenti).
@@ -341,6 +345,7 @@ var max_mana := START_MANA
 var _base_max_mana := START_MANA
 ## Pozioni nella cintura: non hanno limite.
 var mana_potions := START_MANA_POTIONS
+var stamina_potions := START_STAMINA_POTIONS
 ## Bonus alla potenza della magia dai potenziamenti (0.2 = +20%).
 var spell_bonus := 0.0
 var inventory := Inventory.new()
@@ -389,7 +394,7 @@ var max_stamina := MAX_STAMINA
 var _stamina_delay := 0.0
 ## Si sta correndo (consuma vigore).
 var _running := false
-## Pozione che si sta bevendo ("potion" o "mana_potion") e se ha già fatto effetto.
+## Pozione che si sta bevendo ("potion", "mana_potion" o "stamina_potion").
 var _drinking := ""
 ## Corsa accesa (si alterna premendo "run").
 var _run_on := false
@@ -427,7 +432,7 @@ var _camera_height := 0.0
 var _spell_cooldown := 0.0
 ## La schivata in corso è uno scatto in aria (altrimenti è una capriola).
 var _air_dash := false
-## Attacco a terra in corso: "leap", "plunge" o "dash", e se ha già toccato terra.
+## Attacco a terra in corso: "plunge" o "dash", e se ha già toccato terra.
 var _slam_kind := ""
 var _slam_landed := false
 ## Tremolio della telecamera (0-1).
@@ -435,21 +440,16 @@ var _shake := 0.0
 ## Ultimo punto a terra fuori dai burroni e la sua altezza: si riappare lì.
 var _safe_position := Vector2.ZERO
 var _safe_altitude := 0.0
-## Nemico agganciato (null se nessuno) e il suo mirino. Finché l'aggancio è
-## attivo, se il bersaglio sparisce (anche liberato dalla scena) si passa al
-## più vicino.
-var lock_target: Enemy:
-	set(value):
-		lock_target = value
-		_lock_enabled = value != null
-var _lock_enabled := false
-var _lock_hidden := 0.0
-var _lock_sight_check := 0.0
-var _lock_visible := true
+## Nemico agganciato (null se nessuno) e il suo mirino. Se il bersaglio
+## sparisce (anche liberato dalla scena) l'aggancio si toglie.
+var lock_target: Enemy
 var _lock_marker := LockMarker.new()
 ## Carica del colpo potente (0-1) e se il tasto è ancora tenuto premuto.
 var _charge := 0.0
 var _charging := false
+## Carica raggiunta dal primo colpo potente della combo: dà il bonus ai
+## colpi potenti concatenati dopo (vedi CHARGED_CHAIN_BONUS).
+var _chain_charge := 0.0
 ## Il suono del colpo potente parte al rilascio della carica, una volta sola.
 var _heavy_swing_played := false
 var _torch := PointLight2D.new()
@@ -512,6 +512,8 @@ func _physics_process(delta: float) -> void:
 			_raise_shield()
 		if UiNav.game_pressed("mana_potion"):
 			_start_drink("mana_potion")
+		if UiNav.game_pressed("stamina_potion"):
+			_start_drink("stamina_potion")
 		if UiNav.game_pressed("spell"):
 			_cast_fireball(input)
 	if _state != State.DEAD:
@@ -519,10 +521,6 @@ func _physics_process(delta: float) -> void:
 		if UiNav.game_pressed("lock_on"):
 			_toggle_lock()
 		_update_lock()
-	if UiNav.game_pressed("torch") and _state != State.DEAD:
-		torch_on = not torch_on
-		_torch.enabled = torch_on
-		Sfx.play("torch", global_position)
 
 	# La parata è istantanea: annulla subito attacchi (anche in carica),
 	# schivate, scivolate, attacchi a terra, rinculo e il bere.
@@ -801,7 +799,7 @@ func _update_height(delta: float) -> void:
 	if _state == State.ATTACK and _air_attack and _height_velocity < 0.0:
 		gravity *= AIR_ATTACK_GRAVITY_FACTOR
 	if _state == State.SLAM and not _slam_landed:
-		gravity = 0.0 if _slam_kind != "leap" and _state_time < SLAM_HANG else SLAM_GRAVITY
+		gravity = 0.0 if _state_time < SLAM_HANG else SLAM_GRAVITY
 	_height_velocity -= gravity * delta
 	_height += _height_velocity * delta
 	if _height <= 0.0:
@@ -894,6 +892,7 @@ func _update_attack(input: Vector2, delta: float) -> void:
 func _end_combo() -> void:
 	_combo_step = 0
 	_heavy_step = 0
+	_chain_charge = 0.0
 	_combo_timer = 0.0
 	_queued_attack = ""
 
@@ -1049,62 +1048,32 @@ func teleport(at: Vector2) -> void:
 ## Non si passa da un nemico all'altro.
 func _toggle_lock() -> void:
 	lock_target = null if lock_target else _lock_nearest()
-	_lock_hidden = 0.0
-	_lock_visible = true
 	_lock_marker.target = lock_target
 	Sfx.play_ui("ui_move" if lock_target else "ui_confirm")
 
 
-## Il nemico vivo in vista più vicino (null se nessuno).
+## Il nemico vivo più vicino entro LOCK_RANGE (null se nessuno), anche
+## dietro muri e ostacoli: l'aggancio è sempre possibile.
 func _lock_nearest() -> Enemy:
-	var candidates := _lock_candidates()
-	return candidates[0] if not candidates.is_empty() else null
-
-
-## Nemici vivi in vista entro LOCK_RANGE, dal più vicino.
-func _lock_candidates() -> Array[Enemy]:
-	var result: Array[Enemy] = []
+	var nearest: Enemy = null
+	var best := LOCK_RANGE * LOCK_RANGE
 	for node in get_tree().get_nodes_in_group("enemies"):
 		var enemy := node as Enemy
-		if enemy and not enemy.is_dead() and enemy.global_position.distance_to(global_position) <= LOCK_RANGE \
-				and _in_sight(enemy):
-			result.append(enemy)
-	result.sort_custom(func(a: Enemy, b: Enemy) -> bool:
-		return a.global_position.distance_squared_to(global_position) < b.global_position.distance_squared_to(global_position))
-	return result
+		if enemy == null or enemy.is_dead():
+			continue
+		var distance := enemy.global_position.distance_squared_to(global_position)
+		if distance <= best:
+			best = distance
+			nearest = enemy
+	return nearest
 
 
-## Il nemico si vede da qui: guardando verso l'alto o verso il basso conta
-## il più alto dei due terreni, così un nemico su un gradino si vede.
-func _in_sight(enemy: Enemy) -> bool:
-	if World.current == null:
-		return true
-	var altitude := maxf(ground_elevation, enemy.ground_elevation)
-	return World.current.clear_line(global_position, enemy.global_position, altitude)
-
-
-## Se il bersaglio muore, si allontana troppo o resta nascosto dietro un
-## ostacolo si passa da soli al più vicino in vista; se non ce n'è nessuno
-## si sgancia.
+## Se il bersaglio muore (o sparisce) o si allontana troppo, l'aggancio si
+## toglie: non si passa da soli a un altro nemico.
 func _update_lock() -> void:
-	if not _lock_enabled:
-		return
 	if not is_instance_valid(lock_target) or lock_target.is_dead() \
 			or lock_target.global_position.distance_to(global_position) > LOCK_BREAK_RANGE:
-		lock_target = _lock_nearest()
-		_lock_hidden = 0.0
-		_lock_visible = true
-	else:
-		var delta := get_physics_process_delta_time()
-		_lock_sight_check -= delta
-		if _lock_sight_check <= 0.0:
-			_lock_sight_check = LOCK_SIGHT_INTERVAL
-			_lock_visible = _in_sight(lock_target)
-		_lock_hidden = 0.0 if _lock_visible else _lock_hidden + delta
-		if _lock_hidden >= LOCK_HIDDEN_TIME:
-			lock_target = _lock_nearest()
-			_lock_hidden = 0.0
-			_lock_visible = true
+		lock_target = null
 	_lock_marker.target = lock_target
 
 
@@ -1124,7 +1093,7 @@ func save_state() -> Dictionary:
 	return {
 		"level": level, "experience": experience, "xp_curve": XP_CURVE_VERSION, "health": health, "base_max_health": _base_max_health,
 		"mana": mana, "base_max_mana": _base_max_mana, "potions": potions,
-		"mana_potions": mana_potions, "spell_bonus": spell_bonus,
+		"mana_potions": mana_potions, "stamina_potions": stamina_potions, "spell_bonus": spell_bonus,
 		"max_combo_hits": max_combo_hits, "max_heavy_chain": max_heavy_chain,
 		"max_chained_dodges": max_chained_dodges, "max_jumps": max_jumps, "run_speed_bonus": run_speed_bonus,
 		"shield_cooldown_max": shield_cooldown_max, "torch_on": torch_on, "upgrades_taken": upgrades_taken,
@@ -1152,6 +1121,8 @@ func load_state(data: Dictionary) -> void:
 	_base_max_mana = float(data.get("base_max_mana", _base_max_mana))
 	potions = int(data.get("potions", potions))
 	mana_potions = int(data.get("mana_potions", mana_potions))
+	# Salvataggi precedenti alle pozioni verdi: si parte con la scorta iniziale.
+	stamina_potions = int(data.get("stamina_potions", stamina_potions))
 	spell_bonus = float(data.get("spell_bonus", spell_bonus))
 	max_combo_hits = int(data.get("max_combo_hits", max_combo_hits))
 	max_heavy_chain = int(data.get("max_heavy_chain", max_heavy_chain))
@@ -1182,6 +1153,8 @@ func load_state(data: Dictionary) -> void:
 			potions += 1
 		elif saved_items[k] == "potion_mana":
 			mana_potions += 1
+		elif saved_items[k] == "potion_stamina":
+			stamina_potions += 1
 		elif known.has(saved_items[k]):
 			kept[k] = inventory.items.size()
 			inventory.items.append(saved_items[k])
@@ -1378,12 +1351,11 @@ func _start_heavy(input: Vector2, held := false) -> void:
 	if _heavy_step >= max_heavy_chain:
 		_heavy_step = 0
 		_combo_step = 0
+	if _heavy_step == 0:
+		_chain_charge = 0.0
 	_heavy_step += 1
-	# Dopo una combo di colpi normali il colpo potente diventa un salto con
-	# colpo sul terreno (anche i colpi potenti concatenati dopo).
-	if _combo_step >= SLAM_MIN_COMBO and not is_airborne():
-		_start_slam("leap", input)
-		return
+	# Dopo una combo di colpi normali (combo mista) resta un colpo potente
+	# normale, con il bonus MIXED_COMBO_DAMAGE_FACTOR (vedi _attack_damage).
 	_attack_heavy = true
 	_begin_attack(input)
 	_charging = not held
@@ -1426,15 +1398,14 @@ func _next_combo_step() -> int:
 	return _combo_step + 1 if continues else 1
 
 
-## Inizia un attacco a terra: salto (leap) o sosta in aria prima di
-## piombare giù (plunge, dash).
+## Inizia un attacco a terra: sosta in aria prima di piombare giù (plunge, dash).
 func _start_slam(kind: String, input: Vector2) -> void:
 	# Il colpo dallo scatto in aria paga qui; gli altri lo pagano come colpo potente.
 	if kind == "dash" and not _use_stamina(STAMINA_HEAVY):
 		return
 	_slam_kind = kind
 	_slam_landed = false
-	_attack_heavy = kind == "leap"
+	_attack_heavy = false
 	_attack_speed = EMPOWER_ATTACK_SPEED if is_empowered() else 1.0
 	_charge = 0.0
 	_charging = false
@@ -1448,33 +1419,21 @@ func _start_slam(kind: String, input: Vector2) -> void:
 	if kind != "dash":
 		_face_lock()
 	facing = _target_facing
-	if kind == "leap":
-		_height_velocity = SLAM_LEAP_SPEED
-		Sfx.play("jump", global_position, 0.8)
-	else:
-		_height_velocity = 0.0
+	_height_velocity = 0.0
 	Sfx.play("heavy_swing", global_position, 0.85)
 	_change_state(State.SLAM)
 
 
-## Attacco a terra: salita (o sosta in aria), discesa e, toccato terra,
-## l'impatto (vedi _land); poi un breve recupero. Si può già chiedere il
-## colpo potente successivo della catena.
+## Attacco a terra: sosta in aria, discesa e, toccato terra, l'impatto
+## (vedi _land); poi un breve recupero.
 func _update_slam(input: Vector2, delta: float) -> void:
-	if UiNav.game_pressed("heavy_attack") and _slam_kind == "leap" and _can_chain_heavy():
-		_queued_attack = "heavy"
-	elif UiNav.game_held("heavy_attack") and _slam_kind == "leap" and _can_chain_heavy() and _queued_attack == "" and _slam_landed:
-		# Tenendo premuto si concatena da solo il colpo potente successivo.
-		_queued_attack = "heavy_held"
 	if not _slam_landed:
-		if _slam_kind != "leap" and _state_time >= SLAM_HANG and _height_velocity > -SLAM_DIVE_SPEED:
+		if _state_time >= SLAM_HANG and _height_velocity > -SLAM_DIVE_SPEED:
 			_height_velocity = -SLAM_DIVE_SPEED
 		# In aria ci si sposta piano; lo scatto continua nella sua direzione.
 		var target := input * walk_speed() * ATTACK_MOVE_FACTOR
 		if _slam_kind == "dash":
 			target = _dodge_direction * DODGE_SPEED * 0.45
-		elif _slam_kind == "leap":
-			target += facing * SLAM_LEAP_FORWARD
 		_velocity = _velocity.move_toward(target, ACCELERATION_FULL * delta)
 		if _state_time >= SLAM_MAX_TIME:
 			_slam_impact()
@@ -1482,13 +1441,7 @@ func _update_slam(input: Vector2, delta: float) -> void:
 	_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * 2.0 * delta)
 	if _state_time < SLAM_RECOVERY / _attack_speed:
 		return
-	if _queued_attack in ["heavy", "heavy_held"]:
-		_start_heavy(input, _queued_attack == "heavy_held")
-		return
-	if _slam_kind == "leap" and _can_chain_heavy():
-		_combo_timer = COMBO_WINDOW
-	else:
-		_end_combo()
+	_end_combo()
 	_change_state(State.NORMAL)
 
 
@@ -1526,8 +1479,6 @@ func _slam_impact() -> void:
 
 
 func _slam_damage() -> int:
-	if _slam_kind == "leap":
-		return roundi(_attack_damage() * SLAM_LEAP_DAMAGE_FACTOR)
 	var multiplier := PLUNGE_DAMAGE_FACTOR if _slam_kind == "plunge" else DASH_SLAM_DAMAGE_FACTOR
 	if _attack_speed > 1.0:
 		multiplier *= EMPOWER_DAMAGE_FACTOR
@@ -1630,6 +1581,10 @@ func _start_drink(kind: String) -> void:
 		if potions == 0 or health >= max_health:
 			return
 		potions -= 1
+	elif kind == "stamina_potion":
+		if stamina_potions == 0 or stamina >= max_stamina:
+			return
+		stamina_potions -= 1
 	else:
 		if mana_potions == 0 or mana >= max_mana:
 			return
@@ -1645,6 +1600,9 @@ func _apply_drink() -> void:
 		health = mini(health + potion_heal(), max_health)
 		health_changed.emit(health, max_health)
 		Sfx.play("potion", global_position)
+	elif _drinking == "stamina_potion":
+		stamina = minf(stamina + stamina_potion_restore(), max_stamina)
+		Sfx.play("stamina_potion", global_position)
 	else:
 		mana = minf(mana + mana_potion_restore(), max_mana)
 		Sfx.play("mana_potion", global_position)
@@ -1682,7 +1640,7 @@ func _cast_fireball(input: Vector2) -> void:
 	_spell_cooldown = SPELL_COOLDOWN
 	var fireball := Fireball.new()
 	fireball.direction = input.normalized() if input != Vector2.ZERO else facing
-	if lock_target and _lock_visible:
+	if lock_target:
 		fireball.target = lock_target
 		fireball.direction = (lock_target.global_position - global_position).normalized()
 	fireball.damage = spell_damage()
@@ -1705,6 +1663,11 @@ func mana_potion_restore() -> float:
 	return MANA_POTION_RESTORE * (1.0 + MANA_RESTORE_UPGRADE * int(upgrades_taken.get("mana_restore", 0)))
 
 
+## Vigore ridato dalla pozione verde.
+func stamina_potion_restore() -> float:
+	return max_stamina * Items.stat("potion_stamina", "restore_stamina")
+
+
 ## Si può prendere l'oggetto: le pozioni solo finché la cintura non è piena.
 func can_pick_up(id: String) -> bool:
 	match id:
@@ -1712,11 +1675,13 @@ func can_pick_up(id: String) -> bool:
 			return potions < potion_capacity()
 		"potion_mana":
 			return mana_potions < potion_capacity()
+		"potion_stamina":
+			return stamina_potions < potion_capacity()
 	return true
 
 
-## Raccoglie un oggetto: le monete vanno nel borsello, le pozioni di vita e
-## di mana nella cintura (fino a potion_capacity, mai nell'inventario), il
+## Raccoglie un oggetto: le monete vanno nel borsello, le pozioni di vita,
+## di mana e di vigore nella cintura (fino a potion_capacity, mai nell'inventario), il
 ## resto nell'inventario. Restituisce false se la cintura è piena.
 func pickup(id: String, amount := 1) -> bool:
 	if not can_pick_up(id):
@@ -1732,6 +1697,10 @@ func pickup(id: String, amount := 1) -> bool:
 			return true
 		"potion_mana":
 			mana_potions = mini(mana_potions + amount, potion_capacity())
+			Sfx.play("pickup", global_position)
+			return true
+		"potion_stamina":
+			stamina_potions = mini(stamina_potions + amount, potion_capacity())
 			Sfx.play("pickup", global_position)
 			return true
 	inventory.add(id)
@@ -1775,6 +1744,16 @@ func _refresh_stats() -> void:
 	health_changed.emit(health, max_health)
 
 
+## Torcia automatica: Game la accende al buio e la spegne alla luce.
+func set_torch(on: bool) -> void:
+	if on == torch_on:
+		return
+	torch_on = on
+	_torch.enabled = on
+	if on and _state != State.DEAD:
+		Sfx.play("torch", global_position)
+
+
 func _raise_shield() -> void:
 	if shield_active or shield_cooldown > 0.0:
 		return
@@ -1804,6 +1783,12 @@ func _attack_damage() -> int:
 		# nella combo e cresce a ogni colpo potente concatenato.
 		multiplier = HEAVY_DAMAGE_FACTOR * (1.0 + COMBO_DAMAGE_STEP * _combo_step) \
 				* (1.0 + HEAVY_CHAIN_DAMAGE_STEP * (_heavy_step - 1))
+		# Combo mista (colpi normali e poi potente): bonus ai danni.
+		if _combo_step > 0:
+			multiplier *= MIXED_COMBO_DAMAGE_FACTOR
+		# Primo colpo potente caricato: i concatenati dopo fanno di più.
+		if _heavy_step > 1:
+			multiplier *= 1.0 + CHARGED_CHAIN_BONUS * _chain_charge
 	else:
 		multiplier = 1.0 + COMBO_DAMAGE_STEP * (_combo_step - 1)
 	if _attack_speed > 1.0:
@@ -1815,6 +1800,9 @@ func _attack_damage() -> int:
 
 func _resolve_attack() -> void:
 	var damage := _attack_damage()
+	# La carica del primo colpo potente resta per i colpi potenti concatenati.
+	if _attack_heavy and _heavy_step == 1:
+		_chain_charge = _charge
 	var heavy := _attack_heavy or _combo_step >= max_combo_hits
 	var landed := false
 	# In aria si arriva anche ai nemici sotto di sé.
@@ -1934,9 +1922,13 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO)
 
 
-## Bevendo: la fiaschetta (rossa o blu) sale alla bocca e si inclina.
+## Bevendo: la fiaschetta (rossa, blu o verde) sale alla bocca e si inclina.
 func _draw_flask() -> void:
-	var color := COLOR_HEALTH_FLASK if _drinking == "potion" else COLOR_MANA_FLASK
+	var color := COLOR_MANA_FLASK
+	if _drinking == "potion":
+		color = COLOR_HEALTH_FLASK
+	elif _drinking == "stamina_potion":
+		color = COLOR_STAMINA_FLASK
 	var t := clampf(_state_time / DRINK_EFFECT_TIME, 0.0, 1.0)
 	var at := facing * RADIUS * lerpf(1.2, 0.7, t) + Vector2(0, lerpf(4.0, -8.0, t))
 	var neck := Vector2.from_angle(-PI / 2.0 + facing.x * 1.2 * t) * 10.0

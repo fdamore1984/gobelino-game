@@ -45,8 +45,8 @@ HUD_MANA,Mana %d/%d · Mana potions %d/%d
 HUD_GOLD,Gold %d
 UPGRADE_MANA,Max mana +20
 UPGRADE_SPELL,Spell power +20%
-UPGRADE_STAMINA,Stamina +5%
-UPGRADE_POTION_SLOTS,Potions carried +1
+UPGRADE_STAMINA,Stamina +10%
+UPGRADE_POTION_SLOTS,Potions carried +1 (each kind)
 UPGRADE_POTION_HEAL,Health potion heals +1
 UPGRADE_MANA_RESTORE,Mana potion restores +5%
 UPGRADE_CHOICE,One more upgrade to choose
@@ -78,6 +78,7 @@ STAT_MANA,+%d max mana
 STAT_SPELL,+%d%% spell power
 STAT_HEAL,heals %d health
 STAT_RESTORE_MANA,+%d mana
+STAT_RESTORE_STAMINA,restores %d%% stamina
 ITEM_GOLD,Gold
 ITEM_SWORD_IRON,Iron sword
 ITEM_SWORD_STEEL,Steel sword
@@ -91,9 +92,10 @@ ITEM_BOOK_FIRE,Book: Flames
 ITEM_BOOK_MANA,Book: Arcane mind
 ITEM_POTION_HEALTH,Health potion
 ITEM_POTION_MANA,Mana potion
+ITEM_POTION_STAMINA,Stamina potion
 TOUCH_SPELL,Spell
 TOUCH_MANA,Mana
-TOUCH_TORCH,Torch
+TOUCH_STAMINA,Stamina
 TOUCH_INVENTORY,Bag
 MERCHANT_TITLE,Travelling merchant
 MERCHANT_HINT,A travelling merchant: interact with the stall to buy and sell
@@ -130,11 +132,12 @@ CONTROLS_SPELL,Fireball | U | X
 CONTROLS_SHIELD,Shield | R | Y
 CONTROLS_POTION,Health potion | Q | D-pad left
 CONTROLS_MANA,Mana potion | T | D-pad right
-CONTROLS_TORCH,Torch | G | D-pad down
+CONTROLS_STAMINA_POTION,Stamina potion | G | D-pad down
 CONTROLS_INVENTORY,Inventory (R3 / C to sort) | I / Tab | D-pad up
 CONTROLS_MENU,"Pause menu (save, controls, quit) | Esc | Start"
 CONTROLS_SPECIAL_TITLE,Special attacks
-CONTROLS_SPECIAL_LEAP,"Power strike right after a combo: leap and slam the ground, hitting every enemy around"
+CONTROLS_SPECIAL_MIXED,"Power strike right after a combo: a wide power strike with bonus damage"
+CONTROLS_SPECIAL_CHARGED,"Charge the first power strike: every power strike chained after it deals extra damage"
 CONTROLS_SPECIAL_AIR,"Attack in mid-air: wide aerial slashes that also reach the enemies below you"
 CONTROLS_SPECIAL_PLUNGE,"Power strike in mid-air: plunge onto the ground, hitting the enemies where you land"
 CONTROLS_SPECIAL_DASH,Power strike during an air dash: dash strike that smashes a wide area

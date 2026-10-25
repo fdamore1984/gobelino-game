@@ -25,7 +25,7 @@ const BUTTONS := [
 	{"action": "run", "label": "TOUCH_RUN", "offset": Vector2(-335, -300), "radius": SMALL_BUTTON_RADIUS},
 	{"action": "spell", "label": "TOUCH_SPELL", "offset": Vector2(-210, -370), "radius": SMALL_BUTTON_RADIUS},
 	{"action": "mana_potion", "label": "TOUCH_MANA", "offset": Vector2(-450, -60), "radius": SMALL_BUTTON_RADIUS},
-	{"action": "torch", "label": "TOUCH_TORCH", "offset": Vector2(-450, -180), "radius": SMALL_BUTTON_RADIUS},
+	{"action": "stamina_potion", "label": "TOUCH_STAMINA", "offset": Vector2(-450, -180), "radius": SMALL_BUTTON_RADIUS},
 	{"action": "inventory", "label": "TOUCH_INVENTORY", "offset": Vector2(-450, -300), "radius": SMALL_BUTTON_RADIUS},
 	{"action": "lock_on", "label": "TOUCH_LOCK", "offset": Vector2(-335, -420), "radius": SMALL_BUTTON_RADIUS},
 	{"action": "map", "label": "TOUCH_MAP", "offset": Vector2(-450, -420), "radius": SMALL_BUTTON_RADIUS},

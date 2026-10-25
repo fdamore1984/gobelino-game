@@ -103,6 +103,10 @@ func _build_sounds() -> void:
 	_streams["mana_potion"] = _render(0.5, func(t: float, d: float) -> float:
 		var shimmer := sin(TAU * lerpf(700.0, 1400.0, t / d) * t) * 0.6 + sin(TAU * 2100.0 * t) * 0.2
 		return shimmer * 0.25 * sin(PI * t / d))
+	_streams["stamina_potion"] = _render(0.4, func(t: float, d: float) -> float:
+		# Sorso energico: un tono che sale svelto, con un battito.
+		var rise := _triangle(lerpf(350.0, 900.0, t / d) * t) * 0.3
+		return rise * (0.6 + 0.4 * absf(sin(TAU * 12.0 * t))) * sin(PI * t / d))
 	# Magia
 	_streams["fireball"] = _render_filtered(0.45, Vector2(0.15, 0.4), func(t: float, d: float) -> float:
 		var roar := sin(TAU * lerpf(120.0, 220.0, t / d) * t) * 0.4

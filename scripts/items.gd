@@ -82,7 +82,7 @@ static func _random_kind(item: Dictionary) -> bool:
 
 
 ## Quello che lascia un nemico abbattuto: ogni tanto monete o una pozione
-## (di vita o di mana), di rado un oggetto e molto di rado un oggetto raro
+## (di vita, di mana o di vigore), di rado un oggetto e molto di rado un oggetto raro
 ## dei mercanti.
 static func enemy_drops(level: int) -> Array[Array]:
 	var data: Dictionary = DATA.data["enemy_drop"]
@@ -94,6 +94,8 @@ static func enemy_drops(level: int) -> Array[Array]:
 		drops.append(["potion_health", 1])
 	elif randf() < float(data.get("mana_potion_chance", 0.0)):
 		drops.append(["potion_mana", 1])
+	elif randf() < float(data.get("stamina_potion_chance", 0.0)):
+		drops.append(["potion_stamina", 1])
 	if randf() < float(data["rare_chance"]):
 		var rare := shop_items()
 		drops.append([rare[randi() % rare.size()], 1])
