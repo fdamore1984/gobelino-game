@@ -143,9 +143,21 @@ CONTROLS_BACK,Back
 MENU_CONTINUE,Continue
 SLOTS_NEW_TITLE,New game: choose a save slot
 SLOTS_LOAD_TITLE,Continue: choose a save slot
-SLOT_EMPTY,Slot %d   —   Empty
-SLOT_SAVED,Slot %d   —   Level %d   —   %s
-SLOT_OVERWRITE,Slot %d   —   Press again to replace this save
+SLOT_NAME,Slot %d
+SLOT_EMPTY,Empty
+SLOT_EMPTY_NEW,Start a new adventure here
+SLOT_LEVEL,Level %d
+SLOT_HEALTH_DAMAGE,Health %d · Damage %d
+SLOT_GOLD_POTIONS,Gold %d · Potions %d
+SLOT_KILLS,Enemies defeated: %d
+SLOT_PLACE_SURFACE,On the surface
+SLOT_PLACE_DEPTH,Underground · level %d
+SLOT_PLAYTIME,Play time: %s
+SLOT_PLAYTIME_MIN,%d min
+SLOT_PLAYTIME_HOURS,%d h %02d min
+SLOT_PLAYTIME_UNKNOWN,—
+SLOT_SAVED_AT,Saved %s
+SLOT_OVERWRITE,Press again to replace this save
 PAUSE_TITLE,Paused
 PAUSE_RESUME,Resume
 PAUSE_SAVE,Save game

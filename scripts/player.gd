@@ -279,6 +279,14 @@ const STAMINA_ATTACK := 20.0
 const STAMINA_HEAVY := 32.0
 const STAMINA_DODGE := 28.0
 const STAMINA_JUMP := 12.0
+## Curva dell'esperienza (vedi experience_for): punti per il livello 2,
+## aumento per livello, livelli veloci e crescita oltre questi.
+const XP_CURVE_BASE := 40.0
+const XP_CURVE_STEP := 25.0
+const XP_CURVE_FAST_LEVELS := 10
+const XP_CURVE_LATE := 32.0
+## Versione della curva salvata con l'esperienza (1: la vecchia, lineare).
+const XP_CURVE_VERSION := 2
 const STAMINA_BLOCK := 30.0
 const STAMINA_RUN := 16.0
 ## Guardia rotta: si resta storditi per questo tempo.
@@ -492,17 +500,19 @@ func _physics_process(delta: float) -> void:
 	if _state != State.DEAD:
 		mana = minf(mana + MANA_REGEN * delta, max_mana)
 
+	# I tasti si leggono con UiNav.game_pressed / game_held: quello che ha
+	# appena chiuso un menù (A su Riprendi, B) non conta finché non si rilascia.
 	var input := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	var dodge_input := Input.get_vector("move_left", "move_right", "move_up", "move_down", DODGE_STICK_DEADZONE)
 
 	if _state not in [State.DEAD, State.HURT]:
-		if Input.is_action_just_pressed("potion"):
+		if UiNav.game_pressed("potion"):
 			_start_drink("potion")
-		if Input.is_action_just_pressed("shield"):
+		if UiNav.game_pressed("shield"):
 			_raise_shield()
-		if Input.is_action_just_pressed("mana_potion"):
+		if UiNav.game_pressed("mana_potion"):
 			_start_drink("mana_potion")
-		if Input.is_action_just_pressed("spell"):
+		if UiNav.game_pressed("spell"):
 			_cast_fireball(input)
 	if _state != State.DEAD:
 		# Con la levetta destra inclinata si aggancia il nemico in quella
@@ -510,23 +520,23 @@ func _physics_process(delta: float) -> void:
 		# trascinando il dito dal tasto a schermo); altrimenti il più vicino.
 		var aim := Input.get_vector("lock_left", "lock_right", "lock_up", "lock_down")
 		var aiming := aim != Vector2.ZERO
-		if Input.is_action_just_pressed("lock_on"):
+		if UiNav.game_pressed("lock_on"):
 			if aiming:
 				_lock_toward(aim)
 			else:
 				_cycle_lock()
-		elif aiming and not _lock_aiming and Input.is_action_pressed("lock_on"):
+		elif aiming and not _lock_aiming and UiNav.game_held("lock_on"):
 			_lock_toward(aim)
 		_lock_aiming = aiming
 		_update_lock()
-	if Input.is_action_just_pressed("torch") and _state != State.DEAD:
+	if UiNav.game_pressed("torch") and _state != State.DEAD:
 		torch_on = not torch_on
 		_torch.enabled = torch_on
 		Sfx.play("torch", global_position)
 
 	# La parata è istantanea: annulla subito attacchi (anche in carica),
 	# schivate, scivolate, attacchi a terra, rinculo e il bere.
-	if Input.is_action_just_pressed("parry") and _state in [State.NORMAL, State.ATTACK, State.DODGE,
+	if UiNav.game_pressed("parry") and _state in [State.NORMAL, State.ATTACK, State.DODGE,
 			State.SLIDE, State.SLAM, State.RECOIL, State.DRINK]:
 		_start_parry(input)
 
@@ -537,7 +547,7 @@ func _physics_process(delta: float) -> void:
 			_face_lock()
 			# La corsa si accende e si spegne con L3 (o Maiusc); si spegne da
 			# sola fermandosi.
-			if Input.is_action_just_pressed("run"):
+			if UiNav.game_pressed("run"):
 				_run_on = not _run_on
 			if input == Vector2.ZERO:
 				_run_on = false
@@ -551,20 +561,20 @@ func _physics_process(delta: float) -> void:
 			_velocity = _accelerate(_velocity, input * (run_speed() if running else walk_speed()) * air, delta)
 			if _jump_pressed():
 				_jump()
-			if Input.is_action_just_pressed("dodge"):
+			if UiNav.game_pressed("dodge"):
 				if running and not is_airborne():
 					_start_slide(input)
 				elif _dodge_chain_grace > 0.0 and _dodges_used < max_chained_dodges:
 					_chain_dodge(dodge_input)
 				elif _dodge_cooldown == 0.0:
 					_start_dodge(dodge_input)
-			elif Input.is_action_just_pressed("heavy_attack"):
+			elif UiNav.game_pressed("heavy_attack"):
 				_start_heavy(input)
-			elif Input.is_action_just_pressed("attack") or Input.is_action_pressed("attack"):
+			elif UiNav.game_pressed("attack") or UiNav.game_held("attack"):
 				# Tenendo premuto si continua ad attaccare (anche un tocco rapidissimo
 				# conta); in aria è un attacco aereo.
 				_start_attack(_next_combo_step(), input)
-			elif Input.is_action_pressed("parry"):
+			elif UiNav.game_held("parry"):
 				_start_parry(input)
 
 		State.ATTACK:
@@ -578,9 +588,9 @@ func _physics_process(delta: float) -> void:
 				_target_facing = input.normalized()
 			_face_lock()
 			_velocity = _accelerate(_velocity, input * walk_speed() * PARRY_SPEED_FACTOR, delta)
-			if Input.is_action_just_pressed("dodge") and _dodge_cooldown == 0.0:
+			if UiNav.game_pressed("dodge") and _dodge_cooldown == 0.0:
 				_start_dodge(dodge_input)
-			elif not Input.is_action_pressed("parry"):
+			elif not UiNav.game_held("parry"):
 				_change_state(State.NORMAL)
 
 		State.DODGE:
@@ -588,13 +598,13 @@ func _physics_process(delta: float) -> void:
 			# colpo potente fa piombare a terra con un colpo ampio, quello
 			# normale è un attacco aereo.
 			_running = false
-			if is_airborne() and _air_dash and Input.is_action_just_pressed("heavy_attack"):
+			if is_airborne() and _air_dash and UiNav.game_pressed("heavy_attack"):
 				_end_combo()
 				_start_slam("dash", input)
-			elif is_airborne() and Input.is_action_just_pressed("attack"):
+			elif is_airborne() and UiNav.game_pressed("attack"):
 				_end_combo()
 				_start_attack(1, input)
-			elif Input.is_action_just_pressed("dodge") and _dodges_used < max_chained_dodges \
+			elif UiNav.game_pressed("dodge") and _dodges_used < max_chained_dodges \
 					and _state_time >= DODGE_CHAIN_MIN_TIME:
 				_chain_dodge(dodge_input)
 			elif _jump_pressed():
@@ -622,13 +632,13 @@ func _physics_process(delta: float) -> void:
 		State.SLIDE:
 			# Durante la scivolata si può attaccare (continuando la combo),
 			# schivare, saltare o parare (vedi sopra): la scivolata si interrompe.
-			if Input.is_action_just_pressed("attack"):
+			if UiNav.game_pressed("attack"):
 				_carry_velocity = _velocity
 				_start_attack(_next_combo_step(), input)
-			elif Input.is_action_just_pressed("heavy_attack"):
+			elif UiNav.game_pressed("heavy_attack"):
 				_carry_velocity = _velocity
 				_start_heavy(input)
-			elif Input.is_action_just_pressed("dodge") and _dodge_cooldown == 0.0:
+			elif UiNav.game_pressed("dodge") and _dodge_cooldown == 0.0:
 				_start_dodge(dodge_input)
 			elif _jump_pressed():
 				_change_state(State.NORMAL)
@@ -644,7 +654,7 @@ func _physics_process(delta: float) -> void:
 
 		State.RECOIL:
 			_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * 1.5 * delta)
-			if Input.is_action_just_pressed("dodge") and _dodge_cooldown == 0.0:
+			if UiNav.game_pressed("dodge") and _dodge_cooldown == 0.0:
 				_start_dodge(dodge_input)
 			elif _state_time >= REPEL_TIME:
 				_change_state(State.NORMAL)
@@ -865,13 +875,13 @@ func _update_attack(input: Vector2, delta: float) -> void:
 		if input != Vector2.ZERO:
 			_target_facing = input.normalized()
 		_face_lock()
-		if Input.is_action_pressed("heavy_attack") and _state_time >= windup * 0.9:
+		if UiNav.game_held("heavy_attack") and _state_time >= windup * 0.9:
 			var was_full := _charge >= 1.0
 			_charge = minf(_charge + delta / HEAVY_CHARGE_TIME, 1.0)
 			_state_time = windup * 0.9
 			if _charge >= 1.0 and not was_full:
 				Sfx.play("charge_full", global_position)
-		elif not Input.is_action_pressed("heavy_attack"):
+		elif not UiNav.game_held("heavy_attack"):
 			_charging = false
 	# Lo slancio di una scivolata si esaurisce durante l'attacco.
 	_carry_velocity = _carry_velocity.move_toward(Vector2.ZERO, DECELERATION * delta)
@@ -892,10 +902,10 @@ func _update_attack(input: Vector2, delta: float) -> void:
 	_velocity = _walk_velocity + lunge + _carry_velocity
 	# Si memorizza la pressione solo se può davvero continuare la combo:
 	# alla fine della combo le pressioni in più vengono ignorate.
-	if Input.is_action_just_pressed("heavy_attack") and _can_chain_heavy():
+	if UiNav.game_pressed("heavy_attack") and _can_chain_heavy():
 		_queued_attack = "heavy"
-	elif _can_chain_attack() and (Input.is_action_just_pressed("attack") \
-			or (Input.is_action_pressed("attack") and _queued_attack == "" and _state_time >= windup)):
+	elif _can_chain_attack() and (UiNav.game_pressed("attack") \
+			or (UiNav.game_held("attack") and _queued_attack == "" and _state_time >= windup)):
 		# Tenendo premuto il tasto, il colpo successivo parte da solo.
 		_queued_attack = "attack"
 	if not _attack_resolved and _state_time >= windup:
@@ -998,7 +1008,7 @@ func laugh() -> void:
 ## Salto richiesto: vicino a un elemento con cui interagire, il tasto che
 ## salta e interagisce insieme (A) serve a interagire (vedi Game).
 func _jump_pressed() -> bool:
-	return Input.is_action_just_pressed("jump") and not (can_interact and Input.is_action_just_pressed("interact"))
+	return UiNav.game_pressed("jump") and not (can_interact and UiNav.game_pressed("interact"))
 
 
 ## Sta precipitando in un burrone.
@@ -1181,13 +1191,19 @@ func _face_lock() -> bool:
 ## Stato da salvare: livello, caratteristiche, potenziamenti e inventario.
 func save_state() -> Dictionary:
 	return {
-		"level": level, "experience": experience, "health": health, "base_max_health": _base_max_health,
+		"level": level, "experience": experience, "xp_curve": XP_CURVE_VERSION, "health": health, "base_max_health": _base_max_health,
 		"mana": mana, "base_max_mana": _base_max_mana, "potions": potions,
 		"mana_potions": mana_potions, "spell_bonus": spell_bonus,
 		"max_combo_hits": max_combo_hits, "max_heavy_chain": max_heavy_chain,
 		"max_chained_dodges": max_chained_dodges, "max_jumps": max_jumps, "run_speed_bonus": run_speed_bonus,
 		"shield_cooldown_max": shield_cooldown_max, "torch_on": torch_on, "upgrades_taken": upgrades_taken,
 		"items": inventory.items, "equipped": inventory.equipped, "gold": inventory.gold, "learned": inventory.learned,
+		# Solo per mostrarle nello slot del menù (vedi SaveGame.summary): al
+		# caricamento si ricalcolano.
+		"stats": {
+			"max_health": max_health, "max_mana": roundi(max_mana), "damage": base_damage(),
+			"potions": potions, "mana_potions": mana_potions,
+		},
 	}
 
 
@@ -1196,6 +1212,11 @@ func save_state() -> Dictionary:
 func load_state(data: Dictionary) -> void:
 	level = int(data.get("level", level))
 	experience = int(data.get("experience", experience))
+	# Salvataggi con la vecchia curva lineare: si tiene la stessa parte del
+	# livello già fatta, sulla curva nuova.
+	if int(data.get("xp_curve", 1)) < XP_CURVE_VERSION:
+		experience = floori(float(experience) / _old_experience_for(level) * experience_for(level))
+	experience = clampi(experience, 0, experience_needed() - 1)
 	_base_max_health = int(data.get("base_max_health", _base_max_health))
 	_base_max_mana = float(data.get("base_max_mana", _base_max_mana))
 	potions = int(data.get("potions", potions))
@@ -1285,10 +1306,25 @@ func base_damage() -> int:
 	return BASE_DAMAGE + DAMAGE_PER_LEVEL * (level - 1)
 
 
-## Esperienza necessaria per passare al livello successivo:
-## 100 per il livello 2, 200 per il 3, e così via.
+## Esperienza necessaria per passare al livello successivo (vedi experience_for).
 func experience_needed() -> int:
-	return 100 * level
+	return experience_for(level)
+
+
+## Curva dell'esperienza: ai primi livelli si sale in fretta (40 punti per
+## il livello 2, poi 25 in più a livello: 265 al livello 10), dopo il
+## decimo ogni livello costa sempre di più (a XP_CURVE_LATE * oltre^1.5):
+## circa 750 al 15, 1500 al 20, 3600 al 30. Niente grind all'inizio, e
+## salendo i livelli si fanno via via più lenti.
+static func experience_for(from_level: int) -> int:
+	var early := XP_CURVE_BASE + XP_CURVE_STEP * (from_level - 1)
+	var beyond := maxi(from_level - XP_CURVE_FAST_LEVELS, 0)
+	return roundi(early + XP_CURVE_LATE * pow(beyond, 1.5))
+
+
+## Vecchia curva (100 per livello), per convertire i salvataggi precedenti.
+static func _old_experience_for(from_level: int) -> int:
+	return 100 * from_level
 
 
 func add_experience(amount: int) -> void:
@@ -1485,7 +1521,7 @@ func _start_slam(kind: String, input: Vector2) -> void:
 ## l'impatto (vedi _land); poi un breve recupero. Si può già chiedere il
 ## colpo potente successivo della catena.
 func _update_slam(input: Vector2, delta: float) -> void:
-	if Input.is_action_just_pressed("heavy_attack") and _slam_kind == "leap" and _can_chain_heavy():
+	if UiNav.game_pressed("heavy_attack") and _slam_kind == "leap" and _can_chain_heavy():
 		_queued_attack = "heavy"
 	if not _slam_landed:
 		if _slam_kind != "leap" and _state_time >= SLAM_HANG and _height_velocity > -SLAM_DIVE_SPEED:

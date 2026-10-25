@@ -69,6 +69,9 @@ static var pending_save := {}
 @onready var _minimap: Control = $HUD/Minimap
 
 var _kills := 0
+## Tempo di gioco della partita in secondi (senza pause, menù e attese):
+## si somma tra un salvataggio e l'altro e si vede negli slot del menù.
+var play_time := 0.0
 var _maintain_timer := MAINTAIN_INTERVAL
 ## Livelli guadagnati per cui va ancora scelto il potenziamento.
 var _pending_level_ups := 0
@@ -124,7 +127,11 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if Input.is_action_just_pressed("menu") and not get_tree().paused:
+	# Game si ferma con la pausa: qui il tempo conta solo mentre si gioca.
+	play_time += delta
+	UiNav.update()
+	# I tasti si leggono con UiNav: quelli usati per chiudere un menù non contano.
+	if UiNav.game_pressed("menu") and not get_tree().paused:
 		_hud.pause_menu.open(_save_block_reason())
 		return
 	if not get_tree().paused and _world.near_region_edge(_player.position):
@@ -208,7 +215,7 @@ func _update_interaction() -> void:
 		return
 	var at: Vector2 = _interactable["position"]
 	_hud.show_interact(at - Vector2(0, _world.elevation_at(at) + float(_interactable["height"])))
-	if Input.is_action_just_pressed("interact"):
+	if UiNav.game_pressed("interact"):
 		_interact()
 
 
@@ -506,6 +513,7 @@ func _on_save_requested() -> void:
 func _save_data() -> Dictionary:
 	var data := {
 		"version": SAVE_VERSION, "seed": _world.seed_value, "time": _day_night.time, "kills": _kills,
+		"play_time": play_time,
 		"position": SaveGame.array(_player.position), "player": _player.save_state(), "world": _world.save_state(),
 		"enemies": _enemies_state(),
 	}
@@ -558,6 +566,7 @@ func _load(save: Dictionary) -> void:
 	_world.load_state(save["world"])
 	_player.load_state(save["player"])
 	_kills = int(save.get("kills", 0))
+	play_time = float(save.get("play_time", 0.0))
 	_hud.set_kills(_kills)
 	_day_night.time = float(save.get("time", 0.2))
 	var position_saved := SaveGame.vector(save["position"])

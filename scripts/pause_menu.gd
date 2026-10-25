@@ -2,7 +2,9 @@ class_name PauseMenu
 extends Control
 ## Menù di pausa (Start / Esc durante il gioco): riprendi, salva, comandi,
 ## torna al titolo. Si salva solo senza nemici vicini e stando fermi: se
-## non si può, il pulsante è spento e sotto c'è il motivo.
+## non si può, il pulsante è spento e sotto c'è il motivo. Il tasto che
+## chiude la pausa (A su Riprendi, B, Start) è consumato (vedi UiNav.consume):
+## tornati in gioco non fa saltare, schivare né interagire.
 
 signal save_requested
 signal quit_requested
@@ -99,6 +101,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not visible or _controls_panel.visible:
 		return
 	if event.is_action_pressed("ui_cancel") or event.is_action_pressed("menu"):
+		UiNav.consume(event)
 		close()
 		get_viewport().set_input_as_handled()
 	elif UiNav.handle(event, get_viewport(), _resume) and is_inside_tree():
