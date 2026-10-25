@@ -16,10 +16,13 @@ extends Node2D
 ## durante una schivata la interrompe e attacca subito. Salti e schivate si
 ## combinano; schivando mentre si corre si fa una scivolata, durante la
 ## quale si può attaccare (anche in combo), schivare, saltare o parare.
-## Una parata perfetta potenzia gli attacchi per qualche secondo.
+## Una parata perfetta potenzia gli attacchi per qualche secondo. La parata
+## è istantanea: annulla subito qualsiasi altra azione (non lo stordimento).
 ## Con R3 si aggancia il nemico più vicino: il personaggio lo guarda sempre,
 ## gli attacchi e la palla di fuoco vanno verso di lui; premendo di nuovo si
-## passa al nemico vicino successivo.
+## passa al nemico vicino successivo. Inclinando la levetta destra mentre si
+## preme (o si tiene premuto) R3 si aggancia il nemico in quella direzione.
+## Se il bersaglio muore o si perde si passa da soli al più vicino.
 ## Tenendo premuto R1 si continua ad attaccare; in aria R1 fa un attacco
 ## aereo. Attacchi a terra, che colpiscono tutti i nemici attorno: un colpo
 ## potente subito dopo una combo di colpi normali fa saltare e colpire il
@@ -69,7 +72,7 @@ const ATTACK_ARC := deg_to_rad(115.0)
 const ATTACK_STYLES := ["slash", "backhand", "chop", "thrust"]
 ## Rotazione del corpo che accompagna fendente e rovescio.
 const ATTACK_TWIST := 0.18
-const ATTACK_LUNGE_SPEED := 140.0
+const ATTACK_LUNGE_SPEED := 85.0
 ## Durante un attacco ci si muove a questa frazione della velocità normale.
 const ATTACK_MOVE_FACTOR := 0.55
 
@@ -122,6 +125,11 @@ const LOCK_HIDDEN_TIME := 0.6
 const LOCK_SIGHT_INTERVAL := 0.15
 const LOCK_CAMERA_SHARE := 0.3
 const LOCK_CAMERA_MAX := 170.0
+## Aggancio direzionale (levetta destra): si scelgono i nemici entro questo
+## angolo dalla direzione indicata, preferendo i più allineati e poi i più
+## vicini (la distanza pesa come questo angolo, in radianti, per LOCK_RANGE).
+const LOCK_AIM_ARC := deg_to_rad(120.0)
+const LOCK_AIM_DISTANCE_WEIGHT := 0.5
 ## All'impatto la telecamera trema, sempre meno.
 const CAMERA_SHAKE := 9.0
 const CAMERA_SHAKE_DECAY := 4.0
@@ -416,15 +424,26 @@ var _shake := 0.0
 ## Ultimo punto a terra fuori dai burroni e la sua altezza: si riappare lì.
 var _safe_position := Vector2.ZERO
 var _safe_altitude := 0.0
-## Nemico agganciato (null se nessuno) e il suo mirino.
-var lock_target: Enemy
+## Nemico agganciato (null se nessuno) e il suo mirino. Finché l'aggancio è
+## attivo, se il bersaglio sparisce (anche liberato dalla scena) si passa al
+## più vicino.
+var lock_target: Enemy:
+	set(value):
+		lock_target = value
+		_lock_enabled = value != null
+var _lock_enabled := false
 var _lock_hidden := 0.0
 var _lock_sight_check := 0.0
 var _lock_visible := true
 var _lock_marker := LockMarker.new()
+## La levetta destra era inclinata nel passo precedente (per accorgersi di
+## quando la si inclina tenendo premuto R3).
+var _lock_aiming := false
 ## Carica del colpo potente (0-1) e se il tasto è ancora tenuto premuto.
 var _charge := 0.0
 var _charging := false
+## Il suono del colpo potente parte al rilascio della carica, una volta sola.
+var _heavy_swing_played := false
 var _torch := PointLight2D.new()
 ## Tempo passato nei rovi dall'ultima puntura.
 var _thorns_time := 0.0
@@ -486,13 +505,30 @@ func _physics_process(delta: float) -> void:
 		if Input.is_action_just_pressed("spell"):
 			_cast_fireball(input)
 	if _state != State.DEAD:
+		# Con la levetta destra inclinata si aggancia il nemico in quella
+		# direzione (anche inclinandola mentre si tiene premuto R3, o
+		# trascinando il dito dal tasto a schermo); altrimenti il più vicino.
+		var aim := Input.get_vector("lock_left", "lock_right", "lock_up", "lock_down")
+		var aiming := aim != Vector2.ZERO
 		if Input.is_action_just_pressed("lock_on"):
-			_cycle_lock()
+			if aiming:
+				_lock_toward(aim)
+			else:
+				_cycle_lock()
+		elif aiming and not _lock_aiming and Input.is_action_pressed("lock_on"):
+			_lock_toward(aim)
+		_lock_aiming = aiming
 		_update_lock()
 	if Input.is_action_just_pressed("torch") and _state != State.DEAD:
 		torch_on = not torch_on
 		_torch.enabled = torch_on
 		Sfx.play("torch", global_position)
+
+	# La parata è istantanea: annulla subito attacchi (anche in carica),
+	# schivate, scivolate, attacchi a terra, rinculo e il bere.
+	if Input.is_action_just_pressed("parry") and _state in [State.NORMAL, State.ATTACK, State.DODGE,
+			State.SLIDE, State.SLAM, State.RECOIL, State.DRINK]:
+		_start_parry(input)
 
 	match _state:
 		State.NORMAL:
@@ -529,10 +565,11 @@ func _physics_process(delta: float) -> void:
 				# conta); in aria è un attacco aereo.
 				_start_attack(_next_combo_step(), input)
 			elif Input.is_action_pressed("parry"):
-				_change_state(State.PARRY)
+				_start_parry(input)
 
 		State.ATTACK:
-			# Un attacco iniziato non si interrompe: si può solo concatenare il successivo.
+			# Un attacco iniziato si interrompe solo con la parata; si può
+			# concatenare il successivo.
 			_running = false
 			_update_attack(input, delta)
 
@@ -584,7 +621,7 @@ func _physics_process(delta: float) -> void:
 
 		State.SLIDE:
 			# Durante la scivolata si può attaccare (continuando la combo),
-			# schivare, saltare o parare: la scivolata si interrompe.
+			# schivare, saltare o parare (vedi sopra): la scivolata si interrompe.
 			if Input.is_action_just_pressed("attack"):
 				_carry_velocity = _velocity
 				_start_attack(_next_combo_step(), input)
@@ -596,8 +633,6 @@ func _physics_process(delta: float) -> void:
 			elif _jump_pressed():
 				_change_state(State.NORMAL)
 				_jump()
-			elif Input.is_action_just_pressed("parry"):
-				_change_state(State.PARRY)
 			else:
 				var t := _state_time / SLIDE_TIME
 				_velocity = _slide_direction * _slide_speed * (1.0 - 0.7 * t)
@@ -611,8 +646,6 @@ func _physics_process(delta: float) -> void:
 			_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * 1.5 * delta)
 			if Input.is_action_just_pressed("dodge") and _dodge_cooldown == 0.0:
 				_start_dodge(dodge_input)
-			elif Input.is_action_just_pressed("parry"):
-				_change_state(State.PARRY)
 			elif _state_time >= REPEL_TIME:
 				_change_state(State.NORMAL)
 
@@ -827,7 +860,11 @@ func _update_attack(input: Vector2, delta: float) -> void:
 	var active := (HEAVY_ACTIVE if _attack_heavy else ATTACK_ACTIVE) / _attack_speed
 	var recovery := _attack_recovery() / _attack_speed
 	if _charging:
-		# Finché si tiene premuto, il colpo potente resta in carica.
+		# Finché si tiene premuto, il colpo potente resta in carica; intanto ci
+		# si gira con la levetta (o verso il bersaglio agganciato).
+		if input != Vector2.ZERO:
+			_target_facing = input.normalized()
+		_face_lock()
 		if Input.is_action_pressed("heavy_attack") and _state_time >= windup * 0.9:
 			var was_full := _charge >= 1.0
 			_charge = minf(_charge + delta / HEAVY_CHARGE_TIME, 1.0)
@@ -839,13 +876,18 @@ func _update_attack(input: Vector2, delta: float) -> void:
 	# Lo slancio di una scivolata si esaurisce durante l'attacco.
 	_carry_velocity = _carry_velocity.move_toward(Vector2.ZERO, DECELERATION * delta)
 	# Mentre si attacca ci si può muovere (più piano) in qualsiasi
-	# direzione; il colpo resta nella direzione in cui è partito, con un
-	# piccolo affondo in avanti.
+	# direzione; il colpo resta nella direzione in cui è partito (il colpo
+	# potente in quella in cui si guarda al rilascio), con un piccolo affondo
+	# in avanti.
 	_walk_velocity = _accelerate(_walk_velocity, input * walk_speed() * ATTACK_MOVE_FACTOR, delta)
 	var lunge := Vector2.ZERO
 	# Durante la carica del colpo potente si resta fermi sul posto (ci si
 	# può solo spostare piano); l'affondo parte al rilascio.
 	if _state_time >= windup * 0.5 and _state_time < windup + active and not _charging:
+		# Sferzata del colpo potente: nessun suono in carica, solo al rilascio.
+		if _attack_heavy and not _heavy_swing_played:
+			_heavy_swing_played = true
+			Sfx.play("heavy_swing", global_position, (1.0 + 0.08 * (_heavy_step - 1)) * (1.0 - 0.12 * _charge))
 		lunge = facing * (HEAVY_LUNGE_SPEED if _attack_heavy else ATTACK_LUNGE_SPEED * (1.0 + 0.2 * (_combo_step - 1)))
 	_velocity = _walk_velocity + lunge + _carry_velocity
 	# Si memorizza la pressione solo se può davvero continuare la combo:
@@ -1047,6 +1089,37 @@ func _cycle_lock() -> void:
 	Sfx.play_ui("ui_move" if lock_target else "ui_confirm")
 
 
+## Aggancia il nemico nella direzione indicata (levetta destra): tra quelli
+## entro LOCK_AIM_ARC il più allineato, a parità il più vicino. Se in quella
+## direzione non c'è nessuno il bersaglio resta quello di prima.
+func _lock_toward(direction: Vector2) -> void:
+	var best: Enemy = null
+	var best_score := INF
+	for enemy: Enemy in _lock_candidates():
+		var offset := enemy.global_position - global_position
+		var angle := absf(direction.angle_to(offset)) if offset != Vector2.ZERO else 0.0
+		if angle > LOCK_AIM_ARC / 2.0:
+			continue
+		var score := angle + offset.length() / LOCK_RANGE * LOCK_AIM_DISTANCE_WEIGHT
+		if score < best_score:
+			best_score = score
+			best = enemy
+	if best == null:
+		Sfx.play_ui("ui_confirm")
+		return
+	lock_target = best
+	_lock_hidden = 0.0
+	_lock_visible = true
+	_lock_marker.target = lock_target
+	Sfx.play_ui("ui_move")
+
+
+## Il nemico vivo in vista più vicino (null se nessuno).
+func _lock_nearest() -> Enemy:
+	var candidates := _lock_candidates()
+	return candidates[0] if not candidates.is_empty() else null
+
+
 ## Nemici vivi in vista entro LOCK_RANGE, dal più vicino.
 func _lock_candidates() -> Array[Enemy]:
 	var result: Array[Enemy] = []
@@ -1069,17 +1142,17 @@ func _in_sight(enemy: Enemy) -> bool:
 	return World.current.clear_line(global_position, enemy.global_position, altitude)
 
 
-## Se il bersaglio muore si passa al più vicino; se si allontana troppo o
-## resta nascosto dietro un ostacolo si sgancia (o si passa a un altro in vista).
+## Se il bersaglio muore, si allontana troppo o resta nascosto dietro un
+## ostacolo si passa da soli al più vicino in vista; se non ce n'è nessuno
+## si sgancia.
 func _update_lock() -> void:
-	if lock_target == null:
+	if not _lock_enabled:
 		return
-	if not is_instance_valid(lock_target) or lock_target.is_dead():
-		var candidates := _lock_candidates()
-		lock_target = candidates[0] if not candidates.is_empty() else null
+	if not is_instance_valid(lock_target) or lock_target.is_dead() \
+			or lock_target.global_position.distance_to(global_position) > LOCK_BREAK_RANGE:
+		lock_target = _lock_nearest()
 		_lock_hidden = 0.0
-	elif lock_target.global_position.distance_to(global_position) > LOCK_BREAK_RANGE:
-		lock_target = null
+		_lock_visible = true
 	else:
 		var delta := get_physics_process_delta_time()
 		_lock_sight_check -= delta
@@ -1088,8 +1161,7 @@ func _update_lock() -> void:
 			_lock_visible = _in_sight(lock_target)
 		_lock_hidden = 0.0 if _lock_visible else _lock_hidden + delta
 		if _lock_hidden >= LOCK_HIDDEN_TIME:
-			var candidates := _lock_candidates()
-			lock_target = candidates[0] if not candidates.is_empty() else null
+			lock_target = _lock_nearest()
 			_lock_hidden = 0.0
 			_lock_visible = true
 	_lock_marker.target = lock_target
@@ -1339,13 +1411,13 @@ func _start_heavy(input: Vector2) -> void:
 	_attack_heavy = true
 	_begin_attack(input)
 	_charging = true
-	Sfx.play("heavy_swing", global_position, 1.0 + 0.08 * (_heavy_step - 1))
 
 
 func _begin_attack(input: Vector2) -> void:
 	_attack_speed = EMPOWER_ATTACK_SPEED if is_empowered() else 1.0
 	_charge = 0.0
 	_charging = false
+	_heavy_swing_played = false
 	_air_attack = is_airborne()
 	attack_serial += 1
 	if _state != State.ATTACK:
@@ -1510,6 +1582,29 @@ func _start_dodge(input: Vector2) -> void:
 	_heavy_step = 0
 	Sfx.play("dodge", global_position)
 	_change_state(State.DODGE)
+
+
+## Parata istantanea: annulla l'azione in corso (combo, carica, schivata,
+## scivolata, attacco a terra, rinculo, sorso) e si gira subito verso la
+## levetta o il bersaglio agganciato, così la guardia copre il lato giusto
+## già dal primo istante (la finestra della parata perfetta parte da qui).
+func _start_parry(input: Vector2) -> void:
+	# Interrompendo una schivata non se ne può fare subito un'altra.
+	if _state in [State.DODGE, State.SLIDE]:
+		_dodge_cooldown = DODGE_COOLDOWN
+	_end_combo()
+	_charging = false
+	_charge = 0.0
+	_carry_velocity = Vector2.ZERO
+	_walk_velocity = Vector2.ZERO
+	_drinking = ""
+	_running = false
+	_velocity = _velocity.limit_length(walk_speed() * PARRY_SPEED_FACTOR)
+	if input != Vector2.ZERO:
+		_target_facing = input.normalized()
+	_face_lock()
+	facing = _target_facing
+	_change_state(State.PARRY)
 
 
 ## In aria la schivata è uno scatto: si smette di cadere e si scivola nell'aria.

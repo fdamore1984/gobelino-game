@@ -31,8 +31,13 @@ func _physics_process(delta: float) -> void:
 	var player := World.current.player as Player if World.current else null
 	if player and not player.is_dead() and absf(player.ground_elevation - altitude) <= HIT_HEIGHT_REACH \
 			and position.distance_to(player.position) < RADIUS + Player.RADIUS:
-		# Il colpo arriva da dove si trova il dardo: la parata frontale funziona.
-		if player.receive_hit(position - direction * 40.0, damage) != "ignored":
+		# Il colpo arriva da dove si trova il dardo: la parata frontale funziona,
+		# anche appena alzata (la parata è istantanea e gira subito il giocatore).
+		var result := player.receive_hit(position - direction * 40.0, damage)
+		if result != "ignored":
+			if result in ["blocked", "parried", "broken"]:
+				# Parato: il dardo si spezza sulla spada con un lampo.
+				HitSpark.spawn(get_parent(), position, altitude + FLIGHT_HEIGHT, 30.0, Player.COLOR_GUARD_SPARK)
 			queue_free()
 			return
 	if World.current and World.current.blocks_projectile(position, altitude, FLIGHT_HEIGHT, RADIUS):

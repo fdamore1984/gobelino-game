@@ -132,7 +132,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		close()
 		get_viewport().set_input_as_handled()
 		return
-	if event.is_action_pressed("lock_on"):
+	# R3 (o C) ordina: un'azione a parte da "lock_on", che usa gli stessi tasti.
+	if event.is_action_pressed("inventory_sort"):
 		_on_sort_pressed()
 		get_viewport().set_input_as_handled()
 		return

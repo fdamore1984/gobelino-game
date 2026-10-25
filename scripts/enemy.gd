@@ -658,7 +658,12 @@ func _land_slam(player_active: bool, slam: Dictionary) -> void:
 	GroundFx.shockwave(global_position, ground_elevation, impact_radius)
 	Sfx.play("fireball_hit", global_position, 0.5 / sqrt(_type["mass"]))
 	if player_active and player.global_position.distance_to(global_position) <= impact_radius + Player.RADIUS:
-		player.receive_hit(global_position, damage + int(slam["damage_bonus"]))
+		# Anche il colpo a terra si può parare: con una parata perfetta
+		# (istantanea, appena prima dell'impatto) si resta storditi.
+		if player.receive_hit(global_position, damage + int(slam["damage_bonus"])) == "parried":
+			Sfx.play("stun", global_position)
+			_slam_cooldown = randf_range(SLAM_RETRY.x, SLAM_RETRY.y) * 2.0
+			_change_state(State.STUNNED)
 
 
 func _can_summon(distance: float) -> bool:

@@ -120,8 +120,8 @@ CONTROLS_TITLE,Controls
 CONTROLS_HEADER,Action | Keyboard | Controller
 CONTROLS_MOVE,Move | WASD | Left stick
 CONTROLS_ATTACK,"Attack (combo, hold to keep attacking) | J | R1"
-CONTROLS_HEAVY,Power strike (hold to charge) | L | L2
-CONTROLS_PARRY,Parry | K | L1
+CONTROLS_HEAVY,"Power strike (hold to charge, turn while charging) | L | L2"
+CONTROLS_PARRY,"Parry (instant, cancels any action) | K | L1"
 CONTROLS_DODGE,"Dodge (roll, air dash while jumping) | Space | B"
 CONTROLS_JUMP,"Jump (near chests, merchants, caves: interact) | F / E | A"
 CONTROLS_RUN,Run on/off (dodge while running to slide) | Shift | L3
@@ -138,7 +138,7 @@ CONTROLS_SPECIAL_LEAP,"Power strike right after a combo: leap and slam the groun
 CONTROLS_SPECIAL_AIR,"Attack in mid-air: wide aerial slashes that also reach the enemies below you"
 CONTROLS_SPECIAL_PLUNGE,"Power strike in mid-air: plunge onto the ground, hitting the enemies where you land"
 CONTROLS_SPECIAL_DASH,Power strike during an air dash: dash strike that smashes a wide area
-CONTROLS_TOUCH,On touch screens use the on-screen buttons
+CONTROLS_TOUCH,"On touch screens use the on-screen buttons (drag from Lock to pick an enemy)"
 CONTROLS_BACK,Back
 MENU_CONTINUE,Continue
 SLOTS_NEW_TITLE,New game: choose a save slot
@@ -170,7 +170,7 @@ DUNGEON_LEVEL,Underground · level %d of %d
 BOSS_NAME,Cave Guardian
 BOSS_DEFEATED,Guardian defeated! The way out is open
 MENU_CREDITS,Created by fdamore1984 with Claude Code
-CONTROLS_LOCK,Lock on the nearest enemy (press again to switch) | C | R3
+CONTROLS_LOCK,"Lock on (aim with right stick, press again to switch) | C | R3 + right stick"
 TOUCH_LOCK,Lock
 TOUCH_MAP,Map
 MAP_TITLE,Map

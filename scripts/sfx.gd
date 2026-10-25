@@ -77,9 +77,10 @@ func _build_sounds() -> void:
 		var index := mini(int(t / 0.09), notes.size() - 1)
 		var local := t - index * 0.09
 		return _triangle(notes[index] * t) * 0.4 * exp(-local * (4.0 if index == 3 else 12.0)))
+	# Sferzata del colpo potente: suona al rilascio, con un attacco secco.
 	_streams["heavy_swing"] = _render_filtered(0.3, Vector2(0.35, 0.06), func(t: float, d: float) -> float:
 		var rumble := sin(TAU * lerpf(90.0, 50.0, t / d) * t) * 0.5
-		return (_noise() * 0.7 + rumble) * _env(t, d, 0.04))
+		return (_noise() * 0.7 + rumble) * _env(t, d, 0.008))
 	_streams["potion"] = _render(0.45, func(t: float, _d: float) -> float:
 		# Bollicine: brevi toni ascendenti in sequenza.
 		var local := fmod(t, 0.09)
