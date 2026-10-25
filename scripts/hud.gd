@@ -117,9 +117,7 @@ func _ready() -> void:
 	move_child(_boss_bar, 0)
 	add_child(_clock)
 	move_child(_clock, 0)
-	# Bordi rossi con poca vita, sotto tutto il resto dell'interfaccia.
 	add_child(_vignette)
-	move_child(_vignette, 0)
 	# Il suggerimento "Interact" sta sopra il gioco, sotto i pannelli.
 	add_child(_interact)
 	move_child(_interact, 1)
@@ -130,6 +128,9 @@ func _ready() -> void:
 	_build_power_ups_panel()
 	add_child(_actions)
 	move_child(_actions, 1)
+	# Vita bassa e modalità focus: il primo figlio di tutti, così legge lo
+	# schermo col solo mondo disegnato e l'interfaccia resta sopra, intatta.
+	move_child(_vignette, 0)
 	_actions.visible = not Platform.use_touch_controls()
 	_level_up.visible = false
 	(_upgrade_buttons["combo"].get_parent() as GridContainer).columns = UPGRADE_CHOICES

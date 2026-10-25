@@ -4,6 +4,10 @@ extends Control
 ## d'altezza e sentieri), i nemici come puntini rossi, casse, totem,
 ## mercanti, ingressi delle caverne, scale, uscite e oggetti a terra; il
 ## giocatore è la freccia bianca al centro.
+##
+## Prestazioni: il terreno è un'immagine preparata a poco a poco; i punti
+## d'interesse si cercano solo ogni POI_REFRESH secondi e i puntini (nemici,
+## oggetti) sono dischi di Shapes, che il renderer disegna tutti insieme.
 
 ## Metà del lato dell'area mostrata, in pixel del mondo.
 const RANGE := 1100.0
@@ -30,6 +34,7 @@ const COLOR_EXIT := Color(1.0, 0.85, 0.45)
 ## Righe campionate a ogni frame: l'immagine nuova si prepara in più
 ## frame e sostituisce la vecchia quando è pronta, così non ci sono scatti.
 const ROWS_PER_FRAME := 8
+const POI_REFRESH := 0.25
 
 var _image := Image.create(SAMPLES, SAMPLES, false, Image.FORMAT_RGB8)
 var _next_image := Image.create(SAMPLES, SAMPLES, false, Image.FORMAT_RGB8)
@@ -39,6 +44,10 @@ var _texture: ImageTexture
 var _center := Vector2.INF
 var _refresh := 0.0
 var _player: Player
+## Punti d'interesse attorno al giocatore (vedi World.points_of_interest),
+## ricercati ogni POI_REFRESH secondi.
+var _points: Array[Dictionary] = []
+var _points_timer := 0.0
 
 
 func _ready() -> void:
@@ -57,6 +66,10 @@ func _process(delta: float) -> void:
 		_refresh = REFRESH_TIME
 		_next_center = _player.position
 		_next_row = 0
+	_points_timer -= delta
+	if _points_timer <= 0.0 and World.current:
+		_points_timer = POI_REFRESH
+		_points = World.current.points_of_interest(_player.position, RANGE)
 	if _next_center != Vector2.INF:
 		# La prima volta (e dopo un salto lontano) non c'è niente da mostrare
 		# nel frattempo: si campiona tutto subito.
@@ -73,6 +86,8 @@ func reset() -> void:
 	_center = Vector2.INF
 	_next_center = Vector2.INF
 	_refresh = 0.0
+	_points.clear()
+	_points_timer = 0.0
 
 
 ## Campiona qualche riga del terreno attorno al punto scelto (colore del
@@ -103,7 +118,7 @@ func _draw() -> void:
 	draw_texture_rect(_texture, Rect2(_to_map(_center - Vector2(RANGE, RANGE)), size), false)
 	var world := World.current
 	if world:
-		for point: Dictionary in world.points_of_interest(_player.position, RANGE):
+		for point: Dictionary in _points:
 			var at := _to_map(point["position"])
 			if not _inside(at):
 				continue
@@ -111,13 +126,13 @@ func _draw() -> void:
 	for node in get_tree().get_nodes_in_group("loot"):
 		var at := _to_map((node as Node2D).global_position)
 		if _inside(at):
-			draw_circle(at, 3.5, COLOR_OUTLINE)
-			draw_circle(at, 2.5, COLOR_LOOT)
+			Shapes.disc(self, at, 3.5, COLOR_OUTLINE)
+			Shapes.disc(self, at, 2.5, COLOR_LOOT)
 	for node in get_tree().get_nodes_in_group("enemies"):
 		var at := _to_map((node as Node2D).global_position)
 		if _inside(at):
-			draw_circle(at, 5.0, COLOR_OUTLINE)
-			draw_circle(at, 3.8, COLOR_ENEMY)
+			Shapes.disc(self, at, 5.0, COLOR_OUTLINE)
+			Shapes.disc(self, at, 3.8, COLOR_ENEMY)
 	# Giocatore: freccia nella direzione in cui guarda.
 	var center := _to_map(_player.position)
 	var facing := _player.facing

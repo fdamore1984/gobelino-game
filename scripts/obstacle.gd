@@ -9,6 +9,13 @@ extends Node2D
 
 ## La chioma degli alberi diventa trasparente quando il giocatore ci passa dietro.
 const CANOPY_FADE_ALPHA := 0.4
+## Elementi con cui si interagisce: in modalità focus restano a colori con
+## un'aura bianca attorno (vedi LowHealthVignette).
+const INTERACTIVE := ["chest", "cave", "stairs", "exit", "merchant", "totem"]
+const COLOR_AURA := Color(1, 1, 1, 0.55)
+## Urto del giocatore (vedi flash): luminosità in più e durata.
+const FLASH_BOOST := 0.7
+const FLASH_TIME := 0.3
 
 var type_id := ""
 var radius := 20.0
@@ -20,6 +27,9 @@ var _opened := false
 var _lift := 0.0
 ## Ingresso della caverna: direzione della parete in cui si apre.
 var _edge := Vector2.RIGHT
+## Aura della modalità focus disegnata adesso.
+var _aura_shown := false
+var _flash_tween: Tween
 
 
 func setup(data: Dictionary, type: Dictionary) -> void:
@@ -33,10 +43,63 @@ func setup(data: Dictionary, type: Dictionary) -> void:
 	# Disegnato una volta sola; solo gli alberi controllano il giocatore e
 	# il totem si anima.
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
-	set_process(type_id in ["tree", "totem", "chest", "merchant", "stairs", "exit"])
+	set_process(type_id == "tree" or type_id in INTERACTIVE)
+	if type_id in INTERACTIVE:
+		add_to_group(LowHealthVignette.FOCUS_GROUP)
+
+
+## Il giocatore ci è appena andato a sbattere: l'ostacolo si illumina per un
+## attimo (solo lui, senza contorni attorno).
+func flash() -> void:
+	if _flash_tween and _flash_tween.is_running():
+		return
+	modulate = Color(1.0 + FLASH_BOOST, 1.0 + FLASH_BOOST, 1.0 + FLASH_BOOST)
+	_flash_tween = create_tween()
+	_flash_tween.tween_property(self, "modulate", Color.WHITE, FLASH_TIME)
+
+
+## Si può ancora usare (cassa chiusa, caverna non completata, totem pronto).
+func _is_active() -> bool:
+	var world := World.current
+	match type_id:
+		"chest":
+			return not _opened
+		"cave":
+			return world == null or not world.is_cave_cleared(position)
+		"totem":
+			return world == null or world.totem_state(position) == "ready"
+	return type_id in INTERACTIVE
+
+
+## Modalità focus: dove resta a colori e quanto è grande (raggio 0: no).
+func focus_spot() -> Vector3:
+	if not _is_active():
+		return Vector3.ZERO
+	var at := global_position - Vector2(0, _lift + _aura_height())
+	return Vector3(at.x, at.y, radius * 2.2)
+
+
+## Altezza del centro dell'aura sopra la base.
+func _aura_height() -> float:
+	match type_id:
+		"chest":
+			return radius * 0.6
+		"merchant":
+			return radius * 1.4
+		"totem":
+			return radius * 1.4
+	# Archi nella parete.
+	return radius
 
 
 func _process(_delta: float) -> void:
+	if type_id in INTERACTIVE:
+		var aura := LowHealthVignette.focus_held() and _is_active()
+		if aura != _aura_shown:
+			_aura_shown = aura
+			queue_redraw()
+	if type_id == "cave":
+		return
 	if type_id in ["totem", "merchant", "stairs", "exit"]:
 		queue_redraw()
 		return
@@ -74,6 +137,8 @@ func _draw() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _variant
 	draw_set_transform(Vector2(0, -_lift))
+	if _aura_shown:
+		Shapes.glow(self, Vector2(0, -_aura_height()), radius * 2.4, COLOR_AURA)
 	match type_id:
 		"tree":
 			_draw_tree(rng)

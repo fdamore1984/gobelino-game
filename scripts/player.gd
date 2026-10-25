@@ -279,6 +279,11 @@ const STAMINA_ATTACK := 20.0
 const STAMINA_HEAVY := 32.0
 const STAMINA_DODGE := 28.0
 const STAMINA_JUMP := 12.0
+## Aura bianca della modalità focus: altezza del centro e raggio rispetto
+## al raggio del corpo, colore.
+const FOCUS_AURA_HEIGHT := 0.6
+const FOCUS_AURA_RADIUS := 2.6
+const COLOR_FOCUS_AURA := Color(1, 1, 1, 0.5)
 ## Curva dell'esperienza (vedi experience_for): punti per il livello 2,
 ## aumento per livello, livelli veloci e crescita oltre questi.
 const XP_CURVE_BASE := 40.0
@@ -462,6 +467,8 @@ var ground_elevation := 0.0
 
 
 func _ready() -> void:
+	# In modalità focus il giocatore resta a colori, con un'aura bianca.
+	add_to_group(LowHealthVignette.FOCUS_GROUP)
 	if not _lock_marker.is_inside_tree():
 		add_child(_lock_marker)
 	if not _torch.is_inside_tree():
@@ -1306,6 +1313,14 @@ func base_damage() -> int:
 	return BASE_DAMAGE + DAMAGE_PER_LEVEL * (level - 1)
 
 
+## Modalità focus: dove resta a colori e quanto è grande (vedi LowHealthVignette).
+func focus_spot() -> Vector3:
+	if is_dead():
+		return Vector3.ZERO
+	var at := global_position - Vector2(0, altitude() + RADIUS * FOCUS_AURA_HEIGHT)
+	return Vector3(at.x, at.y, RADIUS * FOCUS_AURA_RADIUS)
+
+
 ## Esperienza necessaria per passare al livello successivo (vedi experience_for).
 func experience_needed() -> int:
 	return experience_for(level)
@@ -1915,6 +1930,8 @@ func _draw() -> void:
 	Shapes.disc(self, Vector2(0, RADIUS * 0.8 - ground_elevation), RADIUS * 0.9 * shadow_scale, Color(0, 0, 0, 0.25))
 	var body_scale := Vector2(1.2, 0.6) if _state == State.SLIDE else Vector2.ONE
 	var lift := -altitude() + (RADIUS * 0.4 if _state == State.SLIDE else 0.0)
+	if LowHealthVignette.focus_held() and _state != State.DEAD:
+		Shapes.glow(self, Vector2(0, lift - RADIUS * FOCUS_AURA_HEIGHT), RADIUS * FOCUS_AURA_RADIUS, COLOR_FOCUS_AURA)
 	draw_set_transform(Vector2(0, lift), 0.0, body_scale)
 	# Gambe: camminano quando ci si muove, raccolte in aria e in scivolata.
 	var walking := _velocity.length() > 20.0 and not is_airborne() and _state != State.DEAD

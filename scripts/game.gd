@@ -47,8 +47,10 @@ const TOTEM_HINT_DISTANCE := 220.0
 const MERCHANT_HINT_DISTANCE := 260.0
 const AUTOSAVE_INTERVAL := 300.0
 const SAVE_VERSION := 1
-## Tempo per frame dedicato a generare il territorio, in microsecondi.
-const REGION_STEP_USEC := 12000
+## Tempo per frame dedicato a generare il territorio, in microsecondi: una
+## parte del frame a 60 FPS, il resto serve a disegnare la schermata
+## d'attesa senza scatti (vedi Platform.TARGET_FPS).
+const REGION_STEP_USEC := 9000
 ## Si interagisce con gli elementi entro questa distanza dal bordo del personaggio.
 const INTERACT_REACH := 34.0
 ## Distanza dagli ingressi entro cui l'HUD suggerisce cosa fare.

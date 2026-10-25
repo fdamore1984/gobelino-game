@@ -50,6 +50,9 @@ const OCCLUSION_OUTER := 240.0
 ## Altezza del corpo del giocatore sopra i piedi, dove si misura la distanza.
 const OCCLUSION_BODY := 30.0
 const OCCLUSION_FADE_SPEED := 5.0
+## I blocchi da rendere trasparenti si cercano solo ogni tanto (la
+## dissolvenza continua a ogni frame): costa meno e non si nota.
+const OCCLUSION_INTERVAL := 0.05
 ## Solo i blocchi più alti dei piedi di almeno tanto coprono davvero il corpo
 ## (i gradini bassi restano pieni).
 const OCCLUSION_MIN_HEIGHT := 40.0
@@ -166,6 +169,10 @@ var _has_blocking_cell := false
 var _contact_glow := ContactGlow.new()
 ## Blocchi resi trasparenti perché coprono il giocatore.
 var _faded_blocks := {}
+## Blocchi che adesso coprono il giocatore (blocco -> true) e attesa prima di
+## ricontrollarli.
+var _wanted_blocks := {}
+var _occlusion_timer := 0.0
 
 
 func _ready() -> void:
@@ -283,19 +290,24 @@ func _update_occlusion(delta: float) -> void:
 	var feet := hero.position
 	var altitude := hero.altitude()
 	var body := feet - Vector2(0, altitude + OCCLUSION_BODY)
-	var wanted := {}
-	var center := _chunk_of(cell_at(feet))
-	for i in range(-1, 3):
-		for j in range(-1, 3):
-			var entry: Variant = _chunk_views.get(center + Vector2i(i, j))
-			if entry == null:
-				continue
-			for node: Node in entry["nodes"]:
-				var block := node as TerrainBlock
-				if block and _covers(block, feet, altitude, body):
-					wanted[block] = true
-	for block: TerrainBlock in wanted:
-		_faded_blocks[block] = true
+	_occlusion_timer -= delta
+	if _occlusion_timer <= 0.0:
+		_occlusion_timer = OCCLUSION_INTERVAL
+		_wanted_blocks.clear()
+		var center := _chunk_of(cell_at(feet))
+		for i in range(-1, 3):
+			for j in range(-1, 3):
+				var entry: Variant = _chunk_views.get(center + Vector2i(i, j))
+				if entry == null:
+					continue
+				for node: Node in entry["nodes"]:
+					var block := node as TerrainBlock
+					if block and _covers(block, feet, altitude, body):
+						_wanted_blocks[block] = true
+	var wanted := _wanted_blocks
+	for block: Variant in wanted:
+		if is_instance_valid(block):
+			_faded_blocks[block] = true
 	for key: Variant in _faded_blocks.keys():
 		# I blocchi dei pezzi tolti nel frattempo non esistono più.
 		if not is_instance_valid(key):
@@ -798,19 +810,20 @@ func _push_out(point: Vector2, radius: float) -> Vector2:
 	return point
 
 
-## Segna con un bordo bianco il tratto degli ostacoli solidi e del blocco
-## di terreno troppo alto (incontrato dall'ultima chiamata a move) che chi
-## si muove in point (all'altezza altitude) sta toccando: solo lì, non
-## tutto l'oggetto. Da chiamare subito dopo move.
+## Illumina per un attimo quello che chi si muove in point (all'altezza
+## altitude) sta toccando: gli ostacoli solidi si schiariscono da soli (vedi
+## Obstacle.flash), del blocco di terreno troppo alto (incontrato
+## dall'ultima chiamata a move) si accende solo il tratto di superficie
+## toccato. Niente contorni né riquadri attorno. Da chiamare subito dopo move.
 func highlight_contacts(point: Vector2, radius: float, altitude: float) -> void:
 	if entities == null:
 		return
 	for obstacle: Dictionary in obstacles_close(point):
 		var center: Vector2 = obstacle["position"]
 		if obstacle["solid"] and point.distance_to(center) <= radius + obstacle["collision"] + 1.5:
-			_show_contacts()
-			_contact_glow.touch_obstacle(center - Vector2(0, float(obstacle["elevation"])), float(obstacle["collision"]),
-					(point - center).angle())
+			var node: Variant = obstacle.get("node")
+			if node != null and is_instance_valid(node):
+				(node as Obstacle).flash()
 	if _has_blocking_cell:
 		var corners := cell_corners(_blocking_cell)
 		var best := 0
@@ -820,9 +833,8 @@ func highlight_contacts(point: Vector2, radius: float, altitude: float) -> void:
 			if distance < best_distance:
 				best = k
 				best_distance = distance
-		var top := elevation_at(cell_center(_blocking_cell))
 		_show_contacts()
-		_contact_glow.touch_wall(corners[best], corners[(best + 1) % 4], point, altitude, top)
+		_contact_glow.touch_wall(_blocking_cell, best, point, altitude)
 
 
 func _show_contacts() -> void:
@@ -1245,12 +1257,36 @@ func _covers_behind(cell: Vector2i) -> bool:
 
 func draw_chunk(canvas: CanvasItem, chunk: Vector2i, offset: Vector2) -> void:
 	# Da dietro in avanti: prima i rombi con u + v più piccolo. I blocchi che
-	# coprono chi sta dietro li disegna il loro TerrainBlock, tra i personaggi.
+	# coprono chi sta dietro li disegna il loro TerrainBlock, tra i personaggi;
+	# qui sotto resta il pavimento da cui salgono, che si vede quando il
+	# blocco diventa trasparente (vedi _update_occlusion).
 	for depth in 2 * CHUNK_CELLS - 1:
 		for i in range(maxi(0, depth - CHUNK_CELLS + 1), mini(depth, CHUNK_CELLS - 1) + 1):
 			var cell := chunk * CHUNK_CELLS + Vector2i(i, depth - i)
 			if entities == null or not _covers_behind(cell):
 				draw_cell(canvas, cell, offset)
+			else:
+				draw_floor(canvas, cell, offset)
+
+
+## Pavimento sotto un blocco che copre chi sta dietro: il rombo piano
+## all'altezza del vicino dietro più basso (dove sta chi viene coperto), con
+## le sue pareti verso i vicini davanti. Di solito è nascosto dal blocco.
+func draw_floor(canvas: CanvasItem, cell: Vector2i, offset: Vector2) -> void:
+	var base := _top_height(cell)
+	for step: Vector2i in [Vector2i(-1, 0), Vector2i(0, -1), Vector2i(-1, -1)]:
+		base = minf(base, _top_height(cell + step))
+	var corners := cell_corners(cell)
+	var heights: Array[float] = [base, base, base, base]
+	var top := PackedVector2Array()
+	for k in 4:
+		corners[k] += offset
+		top.append(corners[k] - Vector2(0, base))
+	var kind := kind_of(cell)
+	var faces := _face_colors_of(kind)
+	_draw_face(canvas, corners, heights, cell + Vector2i(1, 0), 1, 2, 0, 3, faces[0], false)
+	_draw_face(canvas, corners, heights, cell + Vector2i(0, 1), 2, 3, 1, 0, faces[1], false)
+	canvas.draw_colored_polygon(top, _top_color(cell, kind, is_path(cell)).darkened(0.15))
 
 
 ## Un blocco: pareti davanti (dove il vicino è più basso) e faccia
@@ -1601,23 +1637,23 @@ class TerrainBlock:
 		world.draw_cell(self, cell, -position)
 
 
-## Bordo bianco sul tratto di ostacolo o di parete contro cui il giocatore
-## sbatte (vedi highlight_contacts): dura un attimo e svanisce.
+## Luce sul tratto di blocco di terreno contro cui il giocatore sbatte
+## (vedi highlight_contacts): solo sulla superficie del blocco, più forte
+## nel punto toccato e sfumata verso i lati; dura un attimo e svanisce. Se
+## il lato toccato è una parete visibile (davanti) si accende la parete,
+## altrimenti il bordo della faccia superiore lungo quel lato.
 class ContactGlow:
 	extends Node2D
 
 	const HOLD := 0.3
-	## Ostacoli: arco del bordo attorno al punto toccato, all'altezza della base
-	## e del corpo, uniti dai due lati.
-	const ARC_HALF := 0.75
-	const BAND_HEIGHT := 26.0
-	## Pareti: tratto del bordo del blocco attorno al punto toccato.
-	const EDGE_HALF := 26.0
-	const WIDTH := 3.0
-	const COLOR_EDGE := Color(1, 1, 1)
-	const COLOR_SHADOW := Color(0, 0, 0, 0.35)
+	## Mezza lunghezza del tratto illuminato e profondità sulla faccia superiore.
+	const EDGE_HALF := 34.0
+	const TOP_DEPTH := 16.0
+	## Altezza illuminata della parete sopra i piedi, al più.
+	const WALL_HEIGHT := 40.0
+	const COLOR_LIGHT := Color(1, 1, 1, 0.55)
 
-	## Chiave (ostacolo o tratto di parete) -> {tempo rimasto e forma}.
+	## Chiave (rombo e lato) -> {tempo rimasto e poligono con i colori}.
 	var _marks := {}
 
 	func _ready() -> void:
@@ -1625,23 +1661,41 @@ class ContactGlow:
 		physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 		set_process(false)
 
-	## base: centro della base dell'ostacolo sullo schermo; angle: da dove arriva il giocatore.
-	func touch_obstacle(base: Vector2, radius: float, angle: float) -> void:
-		_marks[base] = {"time": HOLD, "kind": "arc", "base": base, "radius": radius, "angle": angle}
-		_start()
-
-	## Tratto del lato da a a b (sul terreno) vicino a point, tra la quota
-	## del giocatore (altitude) e la cima del blocco (top).
-	func touch_wall(a: Vector2, b: Vector2, point: Vector2, altitude: float, top: float) -> void:
-		var side := (b - a).normalized()
+	## Lato side (0 alto-destra, 1 destra-basso, 2 basso-sinistra, 3
+	## sinistra-alto) del rombo cell toccato vicino a point da chi sta alla
+	## quota altitude.
+	func touch_wall(cell: Vector2i, side: int, point: Vector2, altitude: float) -> void:
+		var world := World.current
+		var corners := World.cell_corners(cell)
+		var a := corners[side]
+		var b := corners[(side + 1) % 4]
+		var top_a := world.corner_height(cell, side)
+		var top_b := world.corner_height(cell, (side + 1) % 4)
+		var along := (b - a).normalized()
 		var at := Geometry2D.get_closest_point_to_segment(point, a, b)
-		var from := at - side * minf(EDGE_HALF, at.distance_to(a))
-		var to := at + side * minf(EDGE_HALF, at.distance_to(b))
-		var key := Vector4(a.x, a.y, b.x, b.y)
-		_marks[key] = {"time": HOLD, "kind": "edge", "from": from, "to": to, "low": altitude, "high": maxf(top, altitude + BAND_HEIGHT)}
-		_start()
-
-	func _start() -> void:
+		var length := a.distance_to(b)
+		var t := a.distance_to(at) / length
+		var t0 := clampf(t - EDGE_HALF / length, 0.0, 1.0)
+		var t1 := clampf(t + EDGE_HALF / length, 0.0, 1.0)
+		# Tre punti lungo il lato: estremi trasparenti, centro acceso.
+		var steps := [t0, t, t1]
+		var outer := PackedVector2Array()
+		var inner := PackedVector2Array()
+		for k in 3:
+			var u: float = steps[k]
+			var ground := a.lerp(b, u)
+			var top := lerpf(top_a, top_b, u)
+			if side in [1, 2]:
+				# Parete davanti: dalla cima fin quasi ai piedi.
+				outer.append(ground - Vector2(0, top))
+				inner.append(ground - Vector2(0, maxf(altitude, top - WALL_HEIGHT)))
+			else:
+				# Lato dietro: la parete non si vede, si accende il bordo in cima.
+				var toward := (World.cell_center(cell) - ground).normalized()
+				outer.append(ground - Vector2(0, top))
+				inner.append(ground + toward * TOP_DEPTH - Vector2(0, top))
+		var key := Vector3i(cell.x, cell.y, side)
+		_marks[key] = {"time": HOLD, "outer": outer, "inner": inner}
 		set_process(true)
 		queue_redraw()
 
@@ -1656,27 +1710,18 @@ class ContactGlow:
 
 	func _draw() -> void:
 		for mark: Dictionary in _marks.values():
-			var alpha := clampf(mark["time"] / HOLD, 0.0, 1.0)
-			var lines: Array[PackedVector2Array] = []
-			if mark["kind"] == "arc":
-				var base: Vector2 = mark["base"]
-				var radius: float = mark["radius"]
-				var low := PackedVector2Array()
-				var high := PackedVector2Array()
-				for k in 13:
-					var angle: float = mark["angle"] - ARC_HALF + 2.0 * ARC_HALF * k / 12.0
-					var at := base + Vector2.from_angle(angle) * radius
-					low.append(at)
-					high.append(at - Vector2(0, BAND_HEIGHT))
-				lines = [low, high, PackedVector2Array([low[0], high[0]]), PackedVector2Array([low[12], high[12]])]
-			else:
-				var down := Vector2(0, mark["low"])
-				var up := Vector2(0, mark["high"])
-				var from: Vector2 = mark["from"]
-				var to: Vector2 = mark["to"]
-				lines = [PackedVector2Array([from - down, to - down]), PackedVector2Array([from - up, to - up]),
-						PackedVector2Array([from - down, from - up]), PackedVector2Array([to - down, to - up])]
-			for line in lines:
-				draw_polyline(line, Color(COLOR_SHADOW, COLOR_SHADOW.a * alpha), WIDTH + 2.0)
-			for line in lines:
-				draw_polyline(line, Color(COLOR_EDGE, alpha), WIDTH)
+			var alpha := clampf(mark["time"] / HOLD, 0.0, 1.0) * COLOR_LIGHT.a
+			var outer: PackedVector2Array = mark["outer"]
+			var inner: PackedVector2Array = mark["inner"]
+			var clear := Color(COLOR_LIGHT, 0.0)
+			var lit := Color(COLOR_LIGHT, alpha)
+			var edge_lit := Color(COLOR_LIGHT, alpha * 0.4)
+			# Due quadrilateri: dal bordo sinistro al centro e dal centro al destro.
+			for k in 2:
+				# Vicino all'angolo del rombo un tratto può essere lungo zero.
+				if outer[k].distance_to(outer[k + 1]) < 1.0:
+					continue
+				var points := PackedVector2Array([outer[k], outer[k + 1], inner[k + 1], inner[k]])
+				var colors := PackedColorArray([clear if k == 0 else lit, lit if k == 0 else clear,
+						edge_lit if k == 0 else clear, clear if k == 0 else edge_lit])
+				draw_polygon(points, colors)

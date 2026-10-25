@@ -118,8 +118,10 @@ const WALK_CYCLE := 0.08
 const GRID_CELL := 128.0
 const VIEW_MARGIN := Vector2(160, 220)
 ## Oltre questa distanza dal giocatore (fuori dallo schermo, oltre il
-## raggio d'inseguimento) ci si aggiorna a passi alterni.
+## raggio d'inseguimento) ci si aggiorna a passi alterni, oltre
+## VERY_FAR_RANGE un passo ogni quattro (con il tempo di tutti).
 const FAR_RANGE := 1000.0
+const VERY_FAR_RANGE := 1500.0
 
 const COLOR_WINDUP := Color(1.0, 0.45, 0.2)
 const COLOR_STUNNED := Color(0.55, 0.55, 0.8)
@@ -208,8 +210,8 @@ var _body_mesh: ArrayMesh
 var _outline_mesh: ArrayMesh
 var _shape_radius := -1.0
 
-## Aggiornamento a passi alterni da lontano: in quali passi (0 o 1) e tempo saltato.
-var _update_slot := randi() % 2
+## Aggiornamento a passi alterni da lontano: in quali passi (da 0 a 3) e tempo saltato.
+var _update_slot := randi() % 4
 var _skipped_time := 0.0
 
 ## Griglia dei nemici vivi (cella -> nemici) e passo di fisica in cui è stata fatta.
@@ -301,12 +303,14 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	# Lontano dal giocatore ci si aggiorna un passo sì e uno no, con il tempo
-	# di entrambi: non si vede e costa la metà.
-	if player and _state != State.DEAD and global_position.distance_squared_to(player.global_position) > FAR_RANGE * FAR_RANGE \
-			and (Engine.get_physics_frames() + _update_slot) % 2 == 0:
-		_skipped_time += delta
-		return
+	# Lontano dal giocatore ci si aggiorna un passo sì e uno no (molto lontano
+	# uno su quattro), con il tempo di quelli saltati: non si vede e costa meno.
+	if player and _state != State.DEAD:
+		var far := global_position.distance_squared_to(player.global_position)
+		var interval := 4 if far > VERY_FAR_RANGE * VERY_FAR_RANGE else (2 if far > FAR_RANGE * FAR_RANGE else 1)
+		if (Engine.get_physics_frames() + _update_slot) % interval != 0:
+			_skipped_time += delta
+			return
 	delta += _skipped_time
 	_skipped_time = 0.0
 	_state_time += delta
@@ -936,19 +940,16 @@ func _on_screen() -> bool:
 	return _view.has_point(global_position - Vector2(0, ground_elevation))
 
 
-## Cerchi dove compariranno i nemici evocati. L'attacco in carica non ha
+## Cerchi dove compariranno i nemici evocati e bagliore rosso dove atterrerà
+## il salto con colpo a terra. L'attacco in carica non ha
 ## più una zona a terra: si riconosce dal corpo che si accende e dalla spada
 ## (o dal bastone) portata indietro.
 func _draw_telegraph() -> void:
 	if _state == State.SLAM and not _slam_landed:
-		# Zona d'impatto del salto: si riempie man mano che arriva il colpo.
 		var slam: Dictionary = _type["slam"]
 		var total := float(slam["windup"]) + float(slam["air_time"])
-		var at := _slam_target - global_position
-		var impact_radius := float(slam["radius"])
-		Shapes.disc(_telegraph, at, impact_radius, Color(COLOR_DANGER, 0.12))
-		Shapes.disc(_telegraph, at, impact_radius * clampf(_state_time / total, 0.0, 1.0), Color(COLOR_DANGER, 0.22))
-		_telegraph.draw_arc(at, impact_radius, 0.0, TAU, 40, Color(COLOR_DANGER, 0.7), 2.5)
+		# Bagliore rosso sfumato sul punto d'impatto, sempre più acceso.
+		GroundFx.danger_glow(_telegraph, _slam_target - global_position, float(slam["radius"]), _state_time / total)
 	if _state == State.SUMMON:
 		var progress: float = _state_time / _type["summon"]["channel_time"]
 		for offset in _summon_positions:

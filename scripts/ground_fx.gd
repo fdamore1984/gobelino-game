@@ -30,6 +30,9 @@ const SPLAT_REDRAW := 0.05
 const IDLE_REDRAW := 0.2
 ## Le gocce stanno in un quadrato del mondo: la terra sotto è ellittica.
 const GROUND_SQUASH := 0.5
+## Bagliore rosso del punto d'impatto di un attacco a terra (vedi danger_glow).
+const COLOR_DANGER_GLOW := Color(1.0, 0.18, 0.08)
+const COLOR_DANGER_CORE := Color(1.0, 0.55, 0.25)
 
 static var current: GroundFx
 
@@ -96,6 +99,18 @@ static func corpse(at: Vector2, elevation: float, points: PackedVector2Array, co
 static func shockwave(at: Vector2, elevation: float, radius: float) -> void:
 	if current:
 		current._waves.append({"position": at, "elevation": elevation, "radius": radius, "age": 0.0, "seed": randi()})
+
+
+## Zona d'impatto di un attacco a terra che sta per arrivare (salto dei
+## nemici): un bagliore rosso sfumato largo quanto la zona colpita (radius),
+## che si accende man mano che il colpo si avvicina (progress da 0 a 1),
+## con un cuore più caldo al centro. Niente cerchi disegnati a terra.
+static func danger_glow(canvas: CanvasItem, at: Vector2, radius: float, progress: float) -> void:
+	var t := clampf(progress, 0.0, 1.0)
+	# Il bordo del bagliore sfuma oltre la zona colpita: lo si allarga un po'
+	# perché al limite della zona si veda ancora il rosso.
+	Shapes.glow(canvas, at, radius * 1.3, Color(COLOR_DANGER_GLOW, 0.3 + 0.45 * t))
+	Shapes.glow(canvas, at, radius * (0.35 + 0.35 * t), Color(COLOR_DANGER_CORE, 0.15 + 0.45 * t))
 
 
 ## Toglie tutto (passando tra superficie e sotterraneo).
