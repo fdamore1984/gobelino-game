@@ -16,7 +16,6 @@
 		"face_colors": [[0.45, 0.34, 0.23], [0.33, 0.25, 0.17]],
 		"lip_color": [0.16, 0.3, 0.14],
 		"forest_frequency": 0.0022,
-		"bramble_frequency": 0.004,
 		"pregen_radius": 12,
 		"pregen_edge": 4,
 		"barrier_frequency": 0.00016,
@@ -117,12 +116,6 @@
 			"chance": 0.006, "level_bonus": 0.002,
 			"radius": [18, 18], "collision": 1.0, "solid": true,
 			"colors": [[0.55, 0.35, 0.18]], "metal": [0.75, 0.7, 0.55]
-		},
-		"bramble": {
-			"chance": 0.002, "patch_bonus": 0.15,
-			"radius": [22, 34], "collision": 0.85, "solid": false, "slow": 0.45,
-			"damage": 1, "damage_interval": 2.0,
-			"colors": [[0.36, 0.22, 0.28], [0.3, 0.2, 0.16]], "berries": [0.7, 0.1, 0.15]
 		},
 		"cave": {
 			"chance": 0, "radius": [40, 40], "collision": 0.8, "solid": false,

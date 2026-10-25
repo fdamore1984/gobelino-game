@@ -12,23 +12,27 @@ extends Node2D
 ## e di mana (croce destra), torcia (croce giù). Il colpo potente si carica
 ## tenendo premuto, fino al doppio del danno. Equipaggiamento e libri
 ## dell'inventario migliorano le caratteristiche (vedi Inventory).
-## Schivata e parata interrompono la combo in qualsiasi momento; attaccare
-## durante una schivata la interrompe e attacca subito. Salti e schivate si
-## combinano; schivando mentre si corre si fa una scivolata, durante la
-## quale si può attaccare (anche in combo), schivare, saltare o parare.
-## Una parata perfetta potenzia gli attacchi per qualche secondo. La parata
-## è istantanea: annulla subito qualsiasi altra azione (non lo stordimento).
+## Parata, schivata e salto sono istantanei: annullano subito qualsiasi
+## altra azione (combo, carica, attacco a terra, rinculo, sorso; non lo
+## stordimento); attaccare durante una schivata la interrompe e attacca
+## subito. Salti e schivate si combinano; schivando mentre si corre si fa una
+## scivolata, durante la quale si può attaccare (anche in combo), schivare,
+## saltare o parare. Una parata perfetta potenzia gli attacchi per qualche
+## secondo.
 ## Con R3 si aggancia il nemico più vicino: il personaggio lo guarda sempre,
 ## gli attacchi e la palla di fuoco vanno verso di lui; premendo di nuovo si
-## passa al nemico vicino successivo. Inclinando la levetta destra mentre si
-## preme (o si tiene premuto) R3 si aggancia il nemico in quella direzione.
-## Se il bersaglio muore o si perde si passa da soli al più vicino.
+## sgancia (niente passaggio da un nemico all'altro). Se il bersaglio muore o
+## si perde si passa da soli al più vicino.
 ## Tenendo premuto R1 si continua ad attaccare; in aria R1 fa un attacco
-## aereo. Attacchi a terra, che colpiscono tutti i nemici attorno: un colpo
-## potente subito dopo una combo di colpi normali fa saltare e colpire il
-## terreno (anche tutti i colpi potenti concatenati dopo); il colpo potente
-## in aria fa piombare a terra, durante uno scatto in aria con un colpo più
-## ampio.
+## aereo. Tenendo premuto il colpo potente il primo colpo si carica e, a
+## carica piena (o al rilascio), i colpi potenti successivi si concatenano da
+## soli finché si tiene premuto. Attacchi a terra, che colpiscono tutti i
+## nemici attorno: un colpo potente subito dopo una combo di colpi normali fa
+## saltare e colpire il terreno (anche tutti i colpi potenti concatenati
+## dopo); il colpo potente in aria fa piombare a terra, durante uno scatto in
+## aria con un colpo più ampio. Durante gli attacchi a terra si passa
+## attraverso i nemici; all'impatto quelli attorno (non i boss) vengono
+## respinti lontano.
 ## Sconfiggere nemici dà esperienza; a ogni livello aumentano i danni
 ## base e si sceglie un potenziamento.
 
@@ -41,7 +45,7 @@ enum State { NORMAL, ATTACK, PARRY, DODGE, SLIDE, HURT, DEAD, SLAM, FALL, RECOIL
 
 const RADIUS := 22.0
 const START_HEALTH := 5
-const SPEED := 310.0
+const SPEED := 220.0
 
 ## Da fermo si parte piano; più si va veloci, più si accelera.
 const ACCELERATION_START := 600.0
@@ -59,14 +63,17 @@ const COMBO_DAMAGE_STEP := 0.5
 const START_COMBO_HITS := 3
 ## Dopo un attacco c'è questo tempo per continuare la combo.
 const COMBO_WINDOW := 0.35
-const ATTACK_WINDUP := 0.13
-const ATTACK_ACTIVE := 0.15
-const ATTACK_RECOVERY := 0.28
+## Colpi normali più lenti ma ampi.
+const ATTACK_WINDUP := 0.19
+const ATTACK_ACTIVE := 0.18
+const ATTACK_RECOVERY := 0.34
 ## Il colpo finale della combo ha un recupero più lungo.
-const FINISHER_RECOVERY := 0.42
+const FINISHER_RECOVERY := 0.5
+## Pausa tra la fine di un colpo normale e l'inizio del successivo della combo.
+const ATTACK_CHAIN_DELAY := 0.14
 ## I colpi normali colpiscono sempre la stessa area davanti al personaggio.
-const ATTACK_RANGE := 85.0
-const ATTACK_ARC := deg_to_rad(115.0)
+const ATTACK_RANGE := 108.0
+const ATTACK_ARC := deg_to_rad(150.0)
 ## Movimenti dei colpi normali a terra, a turno (ogni colpo è diverso dal
 ## precedente): fendente, rovescio, colpo dall'alto, affondo.
 const ATTACK_STYLES := ["slash", "backhand", "chop", "thrust"]
@@ -125,11 +132,6 @@ const LOCK_HIDDEN_TIME := 0.6
 const LOCK_SIGHT_INTERVAL := 0.15
 const LOCK_CAMERA_SHARE := 0.3
 const LOCK_CAMERA_MAX := 170.0
-## Aggancio direzionale (levetta destra): si scelgono i nemici entro questo
-## angolo dalla direzione indicata, preferendo i più allineati e poi i più
-## vicini (la distanza pesa come questo angolo, in radianti, per LOCK_RANGE).
-const LOCK_AIM_ARC := deg_to_rad(120.0)
-const LOCK_AIM_DISTANCE_WEIGHT := 0.5
 ## All'impatto la telecamera trema, sempre meno.
 const CAMERA_SHAKE := 9.0
 const CAMERA_SHAKE_DECAY := 4.0
@@ -164,9 +166,9 @@ const DODGE_TURN_RATE := 10.0
 const DODGE_STICK_DEADZONE := 0.2
 const DODGE_COOLDOWN := 0.4
 
-## Corsa tenendo premuto R2: più veloce del passo normale. Ogni
+## Corsa (L3): molto più veloce del passo normale. Ogni
 ## potenziamento aggiunge il 5% alla velocità di corsa.
-const RUN_SPEED_FACTOR := 1.6
+const RUN_SPEED_FACTOR := 2.25
 const RUN_SPEED_UPGRADE := 0.05
 
 ## Scivolata: schivando mentre si corre si scivola in avanti, rallentando.
@@ -241,22 +243,18 @@ const START_POTIONS := 2
 const SHIELD_COOLDOWN := 30.0
 const SHIELD_COOLDOWN_UPGRADE := 0.95
 
-## I rovi pungono a intervalli (data/world.json); la prima volta poco dopo
-## esserci entrati.
-const THORNS_FIRST_DELAY := 1.0
-const THORNS_INVULNERABLE_TIME := 0.4
-
 ## Rimbalzo contro ostacoli e pareti: solo sopra BOUNCE_MIN_SPEED verso
 ## l'ostacolo, con una parte della velocità d'urto (al massimo BOUNCE_MAX_SPEED).
 const BOUNCE_MIN_SPEED := 200.0
 const BOUNCE_FACTOR := 0.45
 const BOUNCE_MAX_SPEED := 180.0
 ## I nemici sono solidi: non ci si passa attraverso (si salta sopra solo
-## più in alto di JUMP_EVADE_HEIGHT). Andandoci addosso più veloci di
-## ENEMY_BUMP_SPEED si rimbalza indietro e si perde ENEMY_BUMP_DAMAGE.
-const ENEMY_BUMP_SPEED := 60.0
-const ENEMY_BUMP_DAMAGE := 1
-const ENEMY_BUMP_KNOCKBACK := 360.0
+## più in alto di JUMP_EVADE_HEIGHT, e durante gli attacchi a terra si
+## ignorano). Andarci addosso non fa danni.
+## All'impatto dell'attacco a terra i nemici entro il raggio più questo
+## margine (non i boss) vengono respinti a questa velocità.
+const SLAM_PUSH_MARGIN := 70.0
+const SLAM_PUSH_SPEED := 700.0
 
 ## Colpo parato dalla guardia di un nemico: la combo si interrompe e si
 ## viene respinti indietro per REPEL_TIME secondi (schivata e parata restano
@@ -449,17 +447,12 @@ var _lock_hidden := 0.0
 var _lock_sight_check := 0.0
 var _lock_visible := true
 var _lock_marker := LockMarker.new()
-## La levetta destra era inclinata nel passo precedente (per accorgersi di
-## quando la si inclina tenendo premuto R3).
-var _lock_aiming := false
 ## Carica del colpo potente (0-1) e se il tasto è ancora tenuto premuto.
 var _charge := 0.0
 var _charging := false
 ## Il suono del colpo potente parte al rilascio della carica, una volta sola.
 var _heavy_swing_played := false
 var _torch := PointLight2D.new()
-## Tempo passato nei rovi dall'ultima puntura.
-var _thorns_time := 0.0
 ## Potenziamento -> quante volte è stato scelto, nell'ordine di scelta.
 var upgrades_taken := {}
 ## Altezza del terreno sotto il personaggio (vedi World.elevation_at).
@@ -522,19 +515,9 @@ func _physics_process(delta: float) -> void:
 		if UiNav.game_pressed("spell"):
 			_cast_fireball(input)
 	if _state != State.DEAD:
-		# Con la levetta destra inclinata si aggancia il nemico in quella
-		# direzione (anche inclinandola mentre si tiene premuto R3, o
-		# trascinando il dito dal tasto a schermo); altrimenti il più vicino.
-		var aim := Input.get_vector("lock_left", "lock_right", "lock_up", "lock_down")
-		var aiming := aim != Vector2.ZERO
+		# R3 aggancia il nemico più vicino; premendo di nuovo si sgancia.
 		if UiNav.game_pressed("lock_on"):
-			if aiming:
-				_lock_toward(aim)
-			else:
-				_cycle_lock()
-		elif aiming and not _lock_aiming and UiNav.game_held("lock_on"):
-			_lock_toward(aim)
-		_lock_aiming = aiming
+			_toggle_lock()
 		_update_lock()
 	if UiNav.game_pressed("torch") and _state != State.DEAD:
 		torch_on = not torch_on
@@ -546,6 +529,17 @@ func _physics_process(delta: float) -> void:
 	if UiNav.game_pressed("parry") and _state in [State.NORMAL, State.ATTACK, State.DODGE,
 			State.SLIDE, State.SLAM, State.RECOIL, State.DRINK]:
 		_start_parry(input)
+	# Allo stesso modo schivata e salto annullano subito attacchi (anche in
+	# carica), attacchi a terra, parata, rinculo e il bere (se c'è vigore; in
+	# NORMAL, DODGE e SLIDE si gestiscono più sotto).
+	elif _state in [State.ATTACK, State.SLAM, State.PARRY, State.RECOIL, State.DRINK]:
+		if UiNav.game_pressed("dodge") and stamina > 0.0:
+			_interrupt_action()
+			_start_dodge(dodge_input)
+		elif _jump_pressed() and _can_jump():
+			_interrupt_action()
+			_change_state(State.NORMAL)
+			_jump()
 
 	match _state:
 		State.NORMAL:
@@ -585,8 +579,8 @@ func _physics_process(delta: float) -> void:
 				_start_parry(input)
 
 		State.ATTACK:
-			# Un attacco iniziato si interrompe solo con la parata; si può
-			# concatenare il successivo.
+			# Un attacco iniziato si interrompe con parata, schivata o salto;
+			# si può concatenare il successivo.
 			_running = false
 			_update_attack(input, delta)
 
@@ -595,9 +589,7 @@ func _physics_process(delta: float) -> void:
 				_target_facing = input.normalized()
 			_face_lock()
 			_velocity = _accelerate(_velocity, input * walk_speed() * PARRY_SPEED_FACTOR, delta)
-			if UiNav.game_pressed("dodge") and _dodge_cooldown == 0.0:
-				_start_dodge(dodge_input)
-			elif not UiNav.game_held("parry"):
+			if not UiNav.game_held("parry"):
 				_change_state(State.NORMAL)
 
 		State.DODGE:
@@ -661,9 +653,7 @@ func _physics_process(delta: float) -> void:
 
 		State.RECOIL:
 			_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * 1.5 * delta)
-			if UiNav.game_pressed("dodge") and _dodge_cooldown == 0.0:
-				_start_dodge(dodge_input)
-			elif _state_time >= REPEL_TIME:
+			if _state_time >= REPEL_TIME:
 				_change_state(State.NORMAL)
 
 		State.FALL:
@@ -678,7 +668,8 @@ func _physics_process(delta: float) -> void:
 				_change_state(State.NORMAL)
 
 		State.DRINK:
-			# Si beve: ci si muove piano e non si fa altro finché non si finisce.
+			# Si beve: ci si muove piano e non si fa altro finché non si finisce
+			# (parata, schivata e salto interrompono il sorso).
 			_running = false
 			if input != Vector2.ZERO:
 				_target_facing = input.normalized()
@@ -723,8 +714,8 @@ func _physics_process(delta: float) -> void:
 
 ## Spostamento nel mondo: si sale sui blocchi più alti solo saltando
 ## abbastanza in alto, si scende dai gradini cadendo; gli ostacoli solidi
-## fermano il personaggio, cespugli e rovi lo rallentano (ma non durante
-## schivate e scivolate) e i rovi pungono.
+## fermano il personaggio, i cespugli lo rallentano (ma non durante
+## schivate e scivolate).
 func _move(delta: float) -> void:
 	var world := World.current
 	if world == null:
@@ -759,15 +750,6 @@ func _move(delta: float) -> void:
 	elif not is_airborne():
 		_safe_position = position
 		_safe_altitude = ground_elevation
-	var thorns := world.ground_obstacle_at(position, RADIUS) if grounded else {}
-	if not thorns.is_empty() and thorns["damage"] > 0:
-		_thorns_time += delta
-		if _thorns_time >= thorns["damage_interval"]:
-			_thorns_time -= thorns["damage_interval"]
-			_scratch(thorns["damage"])
-	else:
-		# Appena entrati nei rovi la prima puntura arriva dopo un attimo.
-		_thorns_time = THORNS_FIRST_DELAY
 
 
 ## Urto: la parte del movimento fermata da un ostacolo o da una parete fa
@@ -783,11 +765,11 @@ func _bounce(blocked: Vector2, delta: float) -> void:
 	_velocity += away * (maxf(_velocity.dot(-away), 0.0) + minf(impact * BOUNCE_FACTOR, BOUNCE_MAX_SPEED))
 
 
-## Spinge fuori dai nemici vivi alla stessa quota; se ci si andava addosso
-## si rimbalza indietro e si perde un punto vita (non durante
-## l'invulnerabilità, per esempio all'inizio della schivata o dopo un colpo).
+## Spinge fuori dai nemici vivi alla stessa quota, senza danni: la parte
+## della velocità diretta contro il nemico si annulla. Durante gli attacchi a
+## terra si passa attraverso i nemici.
 func _collide_enemies(world: World) -> void:
-	if _state in [State.DEAD, State.FALL]:
+	if _state in [State.DEAD, State.FALL, State.SLAM]:
 		return
 	for node in get_tree().get_nodes_in_group("enemies"):
 		var enemy := node as Enemy
@@ -802,48 +784,13 @@ func _collide_enemies(world: World) -> void:
 		var away := offset / distance if distance > 0.01 else -facing
 		var into := _velocity.dot(-away)
 		position = world.move(position, away * (minimum - distance), RADIUS * 0.8)
-		if into <= ENEMY_BUMP_SPEED:
-			continue
-		_velocity += away * into
-		_bump_enemy(away)
-
-
-func _bump_enemy(away: Vector2) -> void:
-	var dodging := (_state == State.DODGE and _state_time <= DODGE_INVULNERABLE_TIME) \
-			or (_state == State.SLIDE and _state_time <= SLIDE_INVULNERABLE_TIME)
-	if _invulnerable_time > 0.0 or dodging:
-		return
-	health = maxi(health - ENEMY_BUMP_DAMAGE, 0)
-	health_changed.emit(health, max_health)
-	if health == 0:
-		_change_state(State.DEAD)
-		Sfx.play("death", global_position)
-		died.emit()
-		return
-	_change_state(State.HURT)
-	_velocity = away * ENEMY_BUMP_KNOCKBACK
-	_invulnerable_time = HURT_INVULNERABLE_TIME
-	Sfx.play("hurt", global_position)
+		if into > 0.0:
+			_velocity += away * into
 
 
 ## Spinta senza passare attraverso dirupi e ostacoli.
 func _push(offset: Vector2) -> void:
 	position = World.current.move(position, offset, RADIUS * 0.8) if World.current else position + offset
-
-
-## Puntura dei rovi: toglie vita senza spinta né interruzioni.
-func _scratch(damage: int) -> void:
-	if _state == State.DEAD or _invulnerable_time > 0.0:
-		return
-	health = maxi(health - damage, 0)
-	health_changed.emit(health, max_health)
-	if health == 0:
-		_change_state(State.DEAD)
-		Sfx.play("death", global_position)
-		died.emit()
-	else:
-		_invulnerable_time = THORNS_INVULNERABLE_TIME
-		Sfx.play("hurt", global_position, 1.3, -6.0)
 
 
 ## Salto e caduta: con più salti disponibili si può saltare di nuovo in aria.
@@ -883,11 +830,13 @@ func _update_attack(input: Vector2, delta: float) -> void:
 			_target_facing = input.normalized()
 		_face_lock()
 		if UiNav.game_held("heavy_attack") and _state_time >= windup * 0.9:
-			var was_full := _charge >= 1.0
 			_charge = minf(_charge + delta / HEAVY_CHARGE_TIME, 1.0)
 			_state_time = windup * 0.9
-			if _charge >= 1.0 and not was_full:
+			if _charge >= 1.0:
+				# A carica piena il colpo parte da solo: tenendo ancora premuto
+				# si concatenano i colpi potenti successivi.
 				Sfx.play("charge_full", global_position)
+				_charging = false
 		elif not UiNav.game_held("heavy_attack"):
 			_charging = false
 	# Lo slancio di una scivolata si esaurisce durante l'attacco.
@@ -911,6 +860,10 @@ func _update_attack(input: Vector2, delta: float) -> void:
 	# alla fine della combo le pressioni in più vengono ignorate.
 	if UiNav.game_pressed("heavy_attack") and _can_chain_heavy():
 		_queued_attack = "heavy"
+	elif UiNav.game_held("heavy_attack") and _attack_heavy and not _charging and _queued_attack == "" \
+			and _state_time >= windup and _can_chain_heavy():
+		# Tenendo premuto il colpo potente, il successivo parte da solo.
+		_queued_attack = "heavy_held"
 	elif _can_chain_attack() and (UiNav.game_pressed("attack") \
 			or (UiNav.game_held("attack") and _queued_attack == "" and _state_time >= windup)):
 		# Tenendo premuto il tasto, il colpo successivo parte da solo.
@@ -921,11 +874,13 @@ func _update_attack(input: Vector2, delta: float) -> void:
 		# Parato dalla guardia di un nemico: si è stati respinti.
 		if _state != State.ATTACK:
 			return
-	if _queued_attack != "" and _state_time >= windup + active:
-		if _queued_attack == "heavy":
-			_start_heavy(input)
-		else:
+	# Tra un colpo normale e il successivo della combo c'è una breve pausa.
+	var chain_at := windup + active + (0.0 if _attack_heavy else ATTACK_CHAIN_DELAY / _attack_speed)
+	if _queued_attack != "" and _state_time >= chain_at:
+		if _queued_attack == "attack":
 			_start_attack(_combo_step + 1, input)
+		else:
+			_start_heavy(input, _queued_attack == "heavy_held")
 	elif _state_time >= windup + active + recovery:
 		if _combo_finished():
 			_end_combo()
@@ -1090,45 +1045,14 @@ func teleport(at: Vector2) -> void:
 		_camera.reset_smoothing()
 
 
-## Aggancia il nemico più vicino; se ce n'è già uno passa al successivo
-## per distanza, e se non ce ne sono altri sgancia.
-func _cycle_lock() -> void:
-	var candidates := _lock_candidates()
-	if candidates.is_empty():
-		lock_target = null
-	elif lock_target == null or not candidates.has(lock_target):
-		lock_target = candidates[0]
-	elif candidates.size() == 1:
-		lock_target = null
-	else:
-		lock_target = candidates[(candidates.find(lock_target) + 1) % candidates.size()]
-	_lock_marker.target = lock_target
-	Sfx.play_ui("ui_move" if lock_target else "ui_confirm")
-
-
-## Aggancia il nemico nella direzione indicata (levetta destra): tra quelli
-## entro LOCK_AIM_ARC il più allineato, a parità il più vicino. Se in quella
-## direzione non c'è nessuno il bersaglio resta quello di prima.
-func _lock_toward(direction: Vector2) -> void:
-	var best: Enemy = null
-	var best_score := INF
-	for enemy: Enemy in _lock_candidates():
-		var offset := enemy.global_position - global_position
-		var angle := absf(direction.angle_to(offset)) if offset != Vector2.ZERO else 0.0
-		if angle > LOCK_AIM_ARC / 2.0:
-			continue
-		var score := angle + offset.length() / LOCK_RANGE * LOCK_AIM_DISTANCE_WEIGHT
-		if score < best_score:
-			best_score = score
-			best = enemy
-	if best == null:
-		Sfx.play_ui("ui_confirm")
-		return
-	lock_target = best
+## Aggancia il nemico più vicino; se ce n'è già uno agganciato sgancia.
+## Non si passa da un nemico all'altro.
+func _toggle_lock() -> void:
+	lock_target = null if lock_target else _lock_nearest()
 	_lock_hidden = 0.0
 	_lock_visible = true
 	_lock_marker.target = lock_target
-	Sfx.play_ui("ui_move")
+	Sfx.play_ui("ui_move" if lock_target else "ui_confirm")
 
 
 ## Il nemico vivo in vista più vicino (null se nessuno).
@@ -1439,7 +1363,8 @@ func _start_attack(step: int, input: Vector2) -> void:
 	Sfx.play("swing", global_position, 1.0 + 0.12 * (_combo_step - 1))
 
 
-func _start_heavy(input: Vector2) -> void:
+## held: concatenato tenendo premuto il tasto (non si carica).
+func _start_heavy(input: Vector2, held := false) -> void:
 	if not _use_stamina(STAMINA_HEAVY):
 		return
 	# In aria il colpo potente fa piombare a terra.
@@ -1461,7 +1386,7 @@ func _start_heavy(input: Vector2) -> void:
 		return
 	_attack_heavy = true
 	_begin_attack(input)
-	_charging = true
+	_charging = not held
 
 
 func _begin_attack(input: Vector2) -> void:
@@ -1538,6 +1463,9 @@ func _start_slam(kind: String, input: Vector2) -> void:
 func _update_slam(input: Vector2, delta: float) -> void:
 	if UiNav.game_pressed("heavy_attack") and _slam_kind == "leap" and _can_chain_heavy():
 		_queued_attack = "heavy"
+	elif UiNav.game_held("heavy_attack") and _slam_kind == "leap" and _can_chain_heavy() and _queued_attack == "" and _slam_landed:
+		# Tenendo premuto si concatena da solo il colpo potente successivo.
+		_queued_attack = "heavy_held"
 	if not _slam_landed:
 		if _slam_kind != "leap" and _state_time >= SLAM_HANG and _height_velocity > -SLAM_DIVE_SPEED:
 			_height_velocity = -SLAM_DIVE_SPEED
@@ -1554,8 +1482,8 @@ func _update_slam(input: Vector2, delta: float) -> void:
 	_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * 2.0 * delta)
 	if _state_time < SLAM_RECOVERY / _attack_speed:
 		return
-	if _queued_attack == "heavy":
-		_start_heavy(input)
+	if _queued_attack in ["heavy", "heavy_held"]:
+		_start_heavy(input, _queued_attack == "heavy_held")
 		return
 	if _slam_kind == "leap" and _can_chain_heavy():
 		_combo_timer = COMBO_WINDOW
@@ -1579,10 +1507,15 @@ func _slam_impact() -> void:
 		if enemy == null or enemy.is_dead() or absf(enemy.ground_elevation - ground_elevation) > HIT_HEIGHT_REACH:
 			continue
 		var offset := enemy.global_position - global_position
-		if offset.length() > radius + enemy.radius:
-			continue
 		var direction := offset.normalized() if offset != Vector2.ZERO else facing
+		if offset.length() > radius + enemy.radius:
+			# Poco più in là non si fanno danni, ma si viene comunque respinti.
+			if offset.length() <= radius + enemy.radius + SLAM_PUSH_MARGIN and not enemy.is_boss():
+				enemy.shove(direction * SLAM_PUSH_SPEED)
+			continue
 		enemy.take_damage(damage, direction, true)
+		if not enemy.is_boss():
+			enemy.shove(direction * SLAM_PUSH_SPEED)
 		HitSpark.spawn(get_parent(), enemy.global_position - direction * enemy.radius * 0.8, enemy.ground_elevation + enemy.radius * 0.5, 40.0, COLOR_HEAVY)
 		landed = true
 	GroundFx.shockwave(global_position, ground_elevation, radius)
@@ -1599,6 +1532,10 @@ func _slam_damage() -> int:
 	if _attack_speed > 1.0:
 		multiplier *= EMPOWER_DAMAGE_FACTOR
 	return roundi(base_damage() * multiplier * (1.0 + inventory.bonus("damage")))
+
+
+func _can_jump() -> bool:
+	return _jumps_used < max_jumps and stamina > 0.0
 
 
 func _jump() -> void:
@@ -1643,6 +1580,18 @@ func _start_parry(input: Vector2) -> void:
 	# Interrompendo una schivata non se ne può fare subito un'altra.
 	if _state in [State.DODGE, State.SLIDE]:
 		_dodge_cooldown = DODGE_COOLDOWN
+	_interrupt_action()
+	_velocity = _velocity.limit_length(walk_speed() * PARRY_SPEED_FACTOR)
+	if input != Vector2.ZERO:
+		_target_facing = input.normalized()
+	_face_lock()
+	facing = _target_facing
+	_change_state(State.PARRY)
+
+
+## Annulla l'azione in corso (combo, carica, attacco a terra, sorso) per
+## parare, schivare o saltare subito.
+func _interrupt_action() -> void:
 	_end_combo()
 	_charging = false
 	_charge = 0.0
@@ -1650,12 +1599,6 @@ func _start_parry(input: Vector2) -> void:
 	_walk_velocity = Vector2.ZERO
 	_drinking = ""
 	_running = false
-	_velocity = _velocity.limit_length(walk_speed() * PARRY_SPEED_FACTOR)
-	if input != Vector2.ZERO:
-		_target_facing = input.normalized()
-	_face_lock()
-	facing = _target_facing
-	_change_state(State.PARRY)
 
 
 ## In aria la schivata è uno scatto: si smette di cadere e si scivola nell'aria.

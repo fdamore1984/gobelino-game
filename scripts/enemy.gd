@@ -123,6 +123,15 @@ const VIEW_MARGIN := Vector2(160, 220)
 const FAR_RANGE := 1000.0
 const VERY_FAR_RANGE := 1500.0
 
+## Scia rossa: mentre carica l'attacco il nemico si accende di un bagliore
+## rosso; quando scatta per colpire (e nel salto con colpo a terra) lascia
+## dietro di sé copie rosse del corpo che svaniscono in TRAIL_FADE secondi,
+## una ogni TRAIL_INTERVAL.
+const TRAIL_INTERVAL := 0.025
+const TRAIL_FADE := 0.22
+const TRAIL_ALPHA := 0.5
+const WINDUP_GLOW_ALPHA := 0.45
+
 const COLOR_WINDUP := Color(1.0, 0.45, 0.2)
 const COLOR_STUNNED := Color(0.55, 0.55, 0.8)
 const COLOR_DANGER := Color(1.0, 0.25, 0.15)
@@ -205,6 +214,10 @@ var _walk_phase := 0.0
 var _telegraph := Node2D.new()
 ## Il segnale dell'evocazione è disegnato: va ancora ridisegnato (per toglierlo).
 var _telegraph_shown := false
+## Scia rossa: posizioni (x, y) con l'altezza del salto (z) e da quanto
+## tempo ci si è passati (w); tempo dall'ultima copia lasciata.
+var _trail: Array[Vector4] = []
+var _trail_time := 0.0
 ## Mesh del corpo e del suo contorno (vedi Shapes), preparate una volta per raggio.
 var _body_mesh: ArrayMesh
 var _outline_mesh: ArrayMesh
@@ -489,7 +502,7 @@ func _physics_process(delta: float) -> void:
 	_knockback = _knockback.move_toward(Vector2.ZERO, 1200.0 * delta)
 	# Come il giocatore (vedi Player._move): si scende dai gradini cadendo e si
 	# sale su quelli più alti solo saltando (climb = altezza del salto); ci si
-	# ferma contro gli ostacoli solidi, cespugli e rovi rallentano e nei
+	# ferma contro gli ostacoli solidi, i cespugli rallentano e nei
 	# burroni non si entra.
 	var motion := (_velocity + _knockback) * delta
 	var world := World.current
@@ -512,11 +525,38 @@ func _physics_process(delta: float) -> void:
 	else:
 		position += motion
 	_walk_phase += _velocity.length() * delta * WALK_CYCLE
+	_update_trail(delta)
 	if _on_screen():
 		queue_redraw()
 	if _state in [State.SUMMON, State.SLAM] or _telegraph_shown:
 		_telegraph_shown = _state in [State.SUMMON, State.SLAM]
 		_telegraph.queue_redraw()
+
+
+## Scia rossa dell'attacco: si lascia una copia del corpo a intervalli
+## mentre si scatta per colpire (non i dardi e le magie) o si salta per il
+## colpo a terra; le copie vecchie svaniscono.
+func _update_trail(delta: float) -> void:
+	for k in range(_trail.size() - 1, -1, -1):
+		_trail[k].w += delta
+		if _trail[k].w >= TRAIL_FADE:
+			_trail.remove_at(k)
+	var lunging := _state == State.STRIKE and not _is_ranged() and not _casting and float(_type["lunge_speed"]) > 0.0
+	var leaping := _state == State.SLAM and _air > 0.0
+	if not lunging and not leaping:
+		_trail_time = TRAIL_INTERVAL
+		return
+	_trail_time += delta
+	if _trail_time >= TRAIL_INTERVAL:
+		_trail_time = 0.0
+		_trail.append(Vector4(global_position.x, global_position.y, _air + _height, 0.0))
+
+
+## Spinta improvvisa (per esempio dall'impatto dell'attacco a terra del
+## giocatore): velocity è la velocità iniziale, che poi si esaurisce.
+func shove(velocity: Vector2) -> void:
+	if _state != State.DEAD:
+		_knockback = velocity
 
 
 ## heavy: colpo finale della combo, spinge più lontano.
@@ -983,9 +1023,10 @@ func _draw() -> void:
 	# "occhio" che indica la direzione.
 	var lift := _air + _height
 	Shapes.disc(self, Vector2(0, radius * 0.8), radius * 0.9 * (1.0 - minf(lift, 150.0) / 200.0), Color(0, 0, 0, 0.25))
+	var leg := radius * LEG_FACTOR
+	_draw_trail(leg)
 	# I salti (attacco speciale, gradini) sollevano tutto tranne l'ombra.
 	draw_set_transform(Vector2(0, -ground_elevation - lift))
-	var leg := radius * LEG_FACTOR
 	var walking := _velocity.length() > 15.0 and _state != State.DEAD
 	BodyParts.draw_legs(self, -leg + radius * 0.55, radius * 0.85, radius * 0.35, maxf(4.0, radius * 0.22),
 			_walk_phase, _velocity.normalized(), radius * 0.3 if walking else 0.0, _color.darkened(0.4))
@@ -996,6 +1037,10 @@ func _draw() -> void:
 	if _state == State.SLAM and _state_time < float(_type["slam"]["windup"]):
 		crouch = leg * 0.5 * minf(_state_time / float(_type["slam"]["windup"]) * 3.0, 1.0)
 	draw_set_transform(Vector2(0, -ground_elevation - lift - leg - bob + crouch))
+	if _state == State.WINDUP and not _is_ranged():
+		# Carica dell'attacco: bagliore rosso sempre più acceso attorno al corpo.
+		var progress := minf(_state_time / _windup_time, 1.0)
+		Shapes.glow(self, Vector2.ZERO, radius * (1.6 + 0.6 * progress), Color(COLOR_DANGER, WINDUP_GLOW_ALPHA * progress))
 	if _shape_radius != radius:
 		_shape_radius = radius
 		var key := "%s:%s" % [_type["shape"], radius]
@@ -1026,6 +1071,17 @@ func _draw() -> void:
 		draw_rect(Rect2(origin, Vector2(width * health / max_health, 6)), COLOR_DANGER)
 
 
+## Copie rosse del corpo lasciate dallo scatto dell'attacco (vedi _update_trail).
+func _draw_trail(leg: float) -> void:
+	if _trail.is_empty() or _body_mesh == null:
+		return
+	for point in _trail:
+		var fade := 1.0 - point.w / TRAIL_FADE
+		var offset := Vector2(point.x, point.y) - global_position
+		draw_set_transform(offset + Vector2(0, -ground_elevation - point.z - leg), 0.0, Vector2.ONE * (0.75 + 0.25 * fade))
+		draw_mesh(_body_mesh, null, Transform2D.IDENTITY, Color(COLOR_DANGER, TRAIL_ALPHA * fade * fade))
+
+
 ## Spada: a riposo di lato; durante la carica si porta indietro, poi
 ## fende l'arco dell'attacco (il verso cambia a ogni attacco) lasciando
 ## una scia.
@@ -1041,7 +1097,7 @@ func _draw_sword() -> void:
 			angle = start - _swing_sign * 0.4 * minf(_state_time / _windup_time, 1.0)
 		State.STRIKE:
 			angle = lerpf(start, end, ease(minf(_state_time / STRIKE_TIME, 1.0), 0.6))
-			BodyParts.draw_trail(self, Vector2.ZERO, start, angle, radius * 0.8, radius + float(_type["strike_reach"]), Color(COLOR_DANGER, 0.55))
+			BodyParts.draw_trail(self, Vector2.ZERO, start, angle, radius * 0.6, radius + float(_type["strike_reach"]), Color(COLOR_DANGER, 0.8))
 		State.RECOVER:
 			angle = end
 		_:

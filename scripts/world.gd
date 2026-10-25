@@ -10,7 +10,7 @@ extends Node2D
 ## sui blocchi più alti saltando (un livello col salto normale, di più con
 ## i salti in aria) e si scende cadendo; anche i nemici scendono dai gradini
 ## e saltano su quelli alti un livello (vedi Enemy), ma nei burroni non vanno. Sopra ci sono ostacoli naturali: alberi,
-## sassi, cespugli, rovi e casse con il bottino. Qua e là ci sono arene: ampie zone piane e
+## sassi, cespugli e casse con il bottino. Qua e là ci sono arene: ampie zone piane e
 ## libere con al centro un totem che avvia una sfida (vedi Game).
 ## Lunghe catene di montagne e burroni non si attraversano (hanno qualche
 ## passaggio); nelle pareti delle montagne si aprono caverne che portano a
@@ -130,7 +130,6 @@ var _levels: int
 var _height_noise := FastNoiseLite.new()
 var _path_noise := FastNoiseLite.new()
 var _forest_noise := FastNoiseLite.new()
-var _bramble_noise := FastNoiseLite.new()
 var _ridge_noise := FastNoiseLite.new()
 var _gap_noise := FastNoiseLite.new()
 var _barrier_kind_noise := FastNoiseLite.new()
@@ -224,7 +223,6 @@ func _setup_noises() -> void:
 	_setup_noise(_height_noise, 0, _terrain["height_frequency"], _terrain["height_octaves"])
 	_setup_noise(_path_noise, 1, _terrain["path_frequency"], 1)
 	_setup_noise(_forest_noise, 2, _terrain["forest_frequency"], 2)
-	_setup_noise(_bramble_noise, 3, _terrain["bramble_frequency"], 1)
 	_setup_noise(_ridge_noise, 4, _terrain["barrier_frequency"], 1)
 	_setup_noise(_gap_noise, 5, _terrain["barrier_gap_frequency"], 1)
 	_setup_noise(_barrier_kind_noise, 6, _terrain["barrier_kind_frequency"], 1)
@@ -922,7 +920,7 @@ func clear_line(from: Vector2, to: Vector2, altitude: float, clearance := LINE_C
 	return true
 
 
-## Ostacolo non solido (cespuglio, rovi) su cui si trova il punto, quello
+## Ostacolo non solido (cespuglio) su cui si trova il punto, quello
 ## che rallenta di più; vuoto se non ce ne sono.
 func ground_obstacle_at(point: Vector2, radius: float) -> Dictionary:
 	var found := {}
@@ -935,7 +933,7 @@ func ground_obstacle_at(point: Vector2, radius: float) -> Dictionary:
 	return found
 
 
-## Moltiplicatore della velocità a terra (cespugli e rovi rallentano).
+## Moltiplicatore della velocità a terra (i cespugli rallentano).
 func slow_at(point: Vector2, radius: float) -> float:
 	var obstacle := ground_obstacle_at(point, radius)
 	return 1.0 if obstacle.is_empty() else float(obstacle["slow"])
@@ -1039,7 +1037,7 @@ func _site_obstacle(type_id: String, at: Vector2, radius: float, collision: floa
 
 
 ## Sceglie quale ostacolo mettere sul blocco (o nessuno), con probabilità
-## che dipendono dalla zona: boschi, macchie di rovi, alture, bordi dei gradini.
+## che dipendono dalla zona: boschi, alture, bordi dei gradini.
 func _pick_obstacle(cell: Vector2i, rng: RandomNumberGenerator) -> String:
 	var center := cell_center(cell)
 	if center.length() < float(_terrain["start_clear_radius"]) or kind_of(cell) != Kind.GROUND \
@@ -1052,7 +1050,6 @@ func _pick_obstacle(cell: Vector2i, rng: RandomNumberGenerator) -> String:
 	if merchant != Vector2.INF and center.distance_to(merchant) < float(_merchant["clear_radius"]) + CELL:
 		return ""
 	var forest := clampf(_forest_noise.get_noise_2dv(center) * 2.0, 0.0, 1.0)
-	var brambles := clampf(_bramble_noise.get_noise_2dv(center) * 2.5 - 0.6, 0.0, 1.0)
 	var level := level_of(cell)
 	var near_edge := false
 	for step: Vector2i in RAMP_DIRECTIONS:
@@ -1064,7 +1061,6 @@ func _pick_obstacle(cell: Vector2i, rng: RandomNumberGenerator) -> String:
 		var type: Dictionary = _obstacle_types[type_id]
 		var chance: float = type["chance"]
 		chance += float(type.get("forest_bonus", 0.0)) * forest
-		chance += float(type.get("patch_bonus", 0.0)) * brambles
 		chance += float(type.get("level_bonus", 0.0)) * level
 		if near_edge:
 			chance += float(type.get("edge_bonus", 0.0))
