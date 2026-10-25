@@ -1,11 +1,11 @@
 class_name Obstacle
 extends Node2D
 ## Ostacolo naturale del mondo, disegnato con forme geometriche: albero,
-## sasso, cespuglio, rovi, cassa, il totem al centro di un'arena, il banco di un mercante,
+## sasso, cespuglio, cassa, il totem al centro di un'arena, il banco di un mercante,
 ## l'ingresso di una caverna o le scale del sotterraneo. La posizione è la base a terra, così
 ## l'ordinamento per y lo mette davanti o dietro ai personaggi; viene
 ## disegnato più in alto quanto il blocco di terreno su cui si trova. Gli effetti (blocco,
-## rallentamento, danni dei rovi) sono gestiti da World.
+## rallentamento) sono gestiti da World.
 
 ## La chioma degli alberi diventa trasparente quando il giocatore ci passa dietro.
 const CANOPY_FADE_ALPHA := 0.4
@@ -146,8 +146,6 @@ func _draw() -> void:
 			_draw_rock(rng)
 		"bush":
 			_draw_bush(rng)
-		"bramble":
-			_draw_bramble(rng)
 		"totem":
 			_draw_totem()
 		"chest":
@@ -228,29 +226,6 @@ func _draw_bush(rng: RandomNumberGenerator) -> void:
 		var berries := _type_color("berries")
 		for k in 4:
 			draw_circle(Vector2(rng.randf_range(-0.6, 0.6), rng.randf_range(-1.0, -0.3)) * radius, 2.5, berries)
-
-
-## Rovi: un groviglio di rami spinosi con qualche bacca.
-func _draw_bramble(rng: RandomNumberGenerator) -> void:
-	draw_set_transform(Vector2(0, -_lift), 0.0, Vector2(1.0, 0.5))
-	draw_circle(Vector2.ZERO, radius, Color(0.12, 0.08, 0.06, 0.45))
-	draw_set_transform(Vector2(0, -_lift))
-	var colors := [_color(0), _color(1)]
-	for k in 9:
-		var color: Color = colors[k % 2]
-		var start := Vector2(rng.randf_range(-1.0, 1.0), rng.randf_range(-0.4, 0.4)) * radius
-		var end := start + Vector2.from_angle(rng.randf_range(-PI, 0.0)) * radius * rng.randf_range(0.5, 0.9)
-		end.y = maxf(end.y, -radius * 0.8)
-		var middle := (start + end) / 2.0 + Vector2(rng.randf_range(-8, 8), rng.randf_range(-8, 4))
-		draw_polyline(PackedVector2Array([start, middle, end]), color, 2.0)
-		# Spine.
-		for point: Vector2 in [middle, (middle + end) / 2.0]:
-			var normal := (end - start).normalized().orthogonal() * 5.0
-			draw_line(point, point + normal, color.lightened(0.2), 1.5)
-			draw_line(point, point - normal * 0.8, color.lightened(0.2), 1.5)
-	var berries := _type_color("berries")
-	for k in 5:
-		draw_circle(Vector2(rng.randf_range(-0.8, 0.8), rng.randf_range(-0.6, 0.2)) * radius, 2.5, berries)
 
 
 ## Totem di pietra a tre blocchi con occhi luminosi: azzurri e con un

@@ -62,6 +62,9 @@ const ARRIVAL_DISTANCE := 70.0
 
 ## Partita da riprendere al prossimo avvio della scena (la imposta il menù).
 static var pending_save := {}
+## Gli strumenti (per esempio la cattura delle immagini per lo store) spengono
+## i salvataggi, così non toccano gli slot del giocatore.
+static var saving_enabled := true
 
 @onready var _world: World = $World
 @onready var _entities: Node2D = $Entities
@@ -126,6 +129,10 @@ func _ready() -> void:
 		return
 	await _prepare_region(tr("LOADING_LANDS"))
 	_populate(START_SPAWN_RANGE)
+	# Nuova partita: si salva subito nello slot scelto, anche con nemici
+	# vicini (le regole del salvataggio non valgono qui), così la partita
+	# risulta registrata.
+	_save(tr("SAVE_AUTO"))
 
 
 func _process(delta: float) -> void:
@@ -486,7 +493,7 @@ func _can_autosave() -> bool:
 func _save(message: String) -> void:
 	_autosave_timer = AUTOSAVE_INTERVAL
 	_autosave_pending = false
-	if SaveGame.write(_save_data()):
+	if saving_enabled and SaveGame.write(_save_data()):
 		_hud.flash_challenge(message)
 
 

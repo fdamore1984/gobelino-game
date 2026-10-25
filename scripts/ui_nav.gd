@@ -44,7 +44,11 @@ static func handle(event: InputEvent, viewport: Viewport, first: Control) -> boo
 		# Il tasto di conferma non deve arrivare anche al gioco (per esempio
 		# premendo Riprendi: si tornerebbe in gioco saltando).
 		consume(event)
-		(focused as BaseButton).pressed.emit()
+		# ui_accept (A, Invio) lo gestisce già il pulsante da solo, al
+		# rilascio: premerlo anche qui farebbe due pressioni con un tocco solo
+		# (per esempio la conferma per sostituire uno slot salvato).
+		if not event.is_action_pressed("ui_accept"):
+			(focused as BaseButton).pressed.emit()
 		return true
 	return false
 

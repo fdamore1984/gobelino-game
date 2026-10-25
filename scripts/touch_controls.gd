@@ -11,9 +11,6 @@ const COLOR_ACTIVE := Color(1, 1, 1, 0.4)
 const FONT_SIZE := 18
 
 const SMALL_BUTTON_RADIUS := 40.0
-## Trascinando il dito dal tasto Lock si sceglie il nemico in quella
-## direzione (come la levetta destra): basta spostarsi di questi pixel.
-const LOCK_AIM_DRAG := 60.0
 
 ## Pulsanti: azione, etichetta, posizione rispetto all'angolo in basso a
 ## destra e raggio.
@@ -54,7 +51,6 @@ func _process(_delta: float) -> void:
 		for action: String in _held.values():
 			Input.action_release(action)
 		_held.clear()
-		_set_lock_aim(Vector2.ZERO)
 		_stick_touch = -1
 		_set_stick(Vector2.ZERO)
 	visible = show
@@ -64,7 +60,6 @@ func _exit_tree() -> void:
 	for action: String in _held.values():
 		Input.action_release(action)
 	_set_stick(Vector2.ZERO)
-	_set_lock_aim(Vector2.ZERO)
 
 
 func _input(event: InputEvent) -> void:
@@ -88,8 +83,6 @@ func _input(event: InputEvent) -> void:
 				_stick_origin = touch.position
 				_stick_position = touch.position
 		elif _held.has(touch.index):
-			if _held[touch.index] == "lock_on":
-				_set_lock_aim(Vector2.ZERO)
 			Input.action_release(_held[touch.index])
 			_held.erase(touch.index)
 		elif touch.index == _stick_touch:
@@ -102,28 +95,11 @@ func _input(event: InputEvent) -> void:
 			_stick_position = drag.position
 			_set_stick(((_stick_position - _stick_origin) / STICK_RADIUS).limit_length(1.0))
 			queue_redraw()
-		elif _held.get(drag.index, "") == "lock_on":
-			var offset := drag.position - _button_center("lock_on")
-			_set_lock_aim(offset / LOCK_AIM_DRAG if offset.length() >= LOCK_AIM_DRAG else Vector2.ZERO)
 
 
 func _set_stick(value: Vector2) -> void:
 	_set_axis("move_left", "move_right", value.x)
 	_set_axis("move_up", "move_down", value.y)
-
-
-## Direzione dell'aggancio, come la levetta destra (vedi Player).
-func _set_lock_aim(value: Vector2) -> void:
-	value = value.limit_length(1.0)
-	_set_axis("lock_left", "lock_right", value.x)
-	_set_axis("lock_up", "lock_down", value.y)
-
-
-func _button_center(action: String) -> Vector2:
-	for button: Dictionary in BUTTONS:
-		if button["action"] == action:
-			return size + button["offset"]
-	return Vector2.ZERO
 
 
 func _set_axis(negative: String, positive: String, value: float) -> void:

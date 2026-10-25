@@ -21,6 +21,8 @@ var _player: Player
 
 func _ready() -> void:
 	var mode := "screenshots"
+	# Le partite avviate per le foto non si salvano (niente scritta né slot sovrascritti).
+	Game.saving_enabled = false
 	if not OS.get_cmdline_user_args().is_empty():
 		mode = OS.get_cmdline_user_args()[0]
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTPUT))
