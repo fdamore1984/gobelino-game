@@ -115,6 +115,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("ui_cancel") or event.is_action_pressed("menu") \
 			or ((event is InputEventKey or event is InputEventAction) and event.is_action_pressed("inventory")):
+		# Il tasto che chiude (B, Start...) non deve anche schivare in gioco.
+		UiNav.consume(event)
 		close()
 		get_viewport().set_input_as_handled()
 		return

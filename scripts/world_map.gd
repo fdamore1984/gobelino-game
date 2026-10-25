@@ -59,6 +59,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
 	if event.is_action_pressed("map") or event.is_action_pressed("ui_cancel") or event.is_action_pressed("menu"):
+		# Il tasto che chiude (B, Start...) non deve anche schivare in gioco.
+		UiNav.consume(event)
 		close()
 		get_viewport().set_input_as_handled()
 
