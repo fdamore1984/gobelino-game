@@ -84,9 +84,10 @@ func _draw() -> void:
 	_draw_bar(Rect2(BAR_X + 24, 57, BAR_WIDTH - 24, 13), player.mana / player.max_mana, COLOR_MANA)
 	_text(font, "%d / %d" % [floori(player.mana), roundi(player.max_mana)], Vector2(BAR_X + BAR_WIDTH - 6, 68), SMALL_FONT_SIZE, COLOR_TEXT, HORIZONTAL_ALIGNMENT_RIGHT)
 
-	# Esperienza verso il livello successivo.
-	var needed := player.experience_needed()
-	_draw_bar(Rect2(BAR_X + 24, 76, BAR_WIDTH - 24, 6), float(player.experience) / needed, COLOR_XP)
+	# Esperienza verso il livello successivo (la curva cresce col livello,
+	# vedi Player.experience_for).
+	var needed := maxi(player.experience_needed(), 1)
+	_draw_bar(Rect2(BAR_X + 24, 76, BAR_WIDTH - 24, 6), clampf(float(player.experience) / needed, 0.0, 1.0), COLOR_XP)
 	_text(font, tr("HUD_XP") % [player.experience, needed], Vector2(BAR_X + 24, 99), SMALL_FONT_SIZE, COLOR_DIM_TEXT)
 
 	# Abilità (si leggono anche nell'elenco dei potenziamenti a destra).

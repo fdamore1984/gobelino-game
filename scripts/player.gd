@@ -16,10 +16,13 @@ extends Node2D
 ## durante una schivata la interrompe e attacca subito. Salti e schivate si
 ## combinano; schivando mentre si corre si fa una scivolata, durante la
 ## quale si può attaccare (anche in combo), schivare, saltare o parare.
-## Una parata perfetta potenzia gli attacchi per qualche secondo.
+## Una parata perfetta potenzia gli attacchi per qualche secondo. La parata
+## è istantanea: annulla subito qualsiasi altra azione (non lo stordimento).
 ## Con R3 si aggancia il nemico più vicino: il personaggio lo guarda sempre,
 ## gli attacchi e la palla di fuoco vanno verso di lui; premendo di nuovo si
-## passa al nemico vicino successivo.
+## passa al nemico vicino successivo. Inclinando la levetta destra mentre si
+## preme (o si tiene premuto) R3 si aggancia il nemico in quella direzione.
+## Se il bersaglio muore o si perde si passa da soli al più vicino.
 ## Tenendo premuto R1 si continua ad attaccare; in aria R1 fa un attacco
 ## aereo. Attacchi a terra, che colpiscono tutti i nemici attorno: un colpo
 ## potente subito dopo una combo di colpi normali fa saltare e colpire il
@@ -69,7 +72,7 @@ const ATTACK_ARC := deg_to_rad(115.0)
 const ATTACK_STYLES := ["slash", "backhand", "chop", "thrust"]
 ## Rotazione del corpo che accompagna fendente e rovescio.
 const ATTACK_TWIST := 0.18
-const ATTACK_LUNGE_SPEED := 140.0
+const ATTACK_LUNGE_SPEED := 85.0
 ## Durante un attacco ci si muove a questa frazione della velocità normale.
 const ATTACK_MOVE_FACTOR := 0.55
 
@@ -122,6 +125,11 @@ const LOCK_HIDDEN_TIME := 0.6
 const LOCK_SIGHT_INTERVAL := 0.15
 const LOCK_CAMERA_SHARE := 0.3
 const LOCK_CAMERA_MAX := 170.0
+## Aggancio direzionale (levetta destra): si scelgono i nemici entro questo
+## angolo dalla direzione indicata, preferendo i più allineati e poi i più
+## vicini (la distanza pesa come questo angolo, in radianti, per LOCK_RANGE).
+const LOCK_AIM_ARC := deg_to_rad(120.0)
+const LOCK_AIM_DISTANCE_WEIGHT := 0.5
 ## All'impatto la telecamera trema, sempre meno.
 const CAMERA_SHAKE := 9.0
 const CAMERA_SHAKE_DECAY := 4.0
@@ -271,6 +279,19 @@ const STAMINA_ATTACK := 20.0
 const STAMINA_HEAVY := 32.0
 const STAMINA_DODGE := 28.0
 const STAMINA_JUMP := 12.0
+## Aura bianca della modalità focus: altezza del centro e raggio rispetto
+## al raggio del corpo, colore.
+const FOCUS_AURA_HEIGHT := 0.6
+const FOCUS_AURA_RADIUS := 2.6
+const COLOR_FOCUS_AURA := Color(1, 1, 1, 0.5)
+## Curva dell'esperienza (vedi experience_for): punti per il livello 2,
+## aumento per livello, livelli veloci e crescita oltre questi.
+const XP_CURVE_BASE := 40.0
+const XP_CURVE_STEP := 25.0
+const XP_CURVE_FAST_LEVELS := 10
+const XP_CURVE_LATE := 32.0
+## Versione della curva salvata con l'esperienza (1: la vecchia, lineare).
+const XP_CURVE_VERSION := 2
 const STAMINA_BLOCK := 30.0
 const STAMINA_RUN := 16.0
 ## Guardia rotta: si resta storditi per questo tempo.
@@ -416,15 +437,26 @@ var _shake := 0.0
 ## Ultimo punto a terra fuori dai burroni e la sua altezza: si riappare lì.
 var _safe_position := Vector2.ZERO
 var _safe_altitude := 0.0
-## Nemico agganciato (null se nessuno) e il suo mirino.
-var lock_target: Enemy
+## Nemico agganciato (null se nessuno) e il suo mirino. Finché l'aggancio è
+## attivo, se il bersaglio sparisce (anche liberato dalla scena) si passa al
+## più vicino.
+var lock_target: Enemy:
+	set(value):
+		lock_target = value
+		_lock_enabled = value != null
+var _lock_enabled := false
 var _lock_hidden := 0.0
 var _lock_sight_check := 0.0
 var _lock_visible := true
 var _lock_marker := LockMarker.new()
+## La levetta destra era inclinata nel passo precedente (per accorgersi di
+## quando la si inclina tenendo premuto R3).
+var _lock_aiming := false
 ## Carica del colpo potente (0-1) e se il tasto è ancora tenuto premuto.
 var _charge := 0.0
 var _charging := false
+## Il suono del colpo potente parte al rilascio della carica, una volta sola.
+var _heavy_swing_played := false
 var _torch := PointLight2D.new()
 ## Tempo passato nei rovi dall'ultima puntura.
 var _thorns_time := 0.0
@@ -435,6 +467,8 @@ var ground_elevation := 0.0
 
 
 func _ready() -> void:
+	# In modalità focus il giocatore resta a colori, con un'aura bianca.
+	add_to_group(LowHealthVignette.FOCUS_GROUP)
 	if not _lock_marker.is_inside_tree():
 		add_child(_lock_marker)
 	if not _torch.is_inside_tree():
@@ -473,26 +507,45 @@ func _physics_process(delta: float) -> void:
 	if _state != State.DEAD:
 		mana = minf(mana + MANA_REGEN * delta, max_mana)
 
+	# I tasti si leggono con UiNav.game_pressed / game_held: quello che ha
+	# appena chiuso un menù (A su Riprendi, B) non conta finché non si rilascia.
 	var input := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	var dodge_input := Input.get_vector("move_left", "move_right", "move_up", "move_down", DODGE_STICK_DEADZONE)
 
 	if _state not in [State.DEAD, State.HURT]:
-		if Input.is_action_just_pressed("potion"):
+		if UiNav.game_pressed("potion"):
 			_start_drink("potion")
-		if Input.is_action_just_pressed("shield"):
+		if UiNav.game_pressed("shield"):
 			_raise_shield()
-		if Input.is_action_just_pressed("mana_potion"):
+		if UiNav.game_pressed("mana_potion"):
 			_start_drink("mana_potion")
-		if Input.is_action_just_pressed("spell"):
+		if UiNav.game_pressed("spell"):
 			_cast_fireball(input)
 	if _state != State.DEAD:
-		if Input.is_action_just_pressed("lock_on"):
-			_cycle_lock()
+		# Con la levetta destra inclinata si aggancia il nemico in quella
+		# direzione (anche inclinandola mentre si tiene premuto R3, o
+		# trascinando il dito dal tasto a schermo); altrimenti il più vicino.
+		var aim := Input.get_vector("lock_left", "lock_right", "lock_up", "lock_down")
+		var aiming := aim != Vector2.ZERO
+		if UiNav.game_pressed("lock_on"):
+			if aiming:
+				_lock_toward(aim)
+			else:
+				_cycle_lock()
+		elif aiming and not _lock_aiming and UiNav.game_held("lock_on"):
+			_lock_toward(aim)
+		_lock_aiming = aiming
 		_update_lock()
-	if Input.is_action_just_pressed("torch") and _state != State.DEAD:
+	if UiNav.game_pressed("torch") and _state != State.DEAD:
 		torch_on = not torch_on
 		_torch.enabled = torch_on
 		Sfx.play("torch", global_position)
+
+	# La parata è istantanea: annulla subito attacchi (anche in carica),
+	# schivate, scivolate, attacchi a terra, rinculo e il bere.
+	if UiNav.game_pressed("parry") and _state in [State.NORMAL, State.ATTACK, State.DODGE,
+			State.SLIDE, State.SLAM, State.RECOIL, State.DRINK]:
+		_start_parry(input)
 
 	match _state:
 		State.NORMAL:
@@ -501,7 +554,7 @@ func _physics_process(delta: float) -> void:
 			_face_lock()
 			# La corsa si accende e si spegne con L3 (o Maiusc); si spegne da
 			# sola fermandosi.
-			if Input.is_action_just_pressed("run"):
+			if UiNav.game_pressed("run"):
 				_run_on = not _run_on
 			if input == Vector2.ZERO:
 				_run_on = false
@@ -515,24 +568,25 @@ func _physics_process(delta: float) -> void:
 			_velocity = _accelerate(_velocity, input * (run_speed() if running else walk_speed()) * air, delta)
 			if _jump_pressed():
 				_jump()
-			if Input.is_action_just_pressed("dodge"):
+			if UiNav.game_pressed("dodge"):
 				if running and not is_airborne():
 					_start_slide(input)
 				elif _dodge_chain_grace > 0.0 and _dodges_used < max_chained_dodges:
 					_chain_dodge(dodge_input)
 				elif _dodge_cooldown == 0.0:
 					_start_dodge(dodge_input)
-			elif Input.is_action_just_pressed("heavy_attack"):
+			elif UiNav.game_pressed("heavy_attack"):
 				_start_heavy(input)
-			elif Input.is_action_just_pressed("attack") or Input.is_action_pressed("attack"):
+			elif UiNav.game_pressed("attack") or UiNav.game_held("attack"):
 				# Tenendo premuto si continua ad attaccare (anche un tocco rapidissimo
 				# conta); in aria è un attacco aereo.
 				_start_attack(_next_combo_step(), input)
-			elif Input.is_action_pressed("parry"):
-				_change_state(State.PARRY)
+			elif UiNav.game_held("parry"):
+				_start_parry(input)
 
 		State.ATTACK:
-			# Un attacco iniziato non si interrompe: si può solo concatenare il successivo.
+			# Un attacco iniziato si interrompe solo con la parata; si può
+			# concatenare il successivo.
 			_running = false
 			_update_attack(input, delta)
 
@@ -541,9 +595,9 @@ func _physics_process(delta: float) -> void:
 				_target_facing = input.normalized()
 			_face_lock()
 			_velocity = _accelerate(_velocity, input * walk_speed() * PARRY_SPEED_FACTOR, delta)
-			if Input.is_action_just_pressed("dodge") and _dodge_cooldown == 0.0:
+			if UiNav.game_pressed("dodge") and _dodge_cooldown == 0.0:
 				_start_dodge(dodge_input)
-			elif not Input.is_action_pressed("parry"):
+			elif not UiNav.game_held("parry"):
 				_change_state(State.NORMAL)
 
 		State.DODGE:
@@ -551,13 +605,13 @@ func _physics_process(delta: float) -> void:
 			# colpo potente fa piombare a terra con un colpo ampio, quello
 			# normale è un attacco aereo.
 			_running = false
-			if is_airborne() and _air_dash and Input.is_action_just_pressed("heavy_attack"):
+			if is_airborne() and _air_dash and UiNav.game_pressed("heavy_attack"):
 				_end_combo()
 				_start_slam("dash", input)
-			elif is_airborne() and Input.is_action_just_pressed("attack"):
+			elif is_airborne() and UiNav.game_pressed("attack"):
 				_end_combo()
 				_start_attack(1, input)
-			elif Input.is_action_just_pressed("dodge") and _dodges_used < max_chained_dodges \
+			elif UiNav.game_pressed("dodge") and _dodges_used < max_chained_dodges \
 					and _state_time >= DODGE_CHAIN_MIN_TIME:
 				_chain_dodge(dodge_input)
 			elif _jump_pressed():
@@ -584,20 +638,18 @@ func _physics_process(delta: float) -> void:
 
 		State.SLIDE:
 			# Durante la scivolata si può attaccare (continuando la combo),
-			# schivare, saltare o parare: la scivolata si interrompe.
-			if Input.is_action_just_pressed("attack"):
+			# schivare, saltare o parare (vedi sopra): la scivolata si interrompe.
+			if UiNav.game_pressed("attack"):
 				_carry_velocity = _velocity
 				_start_attack(_next_combo_step(), input)
-			elif Input.is_action_just_pressed("heavy_attack"):
+			elif UiNav.game_pressed("heavy_attack"):
 				_carry_velocity = _velocity
 				_start_heavy(input)
-			elif Input.is_action_just_pressed("dodge") and _dodge_cooldown == 0.0:
+			elif UiNav.game_pressed("dodge") and _dodge_cooldown == 0.0:
 				_start_dodge(dodge_input)
 			elif _jump_pressed():
 				_change_state(State.NORMAL)
 				_jump()
-			elif Input.is_action_just_pressed("parry"):
-				_change_state(State.PARRY)
 			else:
 				var t := _state_time / SLIDE_TIME
 				_velocity = _slide_direction * _slide_speed * (1.0 - 0.7 * t)
@@ -609,10 +661,8 @@ func _physics_process(delta: float) -> void:
 
 		State.RECOIL:
 			_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * 1.5 * delta)
-			if Input.is_action_just_pressed("dodge") and _dodge_cooldown == 0.0:
+			if UiNav.game_pressed("dodge") and _dodge_cooldown == 0.0:
 				_start_dodge(dodge_input)
-			elif Input.is_action_just_pressed("parry"):
-				_change_state(State.PARRY)
 			elif _state_time >= REPEL_TIME:
 				_change_state(State.NORMAL)
 
@@ -827,33 +877,42 @@ func _update_attack(input: Vector2, delta: float) -> void:
 	var active := (HEAVY_ACTIVE if _attack_heavy else ATTACK_ACTIVE) / _attack_speed
 	var recovery := _attack_recovery() / _attack_speed
 	if _charging:
-		# Finché si tiene premuto, il colpo potente resta in carica.
-		if Input.is_action_pressed("heavy_attack") and _state_time >= windup * 0.9:
+		# Finché si tiene premuto, il colpo potente resta in carica; intanto ci
+		# si gira con la levetta (o verso il bersaglio agganciato).
+		if input != Vector2.ZERO:
+			_target_facing = input.normalized()
+		_face_lock()
+		if UiNav.game_held("heavy_attack") and _state_time >= windup * 0.9:
 			var was_full := _charge >= 1.0
 			_charge = minf(_charge + delta / HEAVY_CHARGE_TIME, 1.0)
 			_state_time = windup * 0.9
 			if _charge >= 1.0 and not was_full:
 				Sfx.play("charge_full", global_position)
-		elif not Input.is_action_pressed("heavy_attack"):
+		elif not UiNav.game_held("heavy_attack"):
 			_charging = false
 	# Lo slancio di una scivolata si esaurisce durante l'attacco.
 	_carry_velocity = _carry_velocity.move_toward(Vector2.ZERO, DECELERATION * delta)
 	# Mentre si attacca ci si può muovere (più piano) in qualsiasi
-	# direzione; il colpo resta nella direzione in cui è partito, con un
-	# piccolo affondo in avanti.
+	# direzione; il colpo resta nella direzione in cui è partito (il colpo
+	# potente in quella in cui si guarda al rilascio), con un piccolo affondo
+	# in avanti.
 	_walk_velocity = _accelerate(_walk_velocity, input * walk_speed() * ATTACK_MOVE_FACTOR, delta)
 	var lunge := Vector2.ZERO
 	# Durante la carica del colpo potente si resta fermi sul posto (ci si
 	# può solo spostare piano); l'affondo parte al rilascio.
 	if _state_time >= windup * 0.5 and _state_time < windup + active and not _charging:
+		# Sferzata del colpo potente: nessun suono in carica, solo al rilascio.
+		if _attack_heavy and not _heavy_swing_played:
+			_heavy_swing_played = true
+			Sfx.play("heavy_swing", global_position, (1.0 + 0.08 * (_heavy_step - 1)) * (1.0 - 0.12 * _charge))
 		lunge = facing * (HEAVY_LUNGE_SPEED if _attack_heavy else ATTACK_LUNGE_SPEED * (1.0 + 0.2 * (_combo_step - 1)))
 	_velocity = _walk_velocity + lunge + _carry_velocity
 	# Si memorizza la pressione solo se può davvero continuare la combo:
 	# alla fine della combo le pressioni in più vengono ignorate.
-	if Input.is_action_just_pressed("heavy_attack") and _can_chain_heavy():
+	if UiNav.game_pressed("heavy_attack") and _can_chain_heavy():
 		_queued_attack = "heavy"
-	elif _can_chain_attack() and (Input.is_action_just_pressed("attack") \
-			or (Input.is_action_pressed("attack") and _queued_attack == "" and _state_time >= windup)):
+	elif _can_chain_attack() and (UiNav.game_pressed("attack") \
+			or (UiNav.game_held("attack") and _queued_attack == "" and _state_time >= windup)):
 		# Tenendo premuto il tasto, il colpo successivo parte da solo.
 		_queued_attack = "attack"
 	if not _attack_resolved and _state_time >= windup:
@@ -956,7 +1015,7 @@ func laugh() -> void:
 ## Salto richiesto: vicino a un elemento con cui interagire, il tasto che
 ## salta e interagisce insieme (A) serve a interagire (vedi Game).
 func _jump_pressed() -> bool:
-	return Input.is_action_just_pressed("jump") and not (can_interact and Input.is_action_just_pressed("interact"))
+	return UiNav.game_pressed("jump") and not (can_interact and UiNav.game_pressed("interact"))
 
 
 ## Sta precipitando in un burrone.
@@ -1047,6 +1106,37 @@ func _cycle_lock() -> void:
 	Sfx.play_ui("ui_move" if lock_target else "ui_confirm")
 
 
+## Aggancia il nemico nella direzione indicata (levetta destra): tra quelli
+## entro LOCK_AIM_ARC il più allineato, a parità il più vicino. Se in quella
+## direzione non c'è nessuno il bersaglio resta quello di prima.
+func _lock_toward(direction: Vector2) -> void:
+	var best: Enemy = null
+	var best_score := INF
+	for enemy: Enemy in _lock_candidates():
+		var offset := enemy.global_position - global_position
+		var angle := absf(direction.angle_to(offset)) if offset != Vector2.ZERO else 0.0
+		if angle > LOCK_AIM_ARC / 2.0:
+			continue
+		var score := angle + offset.length() / LOCK_RANGE * LOCK_AIM_DISTANCE_WEIGHT
+		if score < best_score:
+			best_score = score
+			best = enemy
+	if best == null:
+		Sfx.play_ui("ui_confirm")
+		return
+	lock_target = best
+	_lock_hidden = 0.0
+	_lock_visible = true
+	_lock_marker.target = lock_target
+	Sfx.play_ui("ui_move")
+
+
+## Il nemico vivo in vista più vicino (null se nessuno).
+func _lock_nearest() -> Enemy:
+	var candidates := _lock_candidates()
+	return candidates[0] if not candidates.is_empty() else null
+
+
 ## Nemici vivi in vista entro LOCK_RANGE, dal più vicino.
 func _lock_candidates() -> Array[Enemy]:
 	var result: Array[Enemy] = []
@@ -1069,17 +1159,17 @@ func _in_sight(enemy: Enemy) -> bool:
 	return World.current.clear_line(global_position, enemy.global_position, altitude)
 
 
-## Se il bersaglio muore si passa al più vicino; se si allontana troppo o
-## resta nascosto dietro un ostacolo si sgancia (o si passa a un altro in vista).
+## Se il bersaglio muore, si allontana troppo o resta nascosto dietro un
+## ostacolo si passa da soli al più vicino in vista; se non ce n'è nessuno
+## si sgancia.
 func _update_lock() -> void:
-	if lock_target == null:
+	if not _lock_enabled:
 		return
-	if not is_instance_valid(lock_target) or lock_target.is_dead():
-		var candidates := _lock_candidates()
-		lock_target = candidates[0] if not candidates.is_empty() else null
+	if not is_instance_valid(lock_target) or lock_target.is_dead() \
+			or lock_target.global_position.distance_to(global_position) > LOCK_BREAK_RANGE:
+		lock_target = _lock_nearest()
 		_lock_hidden = 0.0
-	elif lock_target.global_position.distance_to(global_position) > LOCK_BREAK_RANGE:
-		lock_target = null
+		_lock_visible = true
 	else:
 		var delta := get_physics_process_delta_time()
 		_lock_sight_check -= delta
@@ -1088,8 +1178,7 @@ func _update_lock() -> void:
 			_lock_visible = _in_sight(lock_target)
 		_lock_hidden = 0.0 if _lock_visible else _lock_hidden + delta
 		if _lock_hidden >= LOCK_HIDDEN_TIME:
-			var candidates := _lock_candidates()
-			lock_target = candidates[0] if not candidates.is_empty() else null
+			lock_target = _lock_nearest()
 			_lock_hidden = 0.0
 			_lock_visible = true
 	_lock_marker.target = lock_target
@@ -1109,13 +1198,19 @@ func _face_lock() -> bool:
 ## Stato da salvare: livello, caratteristiche, potenziamenti e inventario.
 func save_state() -> Dictionary:
 	return {
-		"level": level, "experience": experience, "health": health, "base_max_health": _base_max_health,
+		"level": level, "experience": experience, "xp_curve": XP_CURVE_VERSION, "health": health, "base_max_health": _base_max_health,
 		"mana": mana, "base_max_mana": _base_max_mana, "potions": potions,
 		"mana_potions": mana_potions, "spell_bonus": spell_bonus,
 		"max_combo_hits": max_combo_hits, "max_heavy_chain": max_heavy_chain,
 		"max_chained_dodges": max_chained_dodges, "max_jumps": max_jumps, "run_speed_bonus": run_speed_bonus,
 		"shield_cooldown_max": shield_cooldown_max, "torch_on": torch_on, "upgrades_taken": upgrades_taken,
 		"items": inventory.items, "equipped": inventory.equipped, "gold": inventory.gold, "learned": inventory.learned,
+		# Solo per mostrarle nello slot del menù (vedi SaveGame.summary): al
+		# caricamento si ricalcolano.
+		"stats": {
+			"max_health": max_health, "max_mana": roundi(max_mana), "damage": base_damage(),
+			"potions": potions, "mana_potions": mana_potions,
+		},
 	}
 
 
@@ -1124,6 +1219,11 @@ func save_state() -> Dictionary:
 func load_state(data: Dictionary) -> void:
 	level = int(data.get("level", level))
 	experience = int(data.get("experience", experience))
+	# Salvataggi con la vecchia curva lineare: si tiene la stessa parte del
+	# livello già fatta, sulla curva nuova.
+	if int(data.get("xp_curve", 1)) < XP_CURVE_VERSION:
+		experience = floori(float(experience) / _old_experience_for(level) * experience_for(level))
+	experience = clampi(experience, 0, experience_needed() - 1)
 	_base_max_health = int(data.get("base_max_health", _base_max_health))
 	_base_max_mana = float(data.get("base_max_mana", _base_max_mana))
 	potions = int(data.get("potions", potions))
@@ -1213,10 +1313,33 @@ func base_damage() -> int:
 	return BASE_DAMAGE + DAMAGE_PER_LEVEL * (level - 1)
 
 
-## Esperienza necessaria per passare al livello successivo:
-## 100 per il livello 2, 200 per il 3, e così via.
+## Modalità focus: dove resta a colori e quanto è grande (vedi LowHealthVignette).
+func focus_spot() -> Vector3:
+	if is_dead():
+		return Vector3.ZERO
+	var at := global_position - Vector2(0, altitude() + RADIUS * FOCUS_AURA_HEIGHT)
+	return Vector3(at.x, at.y, RADIUS * FOCUS_AURA_RADIUS)
+
+
+## Esperienza necessaria per passare al livello successivo (vedi experience_for).
 func experience_needed() -> int:
-	return 100 * level
+	return experience_for(level)
+
+
+## Curva dell'esperienza: ai primi livelli si sale in fretta (40 punti per
+## il livello 2, poi 25 in più a livello: 265 al livello 10), dopo il
+## decimo ogni livello costa sempre di più (a XP_CURVE_LATE * oltre^1.5):
+## circa 750 al 15, 1500 al 20, 3600 al 30. Niente grind all'inizio, e
+## salendo i livelli si fanno via via più lenti.
+static func experience_for(from_level: int) -> int:
+	var early := XP_CURVE_BASE + XP_CURVE_STEP * (from_level - 1)
+	var beyond := maxi(from_level - XP_CURVE_FAST_LEVELS, 0)
+	return roundi(early + XP_CURVE_LATE * pow(beyond, 1.5))
+
+
+## Vecchia curva (100 per livello), per convertire i salvataggi precedenti.
+static func _old_experience_for(from_level: int) -> int:
+	return 100 * from_level
 
 
 func add_experience(amount: int) -> void:
@@ -1339,13 +1462,13 @@ func _start_heavy(input: Vector2) -> void:
 	_attack_heavy = true
 	_begin_attack(input)
 	_charging = true
-	Sfx.play("heavy_swing", global_position, 1.0 + 0.08 * (_heavy_step - 1))
 
 
 func _begin_attack(input: Vector2) -> void:
 	_attack_speed = EMPOWER_ATTACK_SPEED if is_empowered() else 1.0
 	_charge = 0.0
 	_charging = false
+	_heavy_swing_played = false
 	_air_attack = is_airborne()
 	attack_serial += 1
 	if _state != State.ATTACK:
@@ -1413,7 +1536,7 @@ func _start_slam(kind: String, input: Vector2) -> void:
 ## l'impatto (vedi _land); poi un breve recupero. Si può già chiedere il
 ## colpo potente successivo della catena.
 func _update_slam(input: Vector2, delta: float) -> void:
-	if Input.is_action_just_pressed("heavy_attack") and _slam_kind == "leap" and _can_chain_heavy():
+	if UiNav.game_pressed("heavy_attack") and _slam_kind == "leap" and _can_chain_heavy():
 		_queued_attack = "heavy"
 	if not _slam_landed:
 		if _slam_kind != "leap" and _state_time >= SLAM_HANG and _height_velocity > -SLAM_DIVE_SPEED:
@@ -1510,6 +1633,29 @@ func _start_dodge(input: Vector2) -> void:
 	_heavy_step = 0
 	Sfx.play("dodge", global_position)
 	_change_state(State.DODGE)
+
+
+## Parata istantanea: annulla l'azione in corso (combo, carica, schivata,
+## scivolata, attacco a terra, rinculo, sorso) e si gira subito verso la
+## levetta o il bersaglio agganciato, così la guardia copre il lato giusto
+## già dal primo istante (la finestra della parata perfetta parte da qui).
+func _start_parry(input: Vector2) -> void:
+	# Interrompendo una schivata non se ne può fare subito un'altra.
+	if _state in [State.DODGE, State.SLIDE]:
+		_dodge_cooldown = DODGE_COOLDOWN
+	_end_combo()
+	_charging = false
+	_charge = 0.0
+	_carry_velocity = Vector2.ZERO
+	_walk_velocity = Vector2.ZERO
+	_drinking = ""
+	_running = false
+	_velocity = _velocity.limit_length(walk_speed() * PARRY_SPEED_FACTOR)
+	if input != Vector2.ZERO:
+		_target_facing = input.normalized()
+	_face_lock()
+	facing = _target_facing
+	_change_state(State.PARRY)
 
 
 ## In aria la schivata è uno scatto: si smette di cadere e si scivola nell'aria.
@@ -1784,6 +1930,8 @@ func _draw() -> void:
 	Shapes.disc(self, Vector2(0, RADIUS * 0.8 - ground_elevation), RADIUS * 0.9 * shadow_scale, Color(0, 0, 0, 0.25))
 	var body_scale := Vector2(1.2, 0.6) if _state == State.SLIDE else Vector2.ONE
 	var lift := -altitude() + (RADIUS * 0.4 if _state == State.SLIDE else 0.0)
+	if LowHealthVignette.focus_held() and _state != State.DEAD:
+		Shapes.glow(self, Vector2(0, lift - RADIUS * FOCUS_AURA_HEIGHT), RADIUS * FOCUS_AURA_RADIUS, COLOR_FOCUS_AURA)
 	draw_set_transform(Vector2(0, lift), 0.0, body_scale)
 	# Gambe: camminano quando ci si muove, raccolte in aria e in scivolata.
 	var walking := _velocity.length() > 20.0 and not is_airborne() and _state != State.DEAD

@@ -2,7 +2,11 @@ class_name InteractPrompt
 extends Button
 ## Suggerimento sopra l'elemento con cui si può interagire (cassa, mercante,
 ## totem, caverna, scala, uscita): il tasto (A sul controller, E sulla
-## tastiera) e "Interact". Toccandolo (o cliccandolo) si interagisce.
+## tastiera) e "Interact". Toccandolo (o cliccandolo) si interagisce
+## (segnale activated): non mentre il gioco è in pausa né nel frame in cui
+## si chiude un menù, così il tocco che chiude la pausa non interagisce.
+
+signal activated
 
 const PANEL_SIZE := Vector2(150, 44)
 const FONT_SIZE := 18
@@ -27,6 +31,12 @@ func _ready() -> void:
 	_panel.border_color = COLOR_BORDER
 	_panel.set_border_width_all(2)
 	_panel.set_corner_radius_all(int(PANEL_SIZE.y / 2.0))
+	pressed.connect(_on_pressed)
+
+
+func _on_pressed() -> void:
+	if visible and not get_tree().paused and not UiNav.just_consumed():
+		activated.emit()
 
 
 ## Mostra il suggerimento sopra il punto del mondo dato.

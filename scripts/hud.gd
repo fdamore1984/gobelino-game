@@ -117,19 +117,20 @@ func _ready() -> void:
 	move_child(_boss_bar, 0)
 	add_child(_clock)
 	move_child(_clock, 0)
-	# Bordi rossi con poca vita, sotto tutto il resto dell'interfaccia.
 	add_child(_vignette)
-	move_child(_vignette, 0)
 	# Il suggerimento "Interact" sta sopra il gioco, sotto i pannelli.
 	add_child(_interact)
 	move_child(_interact, 1)
-	_interact.pressed.connect(interact_pressed.emit)
+	_interact.activated.connect(interact_pressed.emit)
 	# Pannelli sotto tutto il resto (potenziamenti, inventario, messaggi).
 	add_child(_status)
 	move_child(_status, 0)
 	_build_power_ups_panel()
 	add_child(_actions)
 	move_child(_actions, 1)
+	# Vita bassa e modalità focus: il primo figlio di tutti, così legge lo
+	# schermo col solo mondo disegnato e l'interfaccia resta sopra, intatta.
+	move_child(_vignette, 0)
 	_actions.visible = not Platform.use_touch_controls()
 	_level_up.visible = false
 	(_upgrade_buttons["combo"].get_parent() as GridContainer).columns = UPGRADE_CHOICES
@@ -349,8 +350,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-## Vita ed esperienza il pannello di stato le legge dal giocatore: qui basta
-## ridisegnarlo subito.
+## Vita ed esperienza il pannello di stato le legge dal giocatore (anche la
+## soglia del livello, che segue la curva di Player.experience_for): qui
+## basta ridisegnarlo subito.
 func set_health(_current: int, _maximum: int) -> void:
 	_status.queue_redraw()
 

@@ -4,9 +4,12 @@ class_name Shapes
 ## ogni volta un nuovo poligono da mandare alla scheda video, e con tanti
 ## nemici sullo schermo il gioco rallenta: qui i cerchi sono rettangoli con
 ## la texture di un disco (si disegnano insieme in un colpo solo) e i
-## poligoni fissi sono mesh preparate una volta sola.
+## poligoni fissi sono mesh preparate una volta sola, compresi i bagliori
+## sfumati (glow).
 
 const DISC_SIZE := 64
+## Spicchi del cerchio dei bagliori.
+const GLOW_SEGMENTS := 28
 
 static var _disc: ImageTexture
 ## Forma (chiave) -> mesh già pronta, per draw_mesh.
@@ -30,6 +33,41 @@ static func disc_texture() -> Texture2D:
 				image.set_pixel(x, y, Color(1, 1, 1, clampf(middle.x - distance, 0.0, 1.0)))
 		_disc = ImageTexture.create_from_image(image)
 	return _disc
+
+
+## Bagliore sfumato: pieno al centro, svanisce verso il bordo (radius).
+## squash schiaccia in verticale (per i bagliori a terra, vedi GroundFx).
+static func glow(canvas: CanvasItem, center: Vector2, radius: float, color: Color, squash := 1.0) -> void:
+	if radius <= 0.0 or color.a <= 0.0:
+		return
+	canvas.draw_mesh(glow_mesh(), null, Transform2D(0.0, Vector2(radius, radius * squash), 0.0, center), color)
+
+
+## Cerchio di raggio 1 fatto di anelli con l'alfa che scende verso il bordo:
+## la sfumatura la fanno i colori dei vertici, così resta morbida anche con
+## le texture "nearest" del gioco.
+static func glow_mesh() -> ArrayMesh:
+	if not _meshes.has("glow"):
+		var rings: Array[Vector2] = [Vector2(0.0, 1.0), Vector2(0.3, 0.75), Vector2(0.6, 0.35), Vector2(0.82, 0.12), Vector2(1.0, 0.0)]
+		var vertices := PackedVector2Array()
+		var colors := PackedColorArray()
+		for r in range(1, rings.size()):
+			var inner := rings[r - 1]
+			var outer := rings[r]
+			for k in GLOW_SEGMENTS:
+				var a := Vector2.from_angle(TAU * k / GLOW_SEGMENTS)
+				var b := Vector2.from_angle(TAU * (k + 1) / GLOW_SEGMENTS)
+				vertices.append_array(PackedVector2Array([a * inner.x, a * outer.x, b * outer.x, a * inner.x, b * outer.x, b * inner.x]))
+				for alpha: float in [inner.y, outer.y, outer.y, inner.y, outer.y, inner.y]:
+					colors.append(Color(1, 1, 1, alpha))
+		var arrays := []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = vertices
+		arrays[Mesh.ARRAY_COLOR] = colors
+		var mesh := ArrayMesh.new()
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		_meshes["glow"] = mesh
+	return _meshes["glow"]
 
 
 ## Mesh bianca del poligono (da colorare con il modulate di draw_mesh),

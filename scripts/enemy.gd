@@ -18,6 +18,13 @@ extends Node2D
 ## Gli evocatori restano a distanza ed evocano altri nemici: colpirli
 ## mentre evocano interrompe l'evocazione. I tipi con "ranged" (lanciatori)
 ## restano a distanza e scagliano dardi magici (vedi EnemyBolt).
+## I tipi con "magic" (il boss) ogni tanto si fermano a caricare una magia e
+## scagliano da lontano un ventaglio di dardi grandi.
+##
+## Si muovono sul terreno a gradini come il giocatore: scendono dai gradini
+## cadendo e, quando un gradino alto un livello li blocca, ci saltano sopra;
+## nei burroni non entrano mai. Il boss resta sempre dentro la sua arena
+## (vedi confine).
 
 signal died(enemy: Enemy)
 ## Chiede alla scena di gioco di creare i nemici evocati.
@@ -91,6 +98,14 @@ const BLEED_DROPS := 5
 const BLEED_DROPS_HEAVY := 10
 ## I nemici evocati compaiono a questa distanza dall'evocatore.
 const SUMMON_DISTANCE := 70.0
+## Salti sui gradini e cadute: gravità, quanti livelli si superano con un
+## salto, quanto più in alto del gradino si arriva e attesa tra due salti.
+const GRAVITY := 1500.0
+const HOP_LEVELS := 1
+const HOP_CLEARANCE := 10.0
+const HOP_COOLDOWN := 0.6
+## Il salto parte se in un passo si è percorsa meno di questa parte del movimento voluto.
+const HOP_BLOCKED_SHARE := 0.5
 
 ## Gambe: altezza rispetto al raggio del corpo e passo.
 const LEG_FACTOR := 0.5
@@ -103,8 +118,10 @@ const WALK_CYCLE := 0.08
 const GRID_CELL := 128.0
 const VIEW_MARGIN := Vector2(160, 220)
 ## Oltre questa distanza dal giocatore (fuori dallo schermo, oltre il
-## raggio d'inseguimento) ci si aggiorna a passi alterni.
+## raggio d'inseguimento) ci si aggiorna a passi alterni, oltre
+## VERY_FAR_RANGE un passo ogni quattro (con il tempo di tutti).
 const FAR_RANGE := 1000.0
+const VERY_FAR_RANGE := 1500.0
 
 const COLOR_WINDUP := Color(1.0, 0.45, 0.2)
 const COLOR_STUNNED := Color(0.55, 0.55, 0.8)
@@ -125,6 +142,8 @@ var xp_reward := 30
 var damage := 1
 ## Alla morte può lasciare bottino (no per i nemici evocati).
 var drops_loot := true
+## Evocato da un altro nemico (per i salvataggi).
+var is_minion := false
 
 var _type: Dictionary
 var _color := Color.WHITE
@@ -161,6 +180,19 @@ var _slam_landed := false
 var _air := 0.0
 var _knockback := Vector2.ZERO
 var _hit_flash := 0.0
+## Altezza sopra il terreno (salendo su un gradino con un salto o cadendo
+## da uno), velocità verticale e attesa prima del prossimo salto.
+var _height := 0.0
+var _height_velocity := 0.0
+var _hop_cooldown := 0.0
+## Zona da cui non si esce (il boss nella sua arena): centro e raggio in
+## rombi; Vector2.INF se non c'è.
+var _home := Vector2.INF
+var _home_cells := 0.0
+## Magia del boss: sta caricando o scagliando una magia (invece di un
+## fendente) e attesa prima della prossima.
+var _casting := false
+var _magic_cooldown := 0.0
 ## Lato verso cui cade il corpo (+1 destra, -1 sinistra).
 var _fall_side := 1.0
 var _summon_cooldown := 0.0
@@ -178,8 +210,8 @@ var _body_mesh: ArrayMesh
 var _outline_mesh: ArrayMesh
 var _shape_radius := -1.0
 
-## Aggiornamento a passi alterni da lontano: in quali passi (0 o 1) e tempo saltato.
-var _update_slot := randi() % 2
+## Aggiornamento a passi alterni da lontano: in quali passi (da 0 a 3) e tempo saltato.
+var _update_slot := randi() % 4
 var _skipped_time := 0.0
 
 ## Griglia dei nemici vivi (cella -> nemici) e passo di fisica in cui è stata fatta.
@@ -204,6 +236,48 @@ func setup(id: String) -> void:
 	_color = Color(color[0], color[1], color[2])
 	if _type.has("summon"):
 		_summon_cooldown = randf_range(1.0, 2.5)
+	if _type.has("magic"):
+		_magic_cooldown = randf_range(1.5, 3.0)
+
+
+## Stato da salvare: tipo, posizione esatta, vita e valori cambiati dalla
+## scena di gioco (boss più forte, nemici evocati).
+func save_state() -> Dictionary:
+	return {
+		"type": type_id, "position": SaveGame.array(position), "health": health, "max_health": max_health,
+		"xp": xp_reward, "damage": damage, "loot": drops_loot, "minion": is_minion,
+		"facing": SaveGame.array(_facing),
+	}
+
+
+## Riprende lo stato salvato (dopo setup e prima di aggiungere il nemico
+## alla scena); i campi mancanti restano quelli del tipo.
+func load_state(data: Dictionary) -> void:
+	position = SaveGame.vector(data["position"])
+	max_health = maxi(int(data.get("max_health", max_health)), 1)
+	health = clampi(int(data.get("health", max_health)), 1, max_health)
+	xp_reward = int(data.get("xp", xp_reward))
+	damage = int(data.get("damage", damage))
+	drops_loot = bool(data.get("loot", drops_loot))
+	is_minion = bool(data.get("minion", false))
+	if data.has("facing"):
+		var facing := SaveGame.vector(data["facing"])
+		if facing != Vector2.ZERO:
+			_facing = facing.normalized()
+
+
+## Il nemico non esce mai dal cerchio di rombi (raggio in rombi) attorno a
+## center: per il boss, la sua arena.
+func confine(center: Vector2, cells: float) -> void:
+	_home = center
+	_home_cells = maxf(cells, 0.5)
+	if is_inside_tree():
+		position = World.clamp_to_grid_circle(position, _home, _home_cells)
+
+
+## Sta caricando o scagliando una magia (vedi BossBar).
+func is_casting() -> bool:
+	return _casting and _state in [State.WINDUP, State.STRIKE]
 
 
 ## Il giocatore si cura o si ritira a portata: è il momento di attaccare.
@@ -217,7 +291,8 @@ func _ready() -> void:
 	if _type.is_empty():
 		setup(type_id)
 	add_to_group("enemies")
-	_facing = Vector2.from_angle(randf() * TAU)
+	if _facing == Vector2.RIGHT:
+		_facing = Vector2.from_angle(randf() * TAU)
 	_orbit_sign = [-1.0, 1.0].pick_random()
 	_telegraph.z_index = -5
 	_telegraph.draw.connect(_draw_telegraph)
@@ -228,12 +303,14 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	# Lontano dal giocatore ci si aggiorna un passo sì e uno no, con il tempo
-	# di entrambi: non si vede e costa la metà.
-	if player and _state != State.DEAD and global_position.distance_squared_to(player.global_position) > FAR_RANGE * FAR_RANGE \
-			and (Engine.get_physics_frames() + _update_slot) % 2 == 0:
-		_skipped_time += delta
-		return
+	# Lontano dal giocatore ci si aggiorna un passo sì e uno no (molto lontano
+	# uno su quattro), con il tempo di quelli saltati: non si vede e costa meno.
+	if player and _state != State.DEAD:
+		var far := global_position.distance_squared_to(player.global_position)
+		var interval := 4 if far > VERY_FAR_RANGE * VERY_FAR_RANGE else (2 if far > FAR_RANGE * FAR_RANGE else 1)
+		if (Engine.get_physics_frames() + _update_slot) % interval != 0:
+			_skipped_time += delta
+			return
 	delta += _skipped_time
 	_skipped_time = 0.0
 	_state_time += delta
@@ -243,6 +320,8 @@ func _physics_process(delta: float) -> void:
 	_guard_cooldown = maxf(_guard_cooldown - delta, 0.0)
 	_guard_flash = maxf(_guard_flash - delta, 0.0)
 	_slam_cooldown = maxf(_slam_cooldown - delta, 0.0)
+	_magic_cooldown = maxf(_magic_cooldown - delta, 0.0)
+	_hop_cooldown = maxf(_hop_cooldown - delta, 0.0)
 
 	var target_velocity := Vector2.ZERO
 	var to_player := player.global_position - global_position if player else Vector2.INF
@@ -274,6 +353,8 @@ func _physics_process(delta: float) -> void:
 				_begin_guard()
 			elif _can_slam(distance):
 				_begin_slam()
+			elif _can_cast(distance):
+				_begin_cast()
 			elif _can_summon(distance):
 				_begin_summon()
 			elif _attack_cooldown == 0.0 and distance <= _attack_trigger_range() and _can_shoot_player():
@@ -311,9 +392,11 @@ func _physics_process(delta: float) -> void:
 				_change_state(State.STRIKE)
 
 		State.STRIKE:
-			_velocity = _attack_direction * float(_type["lunge_speed"])
+			# Dardi e magie partono da fermi; i fendenti con uno scatto in avanti.
+			var shooting := _is_ranged() or _casting
+			_velocity = Vector2.ZERO if shooting else _attack_direction * float(_type["lunge_speed"])
 			target_velocity = _velocity
-			if not _is_ranged() and not _strike_resolved and player_active and _player_in_strike_zone():
+			if not shooting and not _strike_resolved and player_active and _player_in_strike_zone():
 				_strike_resolved = true
 				var result := player.receive_hit(global_position, damage)
 				if result == "parried":
@@ -324,16 +407,21 @@ func _physics_process(delta: float) -> void:
 					_knockback = -_attack_direction * REPELLED_KNOCKBACK / float(_type["mass"])
 					_velocity = Vector2.ZERO
 					_change_state(State.RECOVER)
-			if _state == State.STRIKE and _is_ranged():
+			if _state == State.STRIKE and shooting:
 				_velocity = Vector2.ZERO
 				if not _strike_resolved:
 					_strike_resolved = true
 					# Se intanto il giocatore è finito dietro un ostacolo, niente dardo.
-					if _can_shoot_player():
-						_shoot_bolt()
+					if _casting:
+						if _clear_shot():
+							_cast_magic()
+					elif _can_shoot_player():
+						_shoot_bolt(_attack_direction, _type["ranged"])
 			if _state == State.STRIKE and _state_time >= STRIKE_TIME:
 				_velocity = _velocity * 0.2
-				if _strikes < int(_type["max_strikes"]) and player_active and randf() < COMBO_CHANCE:
+				if _casting:
+					_finish_cast()
+				elif _strikes < int(_type["max_strikes"]) and player_active and randf() < COMBO_CHANCE:
 					_begin_windup(_type["windup"][0] * COMBO_WINDUP_FACTOR, _type["windup"][1] * COMBO_WINDUP_FACTOR, false)
 				else:
 					_change_state(State.RECOVER)
@@ -370,7 +458,7 @@ func _physics_process(delta: float) -> void:
 			# Il colpo che lo abbatte lo spinge ancora un po' mentre cade.
 			_knockback = _knockback.move_toward(Vector2.ZERO, 1200.0 * delta)
 			if World.current:
-				position = World.current.move(position, _knockback * delta, radius * 0.8)
+				position = _confined(World.current.move(position, _knockback * delta, radius * 0.8, 0.0, true, false))
 				ground_elevation = World.current.elevation_at(position)
 			queue_redraw()
 			if _state_time >= DEATH_FALL_TIME:
@@ -399,13 +487,27 @@ func _physics_process(delta: float) -> void:
 		_turn_toward(_velocity, delta)
 
 	_knockback = _knockback.move_toward(Vector2.ZERO, 1200.0 * delta)
-	# I nemici non saltano: restano sul loro livello del terreno (le rampe
-	# sì), si fermano contro gli ostacoli solidi e cespugli e rovi li rallentano.
+	# Come il giocatore (vedi Player._move): si scende dai gradini cadendo e si
+	# sale su quelli più alti solo saltando (climb = altezza del salto); ci si
+	# ferma contro gli ostacoli solidi, cespugli e rovi rallentano e nei
+	# burroni non si entra.
 	var motion := (_velocity + _knockback) * delta
 	var world := World.current
 	if world:
-		position = world.move(position, motion * world.slow_at(position, radius), radius * 0.8)
+		_update_height(delta)
+		var grounded := _height <= 0.0 and _height_velocity <= 0.0
+		if grounded:
+			motion *= world.slow_at(position, radius)
+		var altitude := ground_elevation + _height
+		var start := position
+		position = _confined(world.move(position, motion, radius * 0.8, _height + _air, true, false))
 		ground_elevation = world.elevation_at(position)
+		# Scendendo da un gradino si resta in aria e si cade; sulle rampe no.
+		_height = maxf(altitude - ground_elevation, 0.0)
+		if grounded and _height <= World.STEP_TOLERANCE:
+			_height = 0.0
+		if grounded and _state in [State.WANDER, State.CHASE]:
+			_try_hop(world, motion, position - start)
 		_telegraph.position.y = -ground_elevation
 	else:
 		position += motion
@@ -479,6 +581,43 @@ func add_minion(minion: Enemy) -> void:
 func _change_state(new_state: State) -> void:
 	_state = new_state
 	_state_time = 0.0
+	# La magia è fatta solo di carica e lancio: qualsiasi altra cosa la interrompe.
+	if new_state not in [State.WINDUP, State.STRIKE]:
+		_casting = false
+
+
+## Altezza sopra il terreno: gravità sul salto o sulla caduta da un gradino.
+func _update_height(delta: float) -> void:
+	if _height <= 0.0 and _height_velocity <= 0.0:
+		return
+	_height_velocity -= GRAVITY * delta
+	_height += _height_velocity * delta
+	if _height <= 0.0:
+		_height = 0.0
+		_height_velocity = 0.0
+
+
+## Se il movimento voluto (motion) è stato fermato da un gradino più alto di
+## al più HOP_LEVELS livelli (non una montagna o la roccia), si salta su.
+func _try_hop(world: World, motion: Vector2, moved: Vector2) -> void:
+	if _hop_cooldown > 0.0 or motion.length() < 0.5 or moved.length() >= motion.length() * HOP_BLOCKED_SHARE:
+		return
+	var probe := position + motion.normalized() * (radius * 0.8 + 16.0)
+	if world.is_barrier(World.cell_at(probe)):
+		return
+	var rise := world.elevation_at(probe) - ground_elevation
+	if rise <= World.STEP_TOLERANCE or rise > HOP_LEVELS * world.level_height + World.STEP_TOLERANCE:
+		return
+	_hop_cooldown = HOP_COOLDOWN
+	_height_velocity = sqrt(2.0 * GRAVITY * (rise + HOP_CLEARANCE))
+	Sfx.play("jump", global_position, 0.8 / sqrt(_type["mass"]), -10.0)
+
+
+## Il punto, tenuto dentro la zona da cui non si esce (se c'è).
+func _confined(point: Vector2) -> Vector2:
+	if _home == Vector2.INF:
+		return point
+	return World.clamp_to_grid_circle(point, _home, _home_cells)
 
 
 func _turn_toward(direction: Vector2, delta: float) -> void:
@@ -493,23 +632,72 @@ func _is_ranged() -> bool:
 ## I lanciatori tirano solo se il dardo può arrivare al giocatore (niente
 ## pareti, montagne, roccia o ostacoli solidi in mezzo); gli altri sempre.
 func _can_shoot_player() -> bool:
-	if not _is_ranged() or player == null or World.current == null:
+	if not _is_ranged():
+		return true
+	return _clear_shot()
+
+
+## Un dardo partito da qui arriverebbe al giocatore.
+func _clear_shot() -> bool:
+	if player == null or World.current == null:
 		return true
 	return World.current.clear_line(global_position, player.global_position, ground_elevation, EnemyBolt.FLIGHT_HEIGHT)
 
 
-## Dardo magico verso la direzione dell'attacco.
-func _shoot_bolt() -> void:
-	var ranged: Dictionary = _type["ranged"]
+## Dardo magico nella direzione data; ranged: voce del tipo con velocità,
+## portata e, se ci sono, grandezza, colore e danno in più del dardo.
+func _shoot_bolt(direction: Vector2, ranged: Dictionary) -> void:
 	var bolt := EnemyBolt.new()
-	bolt.direction = _attack_direction
+	bolt.direction = direction
 	bolt.speed = ranged["bolt_speed"]
-	bolt.damage = damage
-	bolt.max_distance = ranged["range"] * 1.3
+	bolt.damage = damage + int(ranged.get("damage_bonus", 0))
+	bolt.max_distance = float(ranged["range"]) * 1.3
 	bolt.altitude = ground_elevation
-	bolt.color = _color.lightened(0.3)
-	bolt.position = position + _attack_direction * radius
+	bolt.radius = float(ranged.get("bolt_radius", EnemyBolt.RADIUS))
+	bolt.color = World._color(ranged["color"]) if ranged.has("color") else _color.lightened(0.3)
+	bolt.position = position + direction * radius
 	get_parent().add_child(bolt)
+
+
+## Magia da lontano (voce "magic" del tipo): il giocatore è tra "min_range" e
+## "range", nessun ostacolo in mezzo e il tiro con "chance" riesce; se non
+## riesce si riprova dopo "retry" secondi.
+func _can_cast(distance: float) -> bool:
+	if not _type.has("magic") or _magic_cooldown > 0.0 or _attack_cooldown > 0.0:
+		return false
+	var magic: Dictionary = _type["magic"]
+	if distance < float(magic["min_range"]) or distance > float(magic["range"]) or not _clear_shot():
+		return false
+	if randf() >= float(magic["chance"]):
+		var retry: Array = magic["retry"]
+		_magic_cooldown = randf_range(retry[0], retry[1])
+		return false
+	return true
+
+
+func _begin_cast() -> void:
+	var windup: Array = _type["magic"]["windup"]
+	_strikes = 0
+	_begin_windup(windup[0], windup[1], false)
+	_casting = true
+	Sfx.play("summon", global_position, 1.3, -6.0)
+
+
+## Ventaglio di dardi verso il giocatore.
+func _cast_magic() -> void:
+	var magic: Dictionary = _type["magic"]
+	var count := maxi(int(magic["bolts"]), 1)
+	var spread := deg_to_rad(float(magic["spread"]))
+	for i in count:
+		_shoot_bolt(_attack_direction.rotated((i - (count - 1) / 2.0) * spread), magic)
+	Sfx.play("fireball", global_position, 0.7)
+
+
+func _finish_cast() -> void:
+	var cooldown: Array = _type["magic"]["cooldown"]
+	_magic_cooldown = randf_range(cooldown[0], cooldown[1])
+	_attack_cooldown = randf_range(ATTACK_COOLDOWN.x, ATTACK_COOLDOWN.y)
+	_change_state(State.RECOVER)
 
 
 func _orbit_distance() -> float:
@@ -631,14 +819,15 @@ func _update_slam(player_active: bool) -> void:
 	if _state_time < windup:
 		if player_active and _state_time <= windup * SLAM_TRACKING:
 			var reach := (player.global_position - _slam_from).limit_length(float(slam["range"]))
-			_slam_target = _slam_from + reach
+			_slam_target = _confined(_slam_from + reach)
 		return
 	var t := clampf((_state_time - windup) / air_time, 0.0, 1.0)
 	_air = sin(PI * t) * float(slam["height"])
 	var world := World.current
 	var goal := _slam_from.lerp(_slam_target, ease(t, 0.8))
 	if world:
-		position = world.move(position, goal - position, radius * 0.8)
+		# In volo si sale anche sui gradini più alti dell'altezza del salto.
+		position = _confined(world.move(position, goal - position, radius * 0.8, _air, true, false))
 	else:
 		position = goal
 	if t >= 1.0 and not _slam_landed:
@@ -658,7 +847,12 @@ func _land_slam(player_active: bool, slam: Dictionary) -> void:
 	GroundFx.shockwave(global_position, ground_elevation, impact_radius)
 	Sfx.play("fireball_hit", global_position, 0.5 / sqrt(_type["mass"]))
 	if player_active and player.global_position.distance_to(global_position) <= impact_radius + Player.RADIUS:
-		player.receive_hit(global_position, damage + int(slam["damage_bonus"]))
+		# Anche il colpo a terra si può parare: con una parata perfetta
+		# (istantanea, appena prima dell'impatto) si resta storditi.
+		if player.receive_hit(global_position, damage + int(slam["damage_bonus"])) == "parried":
+			Sfx.play("stun", global_position)
+			_slam_cooldown = randf_range(SLAM_RETRY.x, SLAM_RETRY.y) * 2.0
+			_change_state(State.STUNNED)
 
 
 func _can_summon(distance: float) -> bool:
@@ -746,19 +940,16 @@ func _on_screen() -> bool:
 	return _view.has_point(global_position - Vector2(0, ground_elevation))
 
 
-## Cerchi dove compariranno i nemici evocati. L'attacco in carica non ha
+## Cerchi dove compariranno i nemici evocati e bagliore rosso dove atterrerà
+## il salto con colpo a terra. L'attacco in carica non ha
 ## più una zona a terra: si riconosce dal corpo che si accende e dalla spada
 ## (o dal bastone) portata indietro.
 func _draw_telegraph() -> void:
 	if _state == State.SLAM and not _slam_landed:
-		# Zona d'impatto del salto: si riempie man mano che arriva il colpo.
 		var slam: Dictionary = _type["slam"]
 		var total := float(slam["windup"]) + float(slam["air_time"])
-		var at := _slam_target - global_position
-		var impact_radius := float(slam["radius"])
-		Shapes.disc(_telegraph, at, impact_radius, Color(COLOR_DANGER, 0.12))
-		Shapes.disc(_telegraph, at, impact_radius * clampf(_state_time / total, 0.0, 1.0), Color(COLOR_DANGER, 0.22))
-		_telegraph.draw_arc(at, impact_radius, 0.0, TAU, 40, Color(COLOR_DANGER, 0.7), 2.5)
+		# Bagliore rosso sfumato sul punto d'impatto, sempre più acceso.
+		GroundFx.danger_glow(_telegraph, _slam_target - global_position, float(slam["radius"]), _state_time / total)
 	if _state == State.SUMMON:
 		var progress: float = _state_time / _type["summon"]["channel_time"]
 		for offset in _summon_positions:
@@ -790,9 +981,10 @@ func _draw() -> void:
 
 	# Ombra, gambe, corpo con la forma del tipo sopra le gambe e un
 	# "occhio" che indica la direzione.
-	Shapes.disc(self, Vector2(0, radius * 0.8), radius * 0.9 * (1.0 - _air / 200.0), Color(0, 0, 0, 0.25))
-	# Il salto dell'attacco speciale solleva tutto tranne l'ombra.
-	draw_set_transform(Vector2(0, -ground_elevation - _air))
+	var lift := _air + _height
+	Shapes.disc(self, Vector2(0, radius * 0.8), radius * 0.9 * (1.0 - minf(lift, 150.0) / 200.0), Color(0, 0, 0, 0.25))
+	# I salti (attacco speciale, gradini) sollevano tutto tranne l'ombra.
+	draw_set_transform(Vector2(0, -ground_elevation - lift))
 	var leg := radius * LEG_FACTOR
 	var walking := _velocity.length() > 15.0 and _state != State.DEAD
 	BodyParts.draw_legs(self, -leg + radius * 0.55, radius * 0.85, radius * 0.35, maxf(4.0, radius * 0.22),
@@ -803,7 +995,7 @@ func _draw() -> void:
 	var crouch := 0.0
 	if _state == State.SLAM and _state_time < float(_type["slam"]["windup"]):
 		crouch = leg * 0.5 * minf(_state_time / float(_type["slam"]["windup"]) * 3.0, 1.0)
-	draw_set_transform(Vector2(0, -ground_elevation - _air - leg - bob + crouch))
+	draw_set_transform(Vector2(0, -ground_elevation - lift - leg - bob + crouch))
 	if _shape_radius != radius:
 		_shape_radius = radius
 		var key := "%s:%s" % [_type["shape"], radius]
@@ -814,6 +1006,8 @@ func _draw() -> void:
 	Shapes.disc(self, _facing * radius * 0.5, maxf(radius * 0.2, 4.0), Color(0.1, 0.05, 0.1))
 	if is_boss():
 		_draw_crown()
+	if is_casting():
+		_draw_magic()
 	if _is_ranged():
 		_draw_staff()
 	else:
@@ -888,6 +1082,17 @@ func _corpse_points(t: float) -> PackedVector2Array:
 
 func _corpse_color() -> Color:
 	return _color.darkened(0.2).lerp(Color(0.3, 0.27, 0.25), 0.2)
+
+
+## Sfera della magia sopra la testa: cresce durante la carica.
+func _draw_magic() -> void:
+	var color := World._color(_type["magic"]["color"])
+	var charge := minf(_state_time / _windup_time, 1.0) if _state == State.WINDUP else 1.0
+	var at := Vector2(0, -radius * 2.0)
+	var size := radius * 0.45 * (0.3 + 0.7 * charge)
+	Shapes.disc(self, at, size * 1.8, Color(color, 0.25 * charge))
+	Shapes.disc(self, at, size, color.lightened(0.2))
+	Shapes.disc(self, at, size * 0.45, Color(1, 1, 1, 0.9))
 
 
 ## Bastone del lanciatore con la sfera che si accende caricando il dardo.

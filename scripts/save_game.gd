@@ -52,17 +52,33 @@ static func delete(index: int) -> void:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(path(index)))
 
 
-## Livello del giocatore e momento del salvataggio (ora locale, "AAAA-MM-GG
-## HH:MM"), per descrivere lo slot nel menù; vuoto se lo slot è libero.
+## Descrizione dello slot per il menù (vuota se lo slot è libero): livello,
+## momento del salvataggio (ora locale, "AAAA-MM-GG HH:MM"), tempo di gioco
+## in secondi (-1 se il salvataggio è di una versione che non lo contava),
+## vita e danno massimi, monete, pozioni, nemici sconfitti e piano del
+## sotterraneo (0 in superficie). Nei salvataggi vecchi i campi mancanti si
+## ricavano da quelli che ci sono.
 static func summary(index: int) -> Dictionary:
 	var data := read(index)
 	if data.is_empty():
 		return {}
 	var player: Dictionary = data.get("player", {})
+	var stats: Dictionary = player.get("stats", {})
+	var level := int(player.get("level", 1))
 	# I salvataggi vecchi non hanno l'ora: si usa quella del file.
 	var saved_at := int(data.get("saved_at", FileAccess.get_modified_time(path(index))))
 	var local := saved_at + int(Time.get_time_zone_from_system().get("bias", 0)) * 60
-	return {"level": int(player.get("level", 1)), "time": Time.get_datetime_string_from_unix_time(local, true).left(16)}
+	var dungeon: Dictionary = data.get("dungeon", {})
+	return {
+		"level": level, "time": Time.get_datetime_string_from_unix_time(local, true).left(16),
+		"play_time": float(data.get("play_time", -1.0)),
+		"max_health": int(stats.get("max_health", player.get("base_max_health", Player.START_HEALTH))),
+		"damage": int(stats.get("damage", Player.BASE_DAMAGE + Player.DAMAGE_PER_LEVEL * (level - 1))),
+		"gold": int(player.get("gold", 0)),
+		"potions": int(stats.get("potions", player.get("potions", 0))),
+		"kills": int(data.get("kills", 0)),
+		"depth": int(dungeon.get("depth", 0)),
+	}
 
 
 static func _migrate() -> void:

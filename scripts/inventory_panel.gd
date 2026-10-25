@@ -129,10 +129,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	# i tasti I / Tab e il pulsante a schermo.
 	if event.is_action_pressed("ui_cancel") or event.is_action_pressed("menu") \
 			or ((event is InputEventKey or event is InputEventAction) and event.is_action_pressed("inventory")):
+		# Il tasto che chiude (B, Start...) non deve anche schivare in gioco.
+		UiNav.consume(event)
 		close()
 		get_viewport().set_input_as_handled()
 		return
-	if event.is_action_pressed("lock_on"):
+	# R3 (o C) ordina: un'azione a parte da "lock_on", che usa gli stessi tasti.
+	if event.is_action_pressed("inventory_sort"):
 		_on_sort_pressed()
 		get_viewport().set_input_as_handled()
 		return

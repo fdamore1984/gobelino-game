@@ -5,11 +5,23 @@ class_name UiNav
 ## pulsante ha il focus lo riporta sul primo. Serve per esempio sullo Steam
 ## Deck, dove Steam può trasformare i comandi del controller in tasti
 ## diversi da quelli che Godot usa di solito nei menù.
+##
+## Lo stesso tasto serve sia nei menù sia in gioco (A conferma, salta e
+## interagisce; B chiude e schiva): il tasto che chiude un menù o preme un
+## pulsante viene "consumato" (consume) e in gioco non conta finché non lo si
+## rilascia. Il gioco legge i tasti con game_pressed e game_held invece che
+## direttamente da Input: così chiudendo la pausa con A non si salta né si
+## apre la cassa lì vicino.
 
 const _UP := ["ui_up", "move_up"]
 const _DOWN := ["ui_down", "move_down"]
 const _LEFT := ["ui_left", "move_left"]
 const _RIGHT := ["ui_right", "move_right"]
+
+## Azioni consumate da un menù (azione -> true): in gioco si ignorano finché
+## restano premute; e frame in cui è successo l'ultima volta.
+static var _consumed := {}
+static var _consumed_frame := -10
 
 
 ## Da chiamare in _unhandled_input dei menù. Restituisce true se ha gestito
@@ -29,9 +41,51 @@ static func handle(event: InputEvent, viewport: Viewport, first: Control) -> boo
 		_move_focus(focused, side)
 		return true
 	if focused is BaseButton and not (focused as BaseButton).disabled:
+		# Il tasto di conferma non deve arrivare anche al gioco (per esempio
+		# premendo Riprendi: si tornerebbe in gioco saltando).
+		consume(event)
 		(focused as BaseButton).pressed.emit()
 		return true
 	return false
+
+
+## Il tasto dell'evento è stato usato da un menù: tutte le azioni legate a
+## quel tasto (per A: ui_accept, jump, interact) in gioco non contano
+## finché non lo si rilascia.
+static func consume(event: InputEvent) -> void:
+	for action: StringName in InputMap.get_actions():
+		if event.is_action(action, true):
+			_consumed[action] = true
+	_consumed_frame = Engine.get_process_frames()
+
+
+## L'azione è appena stata premuta in gioco (non consumata da un menù).
+static func game_pressed(action: StringName) -> bool:
+	return Input.is_action_just_pressed(action) and not _is_consumed(action)
+
+
+## L'azione è tenuta premuta in gioco (non consumata da un menù).
+static func game_held(action: StringName) -> bool:
+	return Input.is_action_pressed(action) and not _is_consumed(action)
+
+
+## Da un menù si è appena tornati in gioco (questo frame o il precedente):
+## i tocchi sullo schermo che hanno chiuso il menù non devono contare.
+static func just_consumed() -> bool:
+	return Engine.get_process_frames() - _consumed_frame <= 1
+
+
+## Da chiamare a ogni frame mentre si gioca (vedi Game): le azioni
+## consumate tornano valide appena il tasto è rilasciato, così la pressione
+## successiva conta di nuovo.
+static func update() -> void:
+	for action: StringName in _consumed.keys():
+		if not Input.is_action_pressed(action) and not Input.is_action_just_pressed(action):
+			_consumed.erase(action)
+
+
+static func _is_consumed(action: StringName) -> bool:
+	return _consumed.has(action)
 
 
 ## Direzione richiesta dall'evento (SIDE_*), oppure -1.

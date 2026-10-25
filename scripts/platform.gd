@@ -30,7 +30,15 @@ var _removed_desktop_events := {}
 var _touch_active := false
 
 
+## Frame al secondo: fissi a 60 (anche sullo Steam Deck in modalità gioco,
+## dove senza limite il gioco oscilla e perde colpi). La fisica va a 60 passi
+## al secondo con l'interpolazione attiva (project.godot), così il
+## movimento resta fluido anche se un frame tarda.
+const TARGET_FPS := 60
+
+
 func _ready() -> void:
+	Engine.max_fps = TARGET_FPS
 	is_mobile = OS.has_feature("android") or OS.has_feature("ios")
 	is_desktop = OS.has_feature("windows") or OS.has_feature("linuxbsd") or OS.has_feature("macos")
 	# Steam imposta questa variabile d'ambiente quando avvia il gioco sullo
