@@ -66,6 +66,11 @@ func is_last() -> bool:
 	return depth >= levels
 
 
+## Centro dell'arena del boss nel mondo (solo all'ultimo piano).
+func arena_center() -> Vector2:
+	return World.cell_center(arena)
+
+
 func is_floor(cell: Vector2i) -> bool:
 	if cell.x < 0 or cell.y < 0 or cell.x >= width or cell.y >= height:
 		return false

@@ -2,13 +2,15 @@ class_name Game
 extends Node2D
 ## Livello di test del gameplay: un mondo senza limiti generato a caso
 ## (blocchi a gradini su più altezze e ostacoli naturali, vedi World) con nemici di vari
-## tipi sparsi a caso attorno al giocatore. I nemici troppo lontani vengono
+## tipi sparsi a caso attorno al giocatore: pochi ai primi livelli, sempre di
+## più salendo (vedi EnemyTypes.population). I nemici troppo lontani vengono
 ## rimossi e ne compaiono di nuovi fuori dallo schermo, così ce ne sono
 ## sempre. Gestisce anche esperienza, livelli e scelta dei potenziamenti.
 ##
 ## Toccando il totem al centro di un'arena parte una sfida di
 ## sopravvivenza (parametri in data/challenge.json): per 30 secondi
-## arrivano ondate di nemici, più numerose e forti salendo di livello.
+## arrivano ondate di nemici, più numerose e forti salendo di livello, da
+## un'ellisse attorno al totem (il cerchio visto sul terreno isometrico).
 ## Superarla dà esperienza e una pozione.
 ##
 ## Toccando una cassa la si apre: escono monete e oggetti a caso
@@ -21,14 +23,15 @@ extends Node2D
 ## (Dungeon) di 2-5 piani: su ogni piano si cerca la scala per scendere,
 ## all'ultimo c'è il boss; la scala d'arrivo riporta in superficie.
 ##
-## La partita si salva da sola ogni 5 minuti ed entrando in una caverna;
+## La partita si salva da sola ogni 5 minuti ed entrando in una caverna,
+## nemici presenti compresi (tipo, posizione e vita): caricandola ritornano
+## quelli, non nemici nuovi a caso;
 ## dal menù di pausa si salva a mano, ma solo senza nemici vicini e stando
 ## fermi. Vicino al bordo del territorio già generato il gioco si ferma un
 ## attimo per generarne altro (vedi World).
 
 const MENU_SCENE := "res://scenes/menu.tscn"
 
-const ENEMY_COUNT := 12
 ## All'avvio i nemici sono sparsi a questa distanza dal giocatore.
 const START_SPAWN_RANGE := Vector2(450.0, 1300.0)
 ## Poi ricompaiono fuori dall'inquadratura.
@@ -117,8 +120,7 @@ func _ready() -> void:
 		_load(save)
 		return
 	await _prepare_region(tr("LOADING_LANDS"))
-	for i in ENEMY_COUNT:
-		_spawn_enemy(EnemyTypes.pick_random(_player.level), _random_position(START_SPAWN_RANGE))
+	_populate(START_SPAWN_RANGE)
 
 
 func _process(delta: float) -> void:
@@ -149,8 +151,14 @@ func _maintain_enemies() -> void:
 			enemy.queue_free()
 		else:
 			alive += 1
-	for i in ENEMY_COUNT - alive:
+	for i in EnemyTypes.population(_player.level) - alive:
 		_spawn_enemy(EnemyTypes.pick_random(_player.level), _random_position(SPAWN_RANGE))
+
+
+## Nemici a caso attorno al giocatore, quanti ne vuole il suo livello.
+func _populate(distance_range: Vector2) -> void:
+	for i in EnemyTypes.population(_player.level):
+		_spawn_enemy(EnemyTypes.pick_random(_player.level), _random_position(distance_range))
 
 
 func _update_challenge(delta: float) -> void:
@@ -327,13 +335,17 @@ func _cave_seed() -> int:
 
 ## Porta il giocatore a un piano del sotterraneo (vicino alla scala
 ## d'arrivo, o in at se viene da un salvataggio), con i suoi nemici e,
-## all'ultimo piano, il boss.
-func _go_to_depth(depth: int, at: Vector2) -> void:
+## all'ultimo piano, il boss. saved: nemici di un salvataggio da rimettere
+## al posto di quelli nuovi (null se non ci sono).
+func _go_to_depth(depth: int, at: Vector2, saved: Variant = null) -> void:
 	await _prepare_region(tr("LOADING_DEPTHS") % [depth, _cave_levels], _enter_depth.bind(depth, at))
 	var dungeon := _world.dungeon
-	_spawn_dungeon_enemies(dungeon)
-	if dungeon.is_last() and not _world.is_cave_cleared(_cave):
-		_spawn_boss(dungeon)
+	if saved is Array:
+		_restore_enemies(saved)
+	else:
+		_spawn_dungeon_enemies(dungeon)
+		if dungeon.is_last() and not _world.is_cave_cleared(_cave):
+			_spawn_boss(dungeon)
 	_hud.flash_challenge(tr("DUNGEON_LEVEL") % [depth, dungeon.levels])
 
 
@@ -352,8 +364,7 @@ func _enter_depth(depth: int, at: Vector2) -> void:
 
 func _leave_dungeon() -> void:
 	await _prepare_region(tr("LOADING_SURFACE"), _return_to_surface)
-	for i in ENEMY_COUNT:
-		_spawn_enemy(EnemyTypes.pick_random(_player.level), _random_position(SPAWN_RANGE))
+	_populate(SPAWN_RANGE)
 
 
 func _return_to_surface() -> void:
@@ -392,12 +403,19 @@ func _spawn_dungeon_enemies(dungeon: Dungeon) -> void:
 
 ## Il boss al centro dell'arena, più forte quanto più alto è il livello del giocatore.
 func _spawn_boss(dungeon: Dungeon) -> void:
-	var boss := _spawn_enemy(_dungeon_data["boss"], World.cell_center(dungeon.arena))
+	var boss := _spawn_enemy(_dungeon_data["boss"], dungeon.arena_center())
 	var factor := 1.0 + float(_dungeon_data["boss_health_per_level"]) * (_player.level - 1)
 	boss.max_health = roundi(boss.max_health * factor)
 	boss.health = boss.max_health
 	boss.xp_reward = roundi(boss.xp_reward * factor)
 	boss.damage += floori((_player.level - 1) / float(_dungeon_data["boss_damage_per_levels"]))
+	_setup_boss(boss, dungeon)
+
+
+## Il boss (nuovo o da un salvataggio) resta chiuso nella sua arena, con la
+## sua barra della vita.
+func _setup_boss(boss: Enemy, dungeon: Dungeon) -> void:
+	boss.confine(dungeon.arena_center(), dungeon.arena_radius - float(_dungeon_data.get("boss_arena_margin", 1.5)))
 	boss.died.connect(_on_boss_died)
 	_boss = boss
 	_hud.show_boss(boss)
@@ -489,6 +507,7 @@ func _save_data() -> Dictionary:
 	var data := {
 		"version": SAVE_VERSION, "seed": _world.seed_value, "time": _day_night.time, "kills": _kills,
 		"position": SaveGame.array(_player.position), "player": _player.save_state(), "world": _world.save_state(),
+		"enemies": _enemies_state(),
 	}
 	if _cave != Vector2.INF:
 		data["dungeon"] = {
@@ -496,6 +515,41 @@ func _save_data() -> Dictionary:
 			"return": SaveGame.array(_surface_return),
 		}
 	return data
+
+
+## Nemici vivi da salvare (tipo, posizione esatta, vita e il resto, vedi Enemy.save_state).
+func _enemies_state() -> Array:
+	var result := []
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as Enemy
+		if not enemy.is_dead() and not enemy.is_queued_for_deletion():
+			result.append(enemy.save_state())
+	return result
+
+
+## Rimette i nemici salvati al loro posto, con la loro vita (il boss di
+## nuovo chiuso nell'arena). I tipi che non esistono più si saltano; se il
+## terreno è cambiato si cerca un posto libero lì vicino.
+func _restore_enemies(saved: Array) -> void:
+	var boss_allowed := _world.dungeon != null and _world.dungeon.is_last() and not _world.is_cave_cleared(_cave)
+	for entry: Variant in saved:
+		if not (entry is Dictionary) or not entry.has("position") or not EnemyTypes.exists(str(entry.get("type", ""))):
+			continue
+		var type_id := str(entry["type"])
+		# Il boss torna solo nella sua arena, se non è già stato sconfitto.
+		if EnemyTypes.get_type(type_id).get("boss", false) and not boss_allowed:
+			continue
+		var enemy := Enemy.new()
+		enemy.setup(type_id)
+		enemy.load_state(entry)
+		enemy.player = _player
+		if _world.is_barrier(World.cell_at(enemy.position)):
+			enemy.position = _world.free_position_near(_world.safe_position_near(enemy.position), enemy.radius)
+		enemy.died.connect(_on_enemy_died)
+		enemy.summon_requested.connect(_on_summon_requested)
+		_entities.add_child(enemy)
+		if enemy.is_boss():
+			_setup_boss(enemy, _world.dungeon)
 
 
 ## Riprende una partita salvata (all'avvio della scena, vedi pending_save).
@@ -508,6 +562,8 @@ func _load(save: Dictionary) -> void:
 	_day_night.time = float(save.get("time", 0.2))
 	var position_saved := SaveGame.vector(save["position"])
 	var dungeon_state: Dictionary = save.get("dungeon", {})
+	# I salvataggi delle versioni precedenti non hanno i nemici: se ne fanno di nuovi.
+	var enemies: Variant = save.get("enemies")
 	if dungeon_state.is_empty():
 		# Se una versione nuova ha cambiato il terreno, si cerca un posto
 		# libero vicino a quello salvato.
@@ -515,13 +571,15 @@ func _load(save: Dictionary) -> void:
 			position_saved = _world.safe_position_near(position_saved)
 		_player.teleport(position_saved)
 		await _prepare_region(tr("LOADING_GAME"))
-		for i in ENEMY_COUNT:
-			_spawn_enemy(EnemyTypes.pick_random(_player.level), _random_position(START_SPAWN_RANGE))
+		if enemies is Array:
+			_restore_enemies(enemies)
+		else:
+			_populate(START_SPAWN_RANGE)
 	else:
 		_cave = SaveGame.vector(dungeon_state["cave"])
 		_cave_levels = int(dungeon_state["levels"])
 		_surface_return = SaveGame.vector(dungeon_state["return"])
-		await _go_to_depth(int(dungeon_state["depth"]), position_saved)
+		await _go_to_depth(int(dungeon_state["depth"]), position_saved, enemies)
 
 
 # --- Sfide dei totem ---------------------------------------------------
@@ -537,15 +595,18 @@ func _start_challenge(arena: Vector2) -> void:
 
 
 ## Ondata di nemici dal bordo dell'arena: quanti e quanto forti dipende
-## dal livello del giocatore.
+## dal livello del giocatore (fino a "max_per_wave"). Compaiono in
+## un'ellisse schiacciata come il terreno isometrico ("spawn_squash"), che a
+## schermo sembra un cerchio a terra attorno al totem.
 func _spawn_challenge_wave() -> void:
 	var data: Dictionary = CHALLENGE.data
 	var per_wave: Array = data["enemies_per_wave"]
-	var count := floori(float(per_wave[0]) + float(per_wave[1]) * (_player.level - 1))
+	var count := mini(floori(float(per_wave[0]) + float(per_wave[1]) * (_player.level - 1)), int(data.get("max_per_wave", 99)))
 	var distance := _world.arena_radius() * float(data["spawn_distance"])
+	var squash := float(data.get("spawn_squash", GroundFx.GROUND_SQUASH))
 	var start := randf() * TAU
 	for i in count:
-		var at := _challenge_arena + Vector2.from_angle(start + TAU * i / count) * distance
+		var at := _challenge_arena + World.ground_ellipse(start + TAU * i / count, distance, squash)
 		var enemy := _spawn_enemy(EnemyTypes.pick_random(_player.level + int(data["type_level_bonus"])), at)
 		enemy.alert()
 		_challenge_enemies.append(enemy)
@@ -587,6 +648,7 @@ func _on_summon_requested(summoner: Enemy, type_id: String, positions: Array[Vec
 		# lasciare vivo l'evocatore per farne scorta.
 		minion.xp_reward = minion_xp
 		minion.drops_loot = false
+		minion.is_minion = true
 		summoner.add_minion(minion)
 
 

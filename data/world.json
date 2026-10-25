@@ -43,6 +43,10 @@
 			[0.88, [0.16, 0.18, 0.32]], [0.95, [0.8, 0.68, 0.7]], [1.0, [1.0, 1.0, 1.0]]
 		]
 	},
+	"population": {
+		"count": [6, 0.8],
+		"max": 16
+	},
 	"arena": {
 		"region": 2600,
 		"chance": 0.75,
@@ -89,6 +93,7 @@
 		"boss": "guardian",
 		"boss_health_per_level": 0.35,
 		"boss_damage_per_levels": 4,
+		"boss_arena_margin": 1.5,
 		"boss_reward_gold": [60, 15],
 		"boss_reward_items": 2
 	},

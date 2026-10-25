@@ -8,8 +8,8 @@ extends Node2D
 ## preso dal rumore: si formano piattaforme a gradini, colline e altopiani.
 ## Alcuni blocchi sono rampe inclinate che salgono di un livello. Si sale
 ## sui blocchi più alti saltando (un livello col salto normale, di più con
-## i salti in aria) e si scende cadendo; i nemici non saltano e restano sul
-## loro livello, salvo le rampe. Sopra ci sono ostacoli naturali: alberi,
+## i salti in aria) e si scende cadendo; anche i nemici scendono dai gradini
+## e saltano su quelli alti un livello (vedi Enemy), ma nei burroni non vanno. Sopra ci sono ostacoli naturali: alberi,
 ## sassi, cespugli, rovi e casse con il bottino. Qua e là ci sono arene: ampie zone piane e
 ## libere con al centro un totem che avvia una sfida (vedi Game).
 ## Lunghe catene di montagne e burroni non si attraversano (hanno qualche
@@ -339,6 +339,34 @@ static func cell_at(point: Vector2) -> Vector2i:
 ## Punto del mondo con coordinate u = y + x/2, v = y - x/2.
 static func _from_uv(u: float, v: float) -> Vector2:
 	return Vector2(u - v, (u + v) / 2.0)
+
+
+## Coordinate del punto nella griglia dei rombi, con la parte frazionaria
+## (il rombo è la parte intera, vedi cell_at).
+static func to_grid(point: Vector2) -> Vector2:
+	return Vector2((point.y + point.x / 2.0) / CELL, (point.y - point.x / 2.0) / CELL)
+
+
+static func from_grid(grid: Vector2) -> Vector2:
+	return _from_uv(grid.x * CELL, grid.y * CELL)
+
+
+## Il punto più vicino a point dentro il cerchio di rombi attorno a center
+## (raggio in rombi): sullo schermo è un'ellisse, come le caverne del
+## sotterraneo (per esempio l'arena del boss).
+static func clamp_to_grid_circle(point: Vector2, center: Vector2, radius: float) -> Vector2:
+	var origin := to_grid(center)
+	var offset := to_grid(point) - origin
+	if offset.length() <= radius:
+		return point
+	return from_grid(origin + offset.limit_length(radius))
+
+
+## Punto a terra a distanza radius in direzione angle: il terreno isometrico
+## schiaccia i cerchi in ellissi (squash: rapporto tra altezza e larghezza,
+## come le macchie di GroundFx).
+static func ground_ellipse(angle: float, radius: float, squash := GroundFx.GROUND_SQUASH) -> Vector2:
+	return Vector2(cos(angle), sin(angle) * squash) * radius
 
 
 static func cell_center(cell: Vector2i) -> Vector2:
@@ -709,40 +737,42 @@ func _top_height(cell: Vector2i) -> float:
 ## un blocco più alto solo se si è abbastanza in alto (climb: quanto si è
 ## sopra il terreno, per esempio saltando); si scende da un gradino solo
 ## con can_drop. Ci si ferma contro i gradini scivolando lungo il bordo e
-## si viene spinti fuori dagli ostacoli solidi.
-func move(from: Vector2, motion: Vector2, radius: float, climb := 0.0, can_drop := false) -> Vector2:
+## si viene spinti fuori dagli ostacoli solidi. Con into_ravines = false
+## (i nemici) nei burroni non si entra nemmeno potendo scendere.
+func move(from: Vector2, motion: Vector2, radius: float, climb := 0.0, can_drop := false, into_ravines := true) -> Vector2:
 	_has_blocking_cell = false
 	var base := elevation_at(from)
 	var to := from + motion
-	if not _can_pass(from, base, to, radius, climb, can_drop):
+	var drop_ravine := can_drop and into_ravines
+	if not _can_pass(from, base, to, radius, climb, can_drop, drop_ravine):
 		var along_x := from + Vector2(motion.x, 0.0)
 		var along_y := from + Vector2(0.0, motion.y)
-		if _can_pass(from, base, along_x, radius, climb, can_drop):
+		if _can_pass(from, base, along_x, radius, climb, can_drop, drop_ravine):
 			to = along_x
-		elif _can_pass(from, base, along_y, radius, climb, can_drop):
+		elif _can_pass(from, base, along_y, radius, climb, can_drop, drop_ravine):
 			to = along_y
 		else:
 			to = from
 	var pushed := _push_out(to, radius)
-	if pushed != to and _can_pass(from, base, pushed, radius, climb, can_drop):
+	if pushed != to and _can_pass(from, base, pushed, radius, climb, can_drop, drop_ravine):
 		to = pushed
 	return to
 
 
 ## Si controlla il punto d'arrivo e un punto poco più avanti, così ci si
 ## ferma un po' prima del bordo di un gradino (base: altezza di partenza).
-func _can_pass(from: Vector2, base: float, to: Vector2, radius: float, climb: float, can_drop: bool) -> bool:
+func _can_pass(from: Vector2, base: float, to: Vector2, radius: float, climb: float, can_drop: bool, drop_ravine: bool) -> bool:
 	if to == from:
 		return true
-	return _can_stand(to, base, climb, can_drop) \
-			and _can_stand(to + (to - from).normalized() * radius * 0.5, base, climb, can_drop)
+	return _can_stand(to, base, climb, can_drop, drop_ravine) \
+			and _can_stand(to + (to - from).normalized() * radius * 0.5, base, climb, can_drop, drop_ravine)
 
 
-func _can_stand(probe: Vector2, base: float, climb: float, can_drop: bool) -> bool:
+func _can_stand(probe: Vector2, base: float, climb: float, can_drop: bool, drop_ravine: bool) -> bool:
 	var cell := cell_at(probe)
-	# Nei burroni ci si può cadere (chi può scendere dai gradini) o
-	# passarci sopra saltando; montagne e roccia fermano sempre.
-	if is_barrier(cell) and not (can_drop and kind_of(cell) == Kind.RAVINE):
+	# Nei burroni ci si può cadere (chi può scendere dai gradini, salvo i
+	# nemici) o passarci sopra saltando; montagne e roccia fermano sempre.
+	if is_barrier(cell) and not (drop_ravine and kind_of(cell) == Kind.RAVINE):
 		# Montagne e roccia si illuminano; nei burroni non c'è niente da illuminare.
 		_blocking_cell = cell
 		_has_blocking_cell = kind_of(cell) != Kind.RAVINE
