@@ -65,11 +65,10 @@ func _draw() -> void:
 	draw_style_box(_panel, Rect2(Vector2.ZERO, size))
 	_draw_portrait(font)
 
-	# Vita: un segmento per punto vita.
+	# Vita: un segmento per punto vita (barre di vita e mana senza numeri).
 	var low := player.health <= maxf(1.0, player.max_health / 3.0)
 	_draw_heart(Vector2(BAR_X + 9, 26), 9.0)
 	_draw_segments(Rect2(BAR_X + 24, 16, BAR_WIDTH - 24, 20), player.health, player.max_health, COLOR_HEALTH_LOW if low else COLOR_HEALTH)
-	_text(font, "%d / %d" % [player.health, player.max_health], Vector2(BAR_X + BAR_WIDTH - 6, 31), FONT_SIZE, COLOR_TEXT, HORIZONTAL_ALIGNMENT_RIGHT)
 
 	# Stamina: attaccare, schivare, saltare, parare e correre la consumano.
 	var stamina_rect := Rect2(BAR_X + 24, 41, BAR_WIDTH - 24, 11)
@@ -82,7 +81,6 @@ func _draw() -> void:
 	UpgradeIcon.draw_icon(self, Vector2(BAR_X + 9, 63), 18.0, "mana", false)
 	draw_set_transform(Vector2.ZERO)
 	_draw_bar(Rect2(BAR_X + 24, 57, BAR_WIDTH - 24, 13), player.mana / player.max_mana, COLOR_MANA)
-	_text(font, "%d / %d" % [floori(player.mana), roundi(player.max_mana)], Vector2(BAR_X + BAR_WIDTH - 6, 68), SMALL_FONT_SIZE, COLOR_TEXT, HORIZONTAL_ALIGNMENT_RIGHT)
 
 	# Esperienza verso il livello successivo (la curva cresce col livello,
 	# vedi Player.experience_for).

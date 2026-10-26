@@ -126,7 +126,7 @@ CONTROLS_HEAVY,"Power strike (hold to charge, keep holding to chain) | L | L2"
 CONTROLS_PARRY,"Parry (instant, cancels any action) | K | L1"
 CONTROLS_DODGE,"Dodge (cancels any action, air dash while jumping) | Space | B"
 CONTROLS_JUMP,"Jump (cancels any action; near chests, merchants, caves: interact) | F / E | A"
-CONTROLS_RUN,Run on/off (dodge while running to slide) | Shift | L3
+CONTROLS_RUN,"Tap: run on/off (dodge while running to slide) · Hold: torch on/off | Shift | L3"
 CONTROLS_FOCUS,"Focus (hold: dims the world, highlights you, items, chests and passages) | V | R2"
 CONTROLS_SPELL,Fireball | U | X
 CONTROLS_SHIELD,Shield | R | Y
@@ -139,7 +139,7 @@ CONTROLS_SPECIAL_TITLE,Special attacks
 CONTROLS_SPECIAL_MIXED,"Power strike right after a combo: a wide power strike with bonus damage"
 CONTROLS_SPECIAL_CHARGED,"Charge the first power strike: every power strike chained after it deals extra damage"
 CONTROLS_SPECIAL_AIR,"Attack in mid-air: wide aerial slashes that also reach the enemies below you"
-CONTROLS_SPECIAL_PLUNGE,"Power strike in mid-air: plunge onto the ground, hitting the enemies where you land"
+CONTROLS_SPECIAL_PLUNGE,"Power strike in mid-air: plunge onto the ground (hold it to hover and charge a huge slam; the higher you are, the harder it hits)"
 CONTROLS_SPECIAL_DASH,Power strike during an air dash: dash strike that smashes a wide area
 CONTROLS_TOUCH,On touch screens use the on-screen buttons
 CONTROLS_BACK,Back
@@ -188,7 +188,7 @@ DUNGEON_LEVEL,Underground · level %d of %d
 BOSS_NAME,Cave Guardian
 BOSS_DEFEATED,Guardian defeated! The way out is open
 MENU_CREDITS,Created by fdamore1984 with Claude Code
-CONTROLS_LOCK,"Lock on the nearest enemy (press again to release) | C | R3"
+CONTROLS_LOCK,"Lock on the nearest enemy (press again to switch to the nearest one) | C | R3"
 TOUCH_LOCK,Lock
 TOUCH_MAP,Map
 MAP_TITLE,Map
