@@ -26,6 +26,8 @@ var _sell_grid := GridContainer.new()
 var _sell_scroll := ScrollContainer.new()
 var _nothing := Label.new()
 var _details := Label.new()
+## Comandi in fondo: mostrano i tasti scelti dal giocatore (vedi Keybinds).
+var _hint: Label
 var _close := Button.new()
 var _buttons: Array[Button] = []
 
@@ -74,7 +76,8 @@ func _ready() -> void:
 	_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_details.add_theme_font_size_override("font_size", 19)
 	box.add_child(_details)
-	box.add_child(_label("SHOP_HINT", 16, Color(1, 1, 1, 0.55)))
+	_hint = _label("", 16, Color(1, 1, 1, 0.55))
+	box.add_child(_hint)
 	# Per chi gioca col touch o col mouse.
 	_close.text = "SHOP_CLOSE"
 	_close.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -98,6 +101,7 @@ func is_open() -> bool:
 
 func open(merchant: Vector2) -> void:
 	_merchant = merchant
+	_hint.text = tr("SHOP_HINT") % Keybinds.hint("inventory")
 	visible = true
 	get_tree().paused = true
 	Sfx.play_ui("ui_confirm")

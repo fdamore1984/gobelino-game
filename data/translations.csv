@@ -53,9 +53,9 @@ UPGRADE_CHOICE,One more upgrade to choose
 INVENTORY_TITLE,Inventory
 INVENTORY_EQUIPPED,"Equipment: weapon, armor, boots, amulet, ring"
 INVENTORY_EMPTY,Nothing yet: open chests to find items
-INVENTORY_HINT,A / Enter: use · R3 / C: sort · B / Esc / I: close
+INVENTORY_HINT,A / Enter: use · %s: sort · B / Esc / %s: close
 INVENTORY_GOLD,Gold: %d
-INVENTORY_SORT,Sort: %s · R3 / C
+INVENTORY_SORT,Sort: %s · %s
 INVENTORY_COMPARE,Compared to your %s: %s
 INVENTORY_COMPARE_NONE,You have nothing of this kind equipped
 INVENTORY_COMPARE_SAME,same stats
@@ -107,7 +107,7 @@ SHOP_SELL_ACTION,A: sell for %d gold
 SHOP_NOT_ENOUGH,You don't have enough gold
 SHOP_BELT_FULL,Your potion belt is full
 SHOP_NOTHING_TO_SELL,Nothing to sell: collect items from chests
-SHOP_HINT,A / Enter: buy or sell · B / Esc / I: close
+SHOP_HINT,A / Enter: buy or sell · B / Esc / %s: close
 SHOP_CLOSE,Close
 ITEM_SWORD_DRAGON,Dragon sword
 ITEM_ARMOR_PLATE,Plate armor
@@ -119,27 +119,26 @@ ITEM_BOOK_VIGOR,Tome of vigor
 ITEM_POTION_ELIXIR,Elixir
 MENU_CONTROLS,Controls
 CONTROLS_TITLE,Controls
-CONTROLS_HEADER,Action | Keyboard | Controller
-CONTROLS_MOVE,Move | WASD | Left stick
-CONTROLS_ATTACK,"Attack (combo, hold to keep attacking) | J | R1"
-CONTROLS_HEAVY,"Power strike (hold to charge, keep holding to chain) | L | L2"
-CONTROLS_PARRY,"Parry (instant, cancels any action) | K | L1"
-CONTROLS_DODGE,"Dodge (cancels any action, air dash while jumping) | Space | B"
-CONTROLS_JUMP,"Jump (cancels any action; near chests, merchants, caves: interact) | F / E | A"
-CONTROLS_RUN,"Tap: run on/off (dodge while running to slide) · Hold: torch on/off | Shift | L3"
-CONTROLS_FOCUS,"Focus (hold: dims the world, highlights you, items, chests and passages) | V | R2"
-CONTROLS_SPELL,Fireball | U | X
-CONTROLS_SHIELD,Shield | R | Y
-CONTROLS_POTION,Health potion | Q | D-pad left
-CONTROLS_MANA,Mana potion | T | D-pad right
-CONTROLS_STAMINA_POTION,Stamina potion | G | D-pad down
-CONTROLS_INVENTORY,Inventory (R3 / C to sort) | I / Tab | D-pad up
-CONTROLS_MENU,"Pause menu (save, controls, quit) | Esc | Start"
+CONTROLS_MOVE,"Move (mouse: walk to the cursor, hold to follow it)"
+CONTROLS_ATTACK,"Attack (combo, hold to keep attacking)"
+CONTROLS_HEAVY,"Power strike (hold to charge, uses mana while held; keep holding to chain)"
+CONTROLS_PARRY,"Parry (instant, cancels any action)"
+CONTROLS_DODGE,"Dodge (cancels any action, air dash while jumping)"
+CONTROLS_JUMP,"Jump (cancels any action) · Interact (chests, merchants, caves)"
+CONTROLS_RUN,Tap: run on/off (dodge while running to slide) · Hold: torch on/off
+CONTROLS_FOCUS,"Focus (hold: dims the world, highlights you, items, chests and passages)"
+CONTROLS_SPELL,Fireball
+CONTROLS_SHIELD,Shield
+CONTROLS_POTION,Health potion
+CONTROLS_MANA,Mana potion
+CONTROLS_STAMINA_POTION,Stamina potion
+CONTROLS_INVENTORY,Inventory · sort it
+CONTROLS_MENU,"Pause menu (save, controls, options, quit)"
 CONTROLS_SPECIAL_TITLE,Special attacks
 CONTROLS_SPECIAL_MIXED,"Power strike right after a combo: a wide power strike with bonus damage"
 CONTROLS_SPECIAL_CHARGED,"Charge the first power strike: every power strike chained after it deals extra damage"
 CONTROLS_SPECIAL_AIR,"Attack in mid-air: wide aerial slashes that also reach the enemies below you"
-CONTROLS_SPECIAL_PLUNGE,"Power strike in mid-air: plunge onto the ground (hold it to hover and charge a huge slam; the higher you are, the harder it hits)"
+CONTROLS_SPECIAL_PLUNGE,"Power strike in mid-air: plunge (hold it to float and charge a magic slam: drains mana and stamina, archers can hit you)"
 CONTROLS_SPECIAL_DASH,Power strike during an air dash: dash strike that smashes a wide area
 CONTROLS_TOUCH,On touch screens use the on-screen buttons
 CONTROLS_BACK,Back
@@ -172,7 +171,6 @@ PAUSE_QUIT_NO,Cancel
 SAVE_DONE,Game saved
 SAVE_AUTO,Game saved automatically
 SAVE_BLOCKED_ENEMIES,Can't save: enemies nearby
-SAVE_BLOCKED_MOVING,Can't save: stand completely still first
 SAVE_BLOCKED_CHALLENGE,Can't save during a challenge
 SAVE_BLOCKED_DEAD,Can't save now
 LOADING_LANDS,Exploring new lands…
@@ -188,15 +186,97 @@ DUNGEON_LEVEL,Underground · level %d of %d
 BOSS_NAME,Cave Guardian
 BOSS_DEFEATED,Guardian defeated! The way out is open
 MENU_CREDITS,Created by fdamore1984 with Claude Code
-CONTROLS_LOCK,"Lock on the nearest enemy (press again to switch to the nearest one) | C | R3"
+CONTROLS_LOCK,Lock on the nearest enemy (press again to switch to the nearest one)
 TOUCH_LOCK,Lock
 TOUCH_MAP,Map
 MAP_TITLE,Map
-MAP_HINT,Select / M / B: close
-CONTROLS_MAP,Map | M | Select
+MAP_HINT,%s / B: close
+CONTROLS_MAP,Map
 ITEM_BLADE_GUARDIAN,Guardian's blade
 ITEM_ARMOR_GUARDIAN,Guardian's armor
 ITEM_BOOTS_GUARDIAN,Guardian's boots
 ITEM_CROWN_GUARDIAN,Guardian's crown
 ITEM_RING_GUARDIAN,Guardian's ring
 ITEM_BOOK_GUARDIAN,Guardian's tome
+CONTROLS_HEADER_ACTION,Action
+MENU_OPTIONS,Options
+PAUSE_OPTIONS,Options
+OPTIONS_TITLE,Options
+OPTIONS_CONTROLS,"Controls: select a binding, then press the new key, mouse button or controller button"
+OPTIONS_HEADER_ACTION,Action
+OPTIONS_HEADER_KEYBOARD,Keyboard
+OPTIONS_HEADER_MOUSE,Mouse
+OPTIONS_HEADER_CONTROLLER,Controller
+OPTIONS_DEVICE_KEYBOARD,key
+OPTIONS_DEVICE_MOUSE,mouse button
+OPTIONS_DEVICE_CONTROLLER,controller button or stick
+OPTIONS_LISTEN,"Press the new %s for ""%s"" (%d s, another device cancels)"
+OPTIONS_BOUND,"""%s"" set to %s"
+OPTIONS_SHARED,also used by: %s
+OPTIONS_CANCELLED,Cancelled: nothing changed
+OPTIONS_RESET,Reset to defaults
+OPTIONS_RESET_DONE,All controls are back to their defaults
+OPTIONS_BACK,Back
+BIND_NONE,—
+BIND_LEFT_STICK,Left stick
+BIND_RIGHT_STICK,Right stick
+BIND_MOUSE,Mouse %d
+BIND_MOUSE_1,Left click
+BIND_MOUSE_2,Right click
+BIND_MOUSE_3,Middle click
+BIND_MOUSE_8,Mouse back
+BIND_MOUSE_9,Mouse forward
+BIND_JOY,Button %d
+BIND_JOY_0,A
+BIND_JOY_1,B
+BIND_JOY_2,X
+BIND_JOY_3,Y
+BIND_JOY_4,Select
+BIND_JOY_5,Guide
+BIND_JOY_6,Start
+BIND_JOY_7,L3
+BIND_JOY_8,R3
+BIND_JOY_9,L1
+BIND_JOY_10,R1
+BIND_JOY_11,D-pad ↑
+BIND_JOY_12,D-pad ↓
+BIND_JOY_13,D-pad ←
+BIND_JOY_14,D-pad →
+BIND_AXIS,Axis %d
+BIND_AXIS_0_NEG,Left stick ←
+BIND_AXIS_0_POS,Left stick →
+BIND_AXIS_1_NEG,Left stick ↑
+BIND_AXIS_1_POS,Left stick ↓
+BIND_AXIS_2_NEG,Right stick ←
+BIND_AXIS_2_POS,Right stick →
+BIND_AXIS_3_NEG,Right stick ↑
+BIND_AXIS_3_POS,Right stick ↓
+BIND_AXIS_4_POS,L2
+BIND_AXIS_5_POS,R2
+BIND_ACTION_MOVE_UP,Move up
+BIND_ACTION_MOVE_DOWN,Move down
+BIND_ACTION_MOVE_LEFT,Move left
+BIND_ACTION_MOVE_RIGHT,Move right
+BIND_ACTION_MOVE_CLICK,Walk to the cursor
+BIND_ACTION_ATTACK,Attack
+BIND_ACTION_HEAVY_ATTACK,Power strike
+BIND_ACTION_PARRY,Parry
+BIND_ACTION_DODGE,Dodge
+BIND_ACTION_JUMP,Jump
+BIND_ACTION_INTERACT,Interact
+BIND_ACTION_RUN,Run / torch
+BIND_ACTION_FOCUS,Focus
+BIND_ACTION_SPELL,Fireball
+BIND_ACTION_SHIELD,Shield
+BIND_ACTION_POTION,Health potion
+BIND_ACTION_MANA_POTION,Mana potion
+BIND_ACTION_STAMINA_POTION,Stamina potion
+BIND_ACTION_INVENTORY,Inventory
+BIND_ACTION_INVENTORY_SORT,Sort the inventory
+BIND_ACTION_MAP,Map
+BIND_ACTION_LOCK_ON,Lock on
+BIND_ACTION_MENU,Pause menu
+BIND_JOY_SHORT_11,↑
+BIND_JOY_SHORT_12,↓
+BIND_JOY_SHORT_13,←
+BIND_JOY_SHORT_14,→

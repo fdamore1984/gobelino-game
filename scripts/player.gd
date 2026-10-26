@@ -37,6 +37,11 @@ extends Node2D
 ## colpo più ampio. Durante gli attacchi a terra si passa
 ## attraverso i nemici; all'impatto quelli attorno (non i boss) vengono
 ## respinti lontano.
+## Ogni colpo potente consuma mana finché si tiene premuto (HEAVY_CHARGE_MANA):
+## senza mana la carica si interrompe. Lo slam aereo caricato fa fluttuare a
+## mezz'aria, consuma anche vigore ed espone a dardi e frecce.
+## Col mouse: clic sinistro (move_click) per camminare verso il cursore,
+## destro per il colpo potente verso il cursore (vedi _unhandled_input).
 ## Sconfiggere nemici dà esperienza; a ogni livello aumentano i danni
 ## base e si sceglie un potenziamento.
 
@@ -125,16 +130,24 @@ const SLAM_DIVE_SPEED := 650.0
 const SLAM_RECOVERY := 0.32
 ## Se per qualche motivo non si tocca terra, l'impatto arriva comunque.
 const SLAM_MAX_TIME := 2.0
-const SLAM_RADIUS := {"plunge": 105.0, "dash": 165.0}
+const SLAM_RADIUS := {"plunge": 90.0, "dash": 165.0}
 const PLUNGE_DAMAGE_FACTOR := 1.6
-## Slam aereo caricato: tenendo premuto il colpo potente in aria si resta
-## fermi a mezz'aria mentre si carica (fino a HEAVY_CHARGE_TIME, poi parte da
-## solo); al rilascio si piomba giù con un'onda d'urto molto ampia, larga da
+## Slam aereo caricato: tenendo premuto il colpo potente in aria si fluttua
+## salendo piano (AIR_SLAM_RISE_SPEED, sempre più piano con la carica, con
+## un leggero ondeggiare di AIR_SLAM_BOB pixel) mentre la spada si carica
+## di magia (fino a HEAVY_CHARGE_TIME, poi parte da solo). La carica consuma
+## mana (HEAVY_CHARGE_MANA) e vigore (AIR_SLAM_STAMINA_DRAIN) al secondo:
+## se uno dei due finisce la picchiata parte subito con la carica raggiunta.
+## Intanto si è esposti a dardi e frecce dei nemici (vedi receive_hit).
+## Al rilascio si piomba giù con un'onda d'urto ampia, larga da
 ## AIR_SLAM_MIN_RADIUS a AIR_SLAM_MAX_RADIUS secondo la carica. Conta come
 ## caricato se la carica arriva almeno a AIR_SLAM_MIN_CHARGE.
 const AIR_SLAM_MIN_CHARGE := 0.2
-const AIR_SLAM_MIN_RADIUS := 230.0
-const AIR_SLAM_MAX_RADIUS := 330.0
+const AIR_SLAM_MIN_RADIUS := 165.0
+const AIR_SLAM_MAX_RADIUS := 240.0
+const AIR_SLAM_RISE_SPEED := 45.0
+const AIR_SLAM_BOB := 3.0
+const AIR_SLAM_STAMINA_DRAIN := 30.0
 ## Il danno della picchiata cresce con l'altezza da cui parte: questa parte
 ## in più per ogni pixel (un salto ≈ +50%, un doppio salto ≈ +100%), al
 ## massimo SLAM_HEIGHT_MAX_BONUS.
@@ -239,6 +252,19 @@ const SPELL_UPGRADE := 0.2
 ## Tenendo premuto il colpo potente si carica: in questo tempo arriva al
 ## massimo, che raddoppia il danno.
 const HEAVY_CHARGE_TIME := 0.9
+## Ogni colpo potente consuma mana per ogni secondo in cui si tiene premuto
+## il tasto (carica compresa, a terra e in aria): senza mana la carica si
+## interrompe e il colpo parte con quella raggiunta (senza mana non si carica).
+const HEAVY_CHARGE_MANA := 20.0
+const COLOR_CHARGE_GLOW := Color(0.55, 0.8, 1.0)
+
+## Mouse: il tasto di "move_click" (sinistro) fa camminare verso il punto
+## del terreno sotto il cursore (tenendolo premuto lo si segue); ci si ferma
+## entro CLICK_ARRIVE_DISTANCE o se si resta bloccati per CLICK_STUCK_TIME.
+## Gli attacchi partiti con un tasto del mouse (il destro è il colpo
+## potente) vanno verso il cursore.
+const CLICK_ARRIVE_DISTANCE := 10.0
+const CLICK_STUCK_TIME := 0.4
 
 ## Torcia: luce attorno al personaggio, accesa e spenta tenendo premuto L3
 ## (o Maiusc) per TORCH_HOLD_TIME secondi; un tocco più breve è la corsa.
@@ -478,6 +504,17 @@ var _charging := false
 var _chain_charge := 0.0
 ## Il suono del colpo potente parte al rilascio della carica, una volta sola.
 var _heavy_swing_played := false
+## Tempo passato in carica (per l'animazione della magia sulla spada).
+var _charge_time := 0.0
+## Movimento col mouse: in corso, punto del terreno da raggiungere e da
+## quanto si è bloccati.
+var _click_moving := false
+var _click_target := Vector2.ZERO
+var _click_stuck := 0.0
+## L'attacco è partito con un tasto del mouse: si mira al cursore finché
+## lo si tiene premuto; direzione verso il cursore (zero se non si mira).
+var _aim_cursor := false
+var _aim := Vector2.ZERO
 var _torch := PointLight2D.new()
 ## Potenziamento -> quante volte è stato scelto, nell'ordine di scelta.
 var upgrades_taken := {}
@@ -530,6 +567,16 @@ func _physics_process(delta: float) -> void:
 	# appena chiuso un menù (A su Riprendi, B) non conta finché non si rilascia.
 	var input := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	var dodge_input := Input.get_vector("move_left", "move_right", "move_up", "move_down", DODGE_STICK_DEADZONE)
+	# Tastiera e levetta hanno la precedenza sul movimento col mouse.
+	if input != Vector2.ZERO:
+		_click_moving = false
+	else:
+		input = _click_input(delta)
+		if dodge_input == Vector2.ZERO:
+			dodge_input = input
+	_update_aim()
+	# Gli attacchi col mouse partono verso il cursore.
+	var attack_input := _aim if _aim != Vector2.ZERO else input
 
 	if _state not in [State.DEAD, State.HURT]:
 		if UiNav.game_pressed("potion"):
@@ -594,11 +641,11 @@ func _physics_process(delta: float) -> void:
 				elif _dodge_cooldown == 0.0:
 					_start_dodge(dodge_input)
 			elif UiNav.game_pressed("heavy_attack"):
-				_start_heavy(input)
+				_start_heavy(attack_input)
 			elif UiNav.game_pressed("attack") or UiNav.game_held("attack"):
 				# Tenendo premuto si continua ad attaccare (anche un tocco rapidissimo
 				# conta); in aria è un attacco aereo.
-				_start_attack(_next_combo_step(), input)
+				_start_attack(_next_combo_step(), attack_input)
 			elif UiNav.game_held("parry"):
 				_start_parry(input)
 
@@ -606,7 +653,7 @@ func _physics_process(delta: float) -> void:
 			# Un attacco iniziato si interrompe con parata, schivata o salto;
 			# si può concatenare il successivo.
 			_running = false
-			_update_attack(input, delta)
+			_update_attack(input, attack_input, delta)
 
 		State.PARRY:
 			if input != Vector2.ZERO:
@@ -626,7 +673,7 @@ func _physics_process(delta: float) -> void:
 				_start_slam("dash", input)
 			elif is_airborne() and UiNav.game_pressed("attack"):
 				_end_combo()
-				_start_attack(1, input)
+				_start_attack(1, attack_input)
 			elif UiNav.game_pressed("dodge") and _dodges_used < max_chained_dodges \
 					and _state_time >= DODGE_CHAIN_MIN_TIME:
 				_chain_dodge(dodge_input)
@@ -657,10 +704,10 @@ func _physics_process(delta: float) -> void:
 			# schivare, saltare o parare (vedi sopra): la scivolata si interrompe.
 			if UiNav.game_pressed("attack"):
 				_carry_velocity = _velocity
-				_start_attack(_next_combo_step(), input)
+				_start_attack(_next_combo_step(), attack_input)
 			elif UiNav.game_pressed("heavy_attack"):
 				_carry_velocity = _velocity
-				_start_heavy(input)
+				_start_heavy(attack_input)
 			elif UiNav.game_pressed("dodge") and _dodge_cooldown == 0.0:
 				_start_dodge(dodge_input)
 			elif _jump_pressed():
@@ -673,7 +720,7 @@ func _physics_process(delta: float) -> void:
 					_change_state(State.NORMAL)
 
 		State.SLAM:
-			_update_slam(input, delta)
+			_update_slam(input, attack_input, delta)
 
 		State.RECOIL:
 			_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * 1.5 * delta)
@@ -825,7 +872,7 @@ func _update_height(delta: float) -> void:
 	if _state == State.ATTACK and _air_attack and _height_velocity < 0.0:
 		gravity *= AIR_ATTACK_GRAVITY_FACTOR
 	if _state == State.SLAM and not _slam_landed:
-		# Mentre si carica lo slam aereo si resta fermi a mezz'aria.
+		# Mentre si carica lo slam aereo si fluttua (vedi _update_slam).
 		gravity = 0.0 if _charging or _state_time < SLAM_HANG else SLAM_GRAVITY
 	_height_velocity -= gravity * delta
 	_height += _height_velocity * delta
@@ -844,17 +891,25 @@ func _land() -> void:
 
 
 ## Avanzamento dell'attacco in corso: affondo, colpo, combo e recupero.
-func _update_attack(input: Vector2, delta: float) -> void:
+## aim: direzione del colpo (il cursore se l'attacco è partito col mouse).
+func _update_attack(input: Vector2, aim: Vector2, delta: float) -> void:
 	var windup := (HEAVY_WINDUP if _attack_heavy else ATTACK_WINDUP) / _attack_speed
 	var active := (HEAVY_ACTIVE if _attack_heavy else ATTACK_ACTIVE) / _attack_speed
 	var recovery := _attack_recovery() / _attack_speed
 	if _charging:
-		# Finché si tiene premuto, il colpo potente resta in carica; intanto ci
-		# si gira con la levetta (o verso il bersaglio agganciato).
-		if input != Vector2.ZERO:
-			_target_facing = input.normalized()
+		# Finché si tiene premuto, il colpo potente resta in carica (e consuma
+		# mana); intanto ci si gira con la levetta (o verso il bersaglio
+		# agganciato, o verso il cursore).
+		if aim != Vector2.ZERO:
+			_target_facing = aim.normalized()
 		_face_lock()
-		if UiNav.game_held("heavy_attack") and _state_time >= windup * 0.9:
+		_charge_time += delta
+		if not UiNav.game_held("heavy_attack"):
+			_charging = false
+		elif not _drain_charge(delta, false):
+			# Mana finito: il colpo parte con la carica raggiunta.
+			_charging = false
+		elif _state_time >= windup * 0.9:
 			_charge = minf(_charge + delta / HEAVY_CHARGE_TIME, 1.0)
 			_state_time = windup * 0.9
 			if _charge >= 1.0:
@@ -862,8 +917,6 @@ func _update_attack(input: Vector2, delta: float) -> void:
 				# si concatenano i colpi potenti successivi.
 				Sfx.play("charge_full", global_position)
 				_charging = false
-		elif not UiNav.game_held("heavy_attack"):
-			_charging = false
 	# Lo slancio di una scivolata si esaurisce durante l'attacco.
 	_carry_velocity = _carry_velocity.move_toward(Vector2.ZERO, DECELERATION * delta)
 	# Mentre si attacca ci si può muovere (più piano) in qualsiasi
@@ -903,9 +956,9 @@ func _update_attack(input: Vector2, delta: float) -> void:
 	var chain_at := windup + active + (0.0 if _attack_heavy else ATTACK_CHAIN_DELAY / _attack_speed)
 	if _queued_attack != "" and _state_time >= chain_at:
 		if _queued_attack == "attack":
-			_start_attack(_combo_step + 1, input)
+			_start_attack(_combo_step + 1, aim)
 		else:
-			_start_heavy(input, _queued_attack == "heavy_held")
+			_start_heavy(aim, _queued_attack == "heavy_held")
 	elif _state_time >= windup + active + recovery:
 		if _combo_finished():
 			_end_combo()
@@ -926,7 +979,9 @@ func _end_combo() -> void:
 
 ## Un nemico colpisce il giocatore. Restituisce l'esito, così il nemico
 ## può reagire (per esempio restare stordito dopo una parata perfetta).
-func receive_hit(from: Vector2, damage: int) -> String:
+## projectile: colpo a distanza (dardi, frecce), che raggiunge anche chi
+## fluttua a mezz'aria caricando lo slam aereo.
+func receive_hit(from: Vector2, damage: int, projectile := false) -> String:
 	if _state in [State.DEAD, State.FALL] or _invulnerable_time > 0.0:
 		return "ignored"
 	if (_state == State.DODGE and _state_time <= DODGE_INVULNERABLE_TIME) \
@@ -935,7 +990,7 @@ func receive_hit(from: Vector2, damage: int) -> String:
 	# Sopra il nemico (saltando o su un gradino più alto) il colpo passa sotto.
 	var attacker_height := World.current.elevation_at(from) if World.current else 0.0
 	var above := altitude() - attacker_height
-	if above > JUMP_EVADE_HEIGHT:
+	if above > JUMP_EVADE_HEIGHT and not (projectile and is_air_charging()):
 		if not is_airborne():
 			return "ignored"
 		return "dodged"
@@ -972,6 +1027,9 @@ func receive_hit(from: Vector2, damage: int) -> String:
 
 	health = maxi(health - damage, 0)
 	health_changed.emit(health, max_health)
+	# Colpiti si perde la carica (per esempio dello slam aereo: si cade giù).
+	_charging = false
+	_charge = 0.0
 	if health == 0:
 		_change_state(State.DEAD)
 		Sfx.play("death", global_position)
@@ -1022,9 +1080,16 @@ func _repel(from: Vector2) -> void:
 	HitFeedback.hit(get_tree(), 0.07)
 
 
-## Completamente fermo, a terra e senza fare niente: si può salvare.
-func is_still() -> bool:
-	return _state == State.NORMAL and not is_airborne() and _velocity.length() < 5.0
+## Sta caricando lo slam aereo: fluttua a mezz'aria, esposto a dardi e
+## frecce (i nemici a distanza ne approfittano, vedi Enemy).
+func is_air_charging() -> bool:
+	return _state == State.SLAM and _charging
+
+
+## Punto in cui salvare la posizione: si può salvare anche camminando o in
+## aria; in aria si salva l'ultimo punto sicuro a terra (mai sopra un burrone).
+func save_position() -> Vector2:
+	return _safe_position if is_airborne() else position
 
 
 func _fall_into_ravine() -> void:
@@ -1411,6 +1476,7 @@ func _start_heavy(input: Vector2, held := false) -> void:
 func _begin_attack(input: Vector2) -> void:
 	_attack_speed = EMPOWER_ATTACK_SPEED if is_empowered() else 1.0
 	_charge = 0.0
+	_charge_time = 0.0
 	_charging = false
 	_heavy_swing_played = false
 	_air_attack = is_airborne()
@@ -1457,8 +1523,10 @@ func _start_slam(kind: String, input: Vector2) -> void:
 	_attack_heavy = false
 	_attack_speed = EMPOWER_ATTACK_SPEED if is_empowered() else 1.0
 	_charge = 0.0
-	# Tenendo premuto il colpo potente la picchiata si carica a mezz'aria.
-	_charging = kind == "plunge" and UiNav.game_held("heavy_attack")
+	_charge_time = 0.0
+	# Tenendo premuto il colpo potente la picchiata si carica a mezz'aria
+	# (serve un po' di mana e di vigore).
+	_charging = kind == "plunge" and UiNav.game_held("heavy_attack") and mana > 0.0 and stamina > 0.0
 	_queued_attack = ""
 	_combo_timer = 0.0
 	_carry_velocity = Vector2.ZERO
@@ -1476,24 +1544,32 @@ func _start_slam(kind: String, input: Vector2) -> void:
 
 ## Attacco a terra: sosta in aria, discesa e, toccato terra, l'impatto
 ## (vedi _land); poi un breve recupero.
-func _update_slam(input: Vector2, delta: float) -> void:
+## aim: direzione verso cui girarsi in carica (il cursore se lo slam è
+## partito col mouse).
+func _update_slam(input: Vector2, aim: Vector2, delta: float) -> void:
 	if _charging:
-		# Fermi a mezz'aria: ci si gira con la levetta (o verso il bersaglio)
-		# finché si tiene premuto; a carica piena la picchiata parte da sola.
-		_height_velocity = 0.0
+		# A mezz'aria si fluttua salendo piano (sempre più piano con la carica):
+		# ci si gira con la levetta (o verso il bersaglio, o il cursore) finché
+		# si tiene premuto; a carica piena la picchiata parte da sola, e anche
+		# quando finiscono mana o vigore.
+		_height_velocity = AIR_SLAM_RISE_SPEED * (1.0 - 0.6 * _charge)
 		_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * 2.0 * delta)
-		if input != Vector2.ZERO:
-			_target_facing = input.normalized()
+		if aim != Vector2.ZERO:
+			_target_facing = aim.normalized()
 		_face_lock()
 		_state_time = 0.0
-		if UiNav.game_held("heavy_attack"):
+		_charge_time += delta
+		if not UiNav.game_held("heavy_attack"):
+			_charging = false
+		elif not _drain_charge(delta, true):
+			_charging = false
+		else:
 			_charge = minf(_charge + delta / HEAVY_CHARGE_TIME, 1.0)
 			if _charge >= 1.0:
 				Sfx.play("charge_full", global_position)
 				_charging = false
-		else:
-			_charging = false
 		if not _charging:
+			_height_velocity = 0.0
 			_slam_charged = _charge >= AIR_SLAM_MIN_CHARGE
 			facing = _target_facing
 			Sfx.play("heavy_swing", global_position, 0.7)
@@ -1707,6 +1783,81 @@ func _use_stamina(cost: float) -> bool:
 	stamina = maxf(stamina - cost, 0.0)
 	_stamina_delay = STAMINA_REGEN_DELAY
 	return true
+
+
+## Consumo della carica del colpo potente per un passo: mana (vedi
+## HEAVY_CHARGE_MANA) e, nello slam aereo (air), anche vigore. Restituisce
+## false se una delle due risorse è finita: la carica va interrotta.
+func _drain_charge(delta: float, air: bool) -> bool:
+	mana = maxf(mana - HEAVY_CHARGE_MANA * delta, 0.0)
+	if air:
+		stamina = maxf(stamina - AIR_SLAM_STAMINA_DRAIN * delta, 0.0)
+		_stamina_delay = STAMINA_REGEN_DELAY
+	return mana > 0.0 and (not air or stamina > 0.0)
+
+
+## Tasti del mouse premuti sul mondo (non sui pulsanti dell'interfaccia,
+## che li consumano prima): movimento verso il cursore e mira degli
+## attacchi. I tocchi sullo schermo arrivano anche come clic emulati: lì ci
+## sono già i controlli touch, quindi si ignorano.
+func _unhandled_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton) or event.device == InputEvent.DEVICE_ID_EMULATION:
+		return
+	if _state == State.DEAD or Platform.ignores_desktop_input():
+		return
+	if event.is_action_pressed("move_click"):
+		_click_moving = true
+		_click_target = _cursor_ground()
+		_click_stuck = 0.0
+	if event.is_action_pressed("heavy_attack") or event.is_action_pressed("attack"):
+		_aim_cursor = true
+
+
+## Direzione del movimento col mouse (zero se non ci si sta muovendo così):
+## tenendo premuto il tasto si segue il cursore; arrivati, o bloccati da un
+## ostacolo, ci si ferma.
+func _click_input(delta: float) -> Vector2:
+	if not _click_moving or _state == State.DEAD:
+		_click_moving = false
+		return Vector2.ZERO
+	if Input.is_action_pressed("move_click"):
+		_click_target = _cursor_ground()
+	var to_target := _click_target - position
+	if _state == State.NORMAL and _state_time > CLICK_STUCK_TIME and _velocity.length() < SPEED * 0.1:
+		_click_stuck += delta
+	else:
+		_click_stuck = 0.0
+	if to_target.length() <= CLICK_ARRIVE_DISTANCE or _click_stuck >= CLICK_STUCK_TIME:
+		_click_moving = false
+		return Vector2.ZERO
+	return to_target.normalized()
+
+
+## Mira col mouse: finché si tiene premuto il tasto che ha fatto partire
+## l'attacco si mira al cursore.
+func _update_aim() -> void:
+	_aim = Vector2.ZERO
+	if not _aim_cursor:
+		return
+	var to_cursor := _cursor_ground() - position
+	if to_cursor.length() > 1.0:
+		_aim = to_cursor.normalized()
+	if not Input.is_action_pressed("heavy_attack") and not Input.is_action_pressed("attack"):
+		_aim_cursor = false
+
+
+## Punto del terreno sotto il cursore: il terreno è disegnato più in alto
+## della sua altezza, quindi si cerca il punto che, sollevato, cade sotto il
+## cursore (bastano pochi passi).
+func _cursor_ground() -> Vector2:
+	var parent := get_parent() as Node2D
+	var at := parent.to_local(get_global_mouse_position()) if parent else get_global_mouse_position()
+	if World.current == null:
+		return at
+	var point := at
+	for i in 3:
+		point = at + Vector2(0, World.current.elevation_at(point))
+	return point
 
 
 ## Palla di fuoco verso dove si guarda (o si punta la levetta): poi
@@ -1958,6 +2109,9 @@ func _draw() -> void:
 	Shapes.disc(self, Vector2(0, RADIUS * 0.8 - ground_elevation), RADIUS * 0.9 * shadow_scale, Color(0, 0, 0, 0.25))
 	var body_scale := Vector2(1.2, 0.6) if _state == State.SLIDE else Vector2.ONE
 	var lift := -altitude() + (RADIUS * 0.4 if _state == State.SLIDE else 0.0)
+	# Caricando lo slam aereo si ondeggia piano a mezz'aria.
+	if is_air_charging():
+		lift += sin(_charge_time * 5.0) * AIR_SLAM_BOB
 	if LowHealthVignette.focus_held() and _state != State.DEAD:
 		Shapes.glow(self, Vector2(0, lift - RADIUS * FOCUS_AURA_HEIGHT), RADIUS * FOCUS_AURA_RADIUS, COLOR_FOCUS_AURA)
 	draw_set_transform(Vector2(0, lift), 0.0, body_scale)
@@ -2076,9 +2230,7 @@ func _draw_sword() -> void:
 		if _attack_heavy:
 			draw_arc(Vector2.ZERO, RADIUS + 6.0, facing.angle() - arc / 2.0, facing.angle() + arc / 2.0, 24, Color(COLOR_HEAVY, _state_time / windup), 4.0)
 			if _charge > 0.0:
-				# Carica: un anello che si riempie e diventa bianco al massimo.
-				var ring := Color.WHITE if _charge >= 1.0 else COLOR_HEAVY
-				draw_arc(Vector2.ZERO, RADIUS + 14.0, -PI / 2.0, -PI / 2.0 + TAU * _charge, 32, ring, 4.0)
+				_draw_charge_ring()
 	elif _state_time < windup + active:
 		angle = lerpf(start, end, ease((_state_time - windup) / active, 0.6))
 		var slash := COLOR_HEAVY if _attack_heavy else COLOR_SLASH
@@ -2089,6 +2241,8 @@ func _draw_sword() -> void:
 		BodyParts.draw_trail(self, Vector2.ZERO, start, angle, RADIUS + 6.0, _attack_range() + RADIUS, Color(slash, minf(alpha, 0.9)))
 	var length := HEAVY_SWORD_LENGTH if _attack_heavy else SWORD_LENGTH
 	BodyParts.draw_sword(self, Vector2.from_angle(angle) * RADIUS * 0.8, angle, length, SWORD_WIDTH * (1.3 if _attack_heavy else 1.0), tint)
+	if _attack_heavy and _charging:
+		_draw_charge_magic(Vector2.from_angle(angle) * RADIUS * 0.8, angle, length)
 
 
 ## Colpo normale a terra: carica (la spada si porta indietro e la punta
@@ -2220,9 +2374,7 @@ func _draw_slam_sword(tint: Color) -> void:
 	var down := PI / 2.0 - 0.35
 	var angle := raised
 	if _charging and _charge > 0.0:
-		# Slam aereo in carica: un anello che si riempie e diventa bianco al massimo.
-		var ring := Color.WHITE if _charge >= 1.0 else COLOR_HEAVY
-		draw_arc(Vector2.ZERO, RADIUS + 14.0, -PI / 2.0, -PI / 2.0 + TAU * _charge, 32, ring, 4.0)
+		_draw_charge_ring()
 	if _slam_landed:
 		angle = down
 	elif _height_velocity < 0.0:
@@ -2233,6 +2385,41 @@ func _draw_slam_sword(tint: Color) -> void:
 	if mirror:
 		angle = PI - angle
 	BodyParts.draw_sword(self, Vector2.from_angle(angle) * RADIUS * 0.8, angle, HEAVY_SWORD_LENGTH, SWORD_WIDTH * 1.3, tint)
+	if _charging:
+		_draw_charge_magic(Vector2.from_angle(angle) * RADIUS * 0.8, angle, HEAVY_SWORD_LENGTH)
+
+
+## Carica del colpo potente: un anello che si riempie e diventa bianco al massimo.
+func _draw_charge_ring() -> void:
+	var ring := Color.WHITE if _charge >= 1.0 else COLOR_CHARGE_GLOW
+	draw_arc(Vector2.ZERO, RADIUS + 14.0, -PI / 2.0, -PI / 2.0 + TAU * _charge, 32, ring, 4.0)
+
+
+## Magia della carica sulla spada (hand: impugnatura, angle: direzione
+## della lama): un alone azzurro lungo la lama che pulsa e cresce con la
+## carica, scintille che le girano attorno salendo verso la punta e una
+## punta che brilla; a carica piena tutto diventa bianco, con un lampo.
+func _draw_charge_magic(hand: Vector2, angle: float, length: float) -> void:
+	var along := Vector2.from_angle(angle)
+	var across := along.orthogonal()
+	var power := 0.25 + 0.75 * _charge
+	var pulse := 0.5 + 0.5 * sin(_charge_time * 14.0)
+	var color := Color.WHITE if _charge >= 1.0 else COLOR_CHARGE_GLOW
+	Shapes.glow(self, hand + along * length * 0.6, length * (0.55 + 0.25 * power), Color(color, 0.25 + 0.3 * power))
+	for k in 5:
+		var at := hand + along * length * (0.25 + 0.18 * k)
+		Shapes.disc(self, at, (6.0 + 5.0 * power) * (1.0 + 0.15 * pulse), Color(color, 0.1 + 0.12 * power))
+	for k in 6:
+		var t := fposmod(_charge_time * 1.6 + k / 6.0, 1.0)
+		var swirl := sin(_charge_time * 9.0 + k * 2.1) * (10.0 + 8.0 * power) * (1.0 - t * 0.5)
+		Shapes.disc(self, hand + along * length * t + across * swirl, 2.5 + 2.0 * power, Color(color.lightened(0.6), 1.0 - 0.7 * t))
+	var tip := hand + along * length
+	Shapes.disc(self, tip, (5.0 + 6.0 * power) * (0.8 + 0.4 * pulse), Color(color, 0.45))
+	Shapes.disc(self, tip, 2.5 + 2.0 * power, Color(1, 1, 1, 0.9))
+	if _charge >= 1.0:
+		var flash := 10.0 + 6.0 * pulse
+		draw_line(tip - Vector2(flash, 0), tip + Vector2(flash, 0), Color(1, 1, 1, 0.9), 2.0)
+		draw_line(tip - Vector2(0, flash), tip + Vector2(0, flash), Color(1, 1, 1, 0.9), 2.0)
 
 
 ## Torcia nell'altra mano: bastone e fiamma che tremola.

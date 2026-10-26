@@ -39,6 +39,7 @@ func _ready() -> void:
 			await _capture_inventory(language)
 			await _capture_merchant(language)
 			await _capture_slam(language)
+			await _capture_air_charge(language)
 			await _capture_cave(language)
 			await _capture_dungeon(language)
 	get_tree().quit()
@@ -54,6 +55,10 @@ func _capture_menu(language: String) -> void:
 	menu._on_controls_pressed()
 	await _frames(3)
 	await _save("%s_10_controls.png" % language)
+	menu._controls_panel.close()
+	menu._on_options_pressed()
+	await _frames(3)
+	await _save("%s_15_options.png" % language)
 	menu.queue_free()
 	await _frames(2)
 
@@ -276,6 +281,47 @@ func _capture_slam(language: String) -> void:
 	fx.queue_redraw()
 	await _frames(2)
 	await _save("%s_9_slam.png" % language)
+	_end_game()
+
+
+## Slam aereo in carica: il goblin fluttua a mezz'aria con la spada carica
+## di magia, mentre un arciere e un lanciatore gli tirano contro.
+func _capture_air_charge(language: String) -> void:
+	await _start_game(Vector2(0, -40), 1.25)
+	_player.level = 5
+	_hud_stats()
+	var origin := _player.position
+	var archer := _enemy("archer", origin + Vector2(290, 70), Enemy.State.WINDUP, 0.75)
+	var caster := _enemy("caster", origin + Vector2(-280, -60), Enemy.State.WINDUP, 0.5)
+	_enemy("warrior", origin + Vector2(-90, 120), Enemy.State.CHASE, 0.0)
+	await _frames(50)
+	_player._state = Player.State.SLAM
+	_player._slam_kind = "plunge"
+	_player._slam_landed = false
+	_player._charging = true
+	_player._charge = 0.7
+	_player._charge_time = 0.62
+	_player._height = 95.0
+	_player.facing = Vector2(1, 0.15).normalized()
+	_player.mana = _player.max_mana * 0.45
+	_player.stamina = _player.max_stamina * 0.55
+	_player.queue_redraw()
+	# Freccia e dardo in volo, già saliti verso il goblin.
+	for shooter: Enemy in [archer, caster]:
+		var bolt := EnemyBolt.new()
+		var direction := (origin - shooter.position).normalized()
+		bolt.direction = direction
+		bolt.arrow = shooter == archer
+		bolt.color = Color(0.85, 0.85, 0.8) if bolt.arrow else shooter._color.lightened(0.3)
+		bolt.altitude = shooter.ground_elevation
+		bolt.position = shooter.position + direction * shooter.position.distance_to(origin) * 0.55
+		bolt._rise = 45.0
+		bolt._age = 0.3
+		_entities().add_child(bolt)
+		bolt.set_physics_process(false)
+		bolt.queue_redraw()
+	await _frames(2)
+	await _save("%s_14_air_charge.png" % language)
 	_end_game()
 
 

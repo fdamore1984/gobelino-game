@@ -1,7 +1,8 @@
 class_name HudActions
 extends Control
 ## Barra delle azioni in basso a sinistra: pozioni (vita, mana, vigore),
-## scudo, palla di fuoco e inventario, ognuno con la sua icona, il tasto del controller,
+## scudo, palla di fuoco e inventario, ognuno con la sua icona, il tasto del
+## controller scelto dal giocatore (vedi Keybinds),
 ## quante ne restano o la ricarica. Sui dispositivi touch non serve: ci
 ## sono già i pulsanti a schermo.
 
@@ -12,9 +13,10 @@ const COLOR_SLOT := Color(0.05, 0.07, 0.05, 0.72)
 const COLOR_BORDER := Color(1, 1, 1, 0.16)
 const COLOR_ACTIVE := Color(1.0, 0.85, 0.4)
 const COLOR_KEY := Color(1, 1, 1, 0.85)
-## Azioni: icona e tasto del controller.
+## Azioni: icona e azione dell'Input Map (per il tasto del controller).
 const ACTIONS := [
-	["potion", "←"], ["mana", "→"], ["shield", "Y"], ["spell", "X"], ["stamina_potion", "↓"], ["bag", "↑"],
+	["potion", "potion"], ["mana", "mana_potion"], ["shield", "shield"], ["spell", "spell"],
+	["stamina_potion", "stamina_potion"], ["bag", "inventory"],
 ]
 
 var player: Player
@@ -63,7 +65,7 @@ func _draw() -> void:
 		if count != "":
 			_text(font, count, rect.position + Vector2(SLOT - 6, SLOT - 6), 13, Color.WHITE, HORIZONTAL_ALIGNMENT_RIGHT)
 		# Tasto del controller, sotto lo slot.
-		_text(font, ACTIONS[i][1], rect.position + Vector2(SLOT / 2.0, SLOT + 14), 14, COLOR_KEY)
+		_text(font, Keybinds.primary(ACTIONS[i][1], "controller", true), rect.position + Vector2(SLOT / 2.0, SLOT + 14), 14, COLOR_KEY)
 
 
 func _is_ready(kind: String) -> bool:

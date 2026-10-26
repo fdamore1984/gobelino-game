@@ -16,8 +16,11 @@ extends Node2D
 ## invece è il giocatore a parare il suo colpo, il colpo si interrompe e il
 ## nemico viene respinto. Attacca più volte di fila (fino a "max_strikes").
 ## Gli evocatori restano a distanza ed evocano altri nemici: colpirli
-## mentre evocano interrompe l'evocazione. I tipi con "ranged" (lanciatori)
-## restano a distanza e scagliano dardi magici (vedi EnemyBolt).
+## mentre evocano interrompe l'evocazione. I tipi con "ranged" (lanciatori
+## e arcieri) restano a distanza e scagliano dardi magici o frecce (vedi
+## EnemyBolt). Quando il giocatore fluttua a mezz'aria caricando lo slam
+## aereo (vedi Player.is_air_charging) ne approfittano: tirano subito, con
+## una carica più breve, e i loro colpi lo raggiungono anche lassù.
 ## I tipi con "magic" (il boss) ogni tanto si fermano a caricare una magia e
 ## scagliano da lontano un ventaglio di dardi grandi.
 ##
@@ -81,6 +84,12 @@ const COUNTER_CHANCE := 0.6
 const REPELLED_KNOCKBACK := 380.0
 const COLOR_GUARD := Color(0.75, 0.88, 1.0)
 const STUN_TIME := 1.6
+## Giocatore esposto a mezz'aria (vedi _exposed_shot): i tiratori caricano
+## il tiro in questa parte del tempo solito, anche da un po' più lontano e
+## durante il recupero dopo un attacco (passata questa parte).
+const EXPOSED_WINDUP_FACTOR := 0.5
+const EXPOSED_RANGE_FACTOR := 1.25
+const EXPOSED_RECOVER_SHARE := 0.3
 ## Attacco speciale (voce "slam" del tipo in data/enemies.json): si
 ## accuccia, salta sul punto dove sta il giocatore e colpisce il terreno
 ## tutto attorno. La zona d'impatto è segnata a terra durante la carica.
@@ -389,6 +398,8 @@ func _physics_process(delta: float) -> void:
 					_begin_windup(_type["windup"][0], _type["windup"][1], true)
 				else:
 					target_velocity = to_player.normalized() * _speed * PUNISH_SPEED_FACTOR
+			elif _exposed_shot(distance):
+				_begin_exposed_shot()
 			elif _should_guard(distance):
 				_begin_guard()
 			elif _can_slam(distance):
@@ -470,7 +481,9 @@ func _physics_process(delta: float) -> void:
 			_update_slam(player_active)
 
 		State.RECOVER:
-			if _state_time >= RECOVER_TIME:
+			if _state_time >= RECOVER_TIME * EXPOSED_RECOVER_SHARE and _exposed_shot(distance):
+				_begin_exposed_shot()
+			elif _state_time >= RECOVER_TIME:
 				_attack_cooldown = randf_range(ATTACK_COOLDOWN.x, ATTACK_COOLDOWN.y)
 				_change_state(State.CHASE)
 
@@ -719,6 +732,27 @@ func _is_ranged() -> bool:
 	return _type.has("ranged")
 
 
+## Il giocatore fluttua a mezz'aria caricando lo slam aereo, a tiro e senza
+## ostacoli in mezzo: i tiratori (e le magie del boss) ne approfittano.
+func _exposed_shot(distance: float) -> bool:
+	if player == null or not player.is_air_charging() or not (_is_ranged() or _type.has("magic")):
+		return false
+	var reach := float(_type["ranged"]["range"]) if _is_ranged() else float(_type["magic"]["range"])
+	return distance <= reach * EXPOSED_RANGE_FACTOR and _clear_shot()
+
+
+## Tiro rapido verso il giocatore esposto: un dardo o una freccia con una
+## carica più breve, o la magia del boss.
+func _begin_exposed_shot() -> void:
+	_strikes = 0
+	if not _is_ranged():
+		_begin_cast()
+		_windup_time *= EXPOSED_WINDUP_FACTOR
+		return
+	var windup: Array = _type["windup"]
+	_begin_windup(windup[0] * EXPOSED_WINDUP_FACTOR, windup[1] * EXPOSED_WINDUP_FACTOR, false)
+
+
 ## I lanciatori tirano solo se il dardo può arrivare al giocatore (niente
 ## pareti, montagne, roccia o ostacoli solidi in mezzo); gli altri sempre.
 func _can_shoot_player() -> bool:
@@ -745,8 +779,11 @@ func _shoot_bolt(direction: Vector2, ranged: Dictionary) -> void:
 	bolt.altitude = ground_elevation
 	bolt.radius = float(ranged.get("bolt_radius", EnemyBolt.RADIUS))
 	bolt.color = World._color(ranged["color"]) if ranged.has("color") else _color.lightened(0.3)
+	bolt.arrow = ranged.get("arrow", false)
 	bolt.position = position + direction * radius
 	get_parent().add_child(bolt)
+	if bolt.arrow:
+		Sfx.play("bow", global_position)
 
 
 ## Magia da lontano (voce "magic" del tipo): il giocatore è tra "min_range" e
@@ -1089,7 +1126,10 @@ func _draw() -> void:
 	if is_casting():
 		_draw_magic()
 	if _is_ranged():
-		_draw_staff()
+		if _type["ranged"].get("arrow", false):
+			_draw_bow()
+		else:
+			_draw_staff()
 	else:
 		_draw_sword()
 
@@ -1247,6 +1287,26 @@ func _draw_staff() -> void:
 		glow = 0.4 + 0.6 * _state_time / _windup_time
 	Shapes.disc(self, top, radius * 0.35 * (1.0 + glow * 0.4), Color(_color.lightened(0.4), 0.35 * glow))
 	Shapes.disc(self, top, radius * 0.22, _color.lightened(0.3 + 0.4 * glow))
+
+
+## Arco dell'arciere: la corda si tende caricando il tiro, con la freccia
+## incoccata (che parte al momento del tiro).
+func _draw_bow() -> void:
+	var pull := minf(_state_time / _windup_time, 1.0) if _state == State.WINDUP else 0.0
+	var center := _facing * radius * 0.9
+	var across := _facing.orthogonal()
+	var points := PackedVector2Array()
+	for i in 7:
+		var t := i / 6.0
+		points.append(center + across * radius * lerpf(1.1, -1.1, t) + _facing * radius * 0.45 * sin(PI * t))
+	var wood := Color(0.5, 0.33, 0.18)
+	draw_polyline(points, wood, maxf(3.0, radius * 0.15))
+	var nock := center - _facing * radius * 0.6 * pull
+	draw_polyline(PackedVector2Array([points[0], nock, points[6]]), Color(0.9, 0.88, 0.8, 0.8), 1.5)
+	if _state == State.WINDUP:
+		var tip := nock + _facing * radius * 1.7
+		draw_line(nock, tip, wood.lightened(0.3), 2.0)
+		draw_colored_polygon(PackedVector2Array([tip + _facing * 7.0, tip + across * 3.5, tip - across * 3.5]), Color(0.8, 0.82, 0.85))
 
 
 static func _closed(points: PackedVector2Array) -> PackedVector2Array:
