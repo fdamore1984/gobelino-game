@@ -49,6 +49,9 @@ enum State { NORMAL, ATTACK, PARRY, DODGE, SLIDE, HURT, DEAD, SLAM, FALL, RECOIL
 
 const RADIUS := 22.0
 const START_HEALTH := 5
+## Vita massima in più ogni tanti livelli, oltre ai potenziamenti: tiene
+## il passo con il danno dei nemici, che cresce con il livello.
+const HEALTH_LEVELS := 4
 const SPEED := 220.0
 
 ## Da fermo si parte piano; più si va veloci, più si accelera.
@@ -301,13 +304,16 @@ const FOCUS_AURA_HEIGHT := 0.6
 const FOCUS_AURA_RADIUS := 2.6
 const COLOR_FOCUS_AURA := Color(1, 1, 1, 0.5)
 ## Curva dell'esperienza (vedi experience_for): punti per il livello 2,
-## aumento per livello, livelli veloci e crescita oltre questi.
+## aumento lineare e quadratico per livello.
 const XP_CURVE_BASE := 40.0
 const XP_CURVE_STEP := 25.0
+const XP_CURVE_QUAD := 2.5
+## Curva della versione 2 (a tratti), per convertire i salvataggi.
 const XP_CURVE_FAST_LEVELS := 10
 const XP_CURVE_LATE := 32.0
-## Versione della curva salvata con l'esperienza (1: la vecchia, lineare).
-const XP_CURVE_VERSION := 2
+## Versione della curva salvata con l'esperienza (1: lineare, 2: a tratti,
+## 3: quadratica continua).
+const XP_CURVE_VERSION := 3
 const STAMINA_BLOCK := 30.0
 const STAMINA_RUN := 16.0
 ## Guardia rotta: si resta storditi per questo tempo.
@@ -1140,8 +1146,10 @@ func load_state(data: Dictionary) -> void:
 	experience = int(data.get("experience", experience))
 	# Salvataggi con la vecchia curva lineare: si tiene la stessa parte del
 	# livello già fatta, sulla curva nuova.
-	if int(data.get("xp_curve", 1)) < XP_CURVE_VERSION:
-		experience = floori(float(experience) / _old_experience_for(level) * experience_for(level))
+	var curve := int(data.get("xp_curve", 1))
+	if curve < XP_CURVE_VERSION:
+		var old_needed := _old_experience_for(level) if curve == 1 else _v2_experience_for(level)
+		experience = floori(float(experience) / old_needed * experience_for(level))
 	experience = clampi(experience, 0, experience_needed() - 1)
 	_base_max_health = int(data.get("base_max_health", _base_max_health))
 	_base_max_mana = float(data.get("base_max_mana", _base_max_mana))
@@ -1233,7 +1241,13 @@ func spell_damage() -> int:
 
 ## Danni del primo colpo della combo al livello attuale.
 func base_damage() -> int:
-	return BASE_DAMAGE + DAMAGE_PER_LEVEL * (level - 1)
+	return damage_at(level)
+
+
+## Danni del primo colpo della combo a un livello: +30% del valore di
+## partenza a livello, poco più della vita dei nemici (vedi EnemyTypes.scaled).
+static func damage_at(at_level: int) -> int:
+	return BASE_DAMAGE + DAMAGE_PER_LEVEL * maxi(at_level - 1, 0)
 
 
 ## Modalità focus: dove resta a colori e quanto è grande (vedi LowHealthVignette).
@@ -1249,12 +1263,18 @@ func experience_needed() -> int:
 	return experience_for(level)
 
 
-## Curva dell'esperienza: ai primi livelli si sale in fretta (40 punti per
-## il livello 2, poi 25 in più a livello: 265 al livello 10), dopo il
-## decimo ogni livello costa sempre di più (a XP_CURVE_LATE * oltre^1.5):
-## circa 750 al 15, 1500 al 20, 3600 al 30. Niente grind all'inizio, e
-## salendo i livelli si fanno via via più lenti.
+## Curva dell'esperienza, continua e senza salti: 40 punti per il livello
+## 2, poi base + passo * n + quadratico * n^2 (n = livelli già fatti):
+## circa 470 al 10, 880 al 15, 1400 al 20, 2900 al 30. Dato che anche
+## l'esperienza dei nemici cresce del 10% a livello, le uccisioni per
+## livello salgono piano (circa 3 al primo, 17 al decimo, 33 al ventesimo).
 static func experience_for(from_level: int) -> int:
+	var n := float(maxi(from_level - 1, 0))
+	return roundi(XP_CURVE_BASE + XP_CURVE_STEP * n + XP_CURVE_QUAD * n * n)
+
+
+## Curva della versione 2, per convertire i salvataggi precedenti.
+static func _v2_experience_for(from_level: int) -> int:
 	var early := XP_CURVE_BASE + XP_CURVE_STEP * (from_level - 1)
 	var beyond := maxi(from_level - XP_CURVE_FAST_LEVELS, 0)
 	return roundi(early + XP_CURVE_LATE * pow(beyond, 1.5))
@@ -1272,6 +1292,7 @@ func add_experience(amount: int) -> void:
 	while experience >= experience_needed():
 		experience -= experience_needed()
 		level += 1
+		_refresh_stats()
 		Sfx.play("level_up", global_position)
 		leveled_up.emit(level)
 	experience_changed.emit(experience, experience_needed(), level)
@@ -1796,7 +1817,7 @@ func use_item(index: int) -> void:
 ## Ricalcola vita e mana massimi con equipaggiamento e libri.
 func _refresh_stats() -> void:
 	var old_max_health := max_health
-	max_health = _base_max_health + int(inventory.bonus("health"))
+	max_health = _base_max_health + floori((level - 1) / float(HEALTH_LEVELS)) + int(inventory.bonus("health"))
 	health = clampi(health + maxi(max_health - old_max_health, 0), 1 if health > 0 else 0, max_health)
 	var old_max_mana := max_mana
 	max_mana = _base_max_mana + inventory.bonus("mana")
