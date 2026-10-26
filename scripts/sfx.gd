@@ -142,6 +142,10 @@ func _build_sounds() -> void:
 		return _triangle(lerpf(180.0, 420.0, t / d) * t) * 0.25 * _env(t, d, 0.05))
 	_streams["enemy_strike"] = _render_filtered(0.2, Vector2(0.3, 0.08), func(t: float, d: float) -> float:
 		return _noise() * _env(t, d, 0.01) * 0.6)
+	# Arciere: la corda dell'arco vibra e la freccia sibila via.
+	_streams["bow"] = _render(0.3, func(t: float, d: float) -> float:
+		var twang := _triangle(lerpf(190.0, 150.0, t / d) * t) * exp(-t * 14.0)
+		return (twang * 0.5 + _noise() * 0.18 * _env(t, 0.12, 0.01)) * _env(t, d, 0.003))
 	_streams["enemy_death"] = _render(0.35, func(t: float, d: float) -> float:
 		var tone := sin(TAU * lerpf(520.0, 110.0, t / d) * t)
 		return (tone * 0.5 + _noise() * 0.2) * _env(t, d, 0.005))

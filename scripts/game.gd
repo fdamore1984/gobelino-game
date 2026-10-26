@@ -26,9 +26,10 @@ extends Node2D
 ## La partita si salva da sola ogni 5 minuti ed entrando in una caverna,
 ## nemici presenti compresi (tipo, posizione e vita): caricandola ritornano
 ## quelli, non nemici nuovi a caso;
-## dal menù di pausa si salva a mano, ma solo senza nemici vicini e stando
-## fermi. Vicino al bordo del territorio già generato il gioco si ferma un
-## attimo per generarne altro (vedi World).
+## dal menù di pausa si salva a mano, ma solo senza nemici vicini (anche
+## camminando o in aria: si salva l'ultimo punto sicuro a terra, vedi
+## Player.save_position). Vicino al bordo del territorio già generato il
+## gioco si ferma un attimo per generarne altro (vedi World).
 
 const MENU_SCENE := "res://scenes/menu.tscn"
 
@@ -484,7 +485,7 @@ func _update_autosave(delta: float) -> void:
 
 
 func _can_autosave() -> bool:
-	return _save_block_reason() in ["", "SAVE_BLOCKED_MOVING"] and not _player.is_airborne() and not _player.is_falling()
+	return _save_block_reason() == "" and not _player.is_airborne()
 
 
 func _save(message: String) -> void:
@@ -495,8 +496,9 @@ func _save(message: String) -> void:
 
 
 ## Perché adesso non si può salvare dal menù (chiave del testo, "" se si può).
+## Muoversi non impedisce di salvare: contano solo i nemici vicini.
 func _save_block_reason() -> String:
-	if _player.is_dead():
+	if _player.is_dead() or _player.is_falling():
 		return "SAVE_BLOCKED_DEAD"
 	if _challenge_arena != Vector2.INF:
 		return "SAVE_BLOCKED_CHALLENGE"
@@ -504,8 +506,6 @@ func _save_block_reason() -> String:
 		var enemy := node as Enemy
 		if not enemy.is_dead() and enemy.global_position.distance_to(_player.global_position) < SAVE_SAFE_DISTANCE:
 			return "SAVE_BLOCKED_ENEMIES"
-	if not _player.is_still():
-		return "SAVE_BLOCKED_MOVING"
 	return ""
 
 
@@ -520,7 +520,7 @@ func _save_data() -> Dictionary:
 	var data := {
 		"version": SAVE_VERSION, "seed": _world.seed_value, "time": _day_night.time, "kills": _kills,
 		"play_time": play_time,
-		"position": SaveGame.array(_player.position), "player": _player.save_state(), "world": _world.save_state(),
+		"position": SaveGame.array(_player.save_position()), "player": _player.save_state(), "world": _world.save_state(),
 		"enemies": _enemies_state(),
 	}
 	if _cave != Vector2.INF:

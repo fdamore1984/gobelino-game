@@ -39,6 +39,8 @@ var _order: Array[int] = []
 var _gold := Label.new()
 var _equipped := HBoxContainer.new()
 var _details := Label.new()
+## Comandi in fondo: mostrano i tasti scelti dal giocatore (vedi Keybinds).
+var _hint: Label
 var _empty := Label.new()
 var _buttons: Array[Button] = []
 
@@ -93,7 +95,8 @@ func _ready() -> void:
 	_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_details.add_theme_font_size_override("font_size", 19)
 	box.add_child(_details)
-	box.add_child(_label("INVENTORY_HINT", 16, Color(1, 1, 1, 0.55)))
+	_hint = _label("", 16, Color(1, 1, 1, 0.55))
+	box.add_child(_hint)
 
 
 func _label(text: String, font_size: int, color: Color) -> Label:
@@ -147,7 +150,8 @@ func _unhandled_input(event: InputEvent) -> void:
 func _rebuild(focus_index: int) -> void:
 	var inventory := player.inventory
 	_gold.text = tr("INVENTORY_GOLD") % inventory.gold
-	_sort_button.text = tr("INVENTORY_SORT") % tr("INVENTORY_SORT_" + _sort.to_upper())
+	_sort_button.text = tr("INVENTORY_SORT") % [tr("INVENTORY_SORT_" + _sort.to_upper()), Keybinds.hint("inventory_sort")]
+	_hint.text = tr("INVENTORY_HINT") % [Keybinds.hint("inventory_sort"), Keybinds.hint("inventory")]
 	for child in _grid.get_children():
 		child.queue_free()
 	for child in _equipped.get_children():

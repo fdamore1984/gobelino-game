@@ -105,10 +105,21 @@ func _update_desktop_events() -> void:
 			if not removed.is_empty():
 				_removed_desktop_events[action] = removed
 	elif not has_joypad and not _removed_desktop_events.is_empty():
-		for action: StringName in _removed_desktop_events:
-			for event: InputEvent in _removed_desktop_events[action]:
-				InputMap.action_add_event(action, event)
-		_removed_desktop_events.clear()
+		restore_desktop_events()
+
+
+## Rimette nelle azioni i tasti e i clic tolti: va fatto prima di cambiare
+## i comandi (vedi Keybinds), che poi chiama refresh_desktop_events.
+func restore_desktop_events() -> void:
+	for action: StringName in _removed_desktop_events:
+		for event: InputEvent in _removed_desktop_events[action]:
+			InputMap.action_add_event(action, event)
+	_removed_desktop_events.clear()
+
+
+## Dopo aver cambiato i comandi: si ricontrolla se vanno tolti tastiera e mouse.
+func refresh_desktop_events() -> void:
+	_update_desktop_events()
 
 
 ## True se gli eventi di tastiera e mouse vanno ignorati (vedi sopra).

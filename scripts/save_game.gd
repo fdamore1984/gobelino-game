@@ -1,7 +1,8 @@
 class_name SaveGame
 ## Salvataggi della partita: tre slot, ognuno un file JSON in user://. Il
-## menù iniziale fa scegliere lo slot (nuova partita o continua) e lo
-## imposta in slot; Game scrive e legge sempre quello. Il vecchio file unico
+## menù iniziale fa scegliere lo slot per una nuova partita, mentre
+## Continua riprende lo slot salvato più di recente (vedi latest); in
+## entrambi i casi lo imposta in slot e Game scrive e legge sempre quello. Il vecchio file unico
 ## (versioni precedenti) diventa lo slot 1 la prima volta che serve.
 
 const SLOTS := 3
@@ -47,6 +48,28 @@ static func read(index := slot) -> Dictionary:
 	return parsed if parsed is Dictionary else {}
 
 
+## Momento del salvataggio dello slot (secondi Unix; 0 se lo slot è
+## libero). I salvataggi vecchi non hanno l'ora: si usa quella del file.
+static func saved_at(index: int, data := {}) -> int:
+	if data.is_empty():
+		data = read(index)
+	if data.is_empty():
+		return 0
+	return int(data.get("saved_at", FileAccess.get_modified_time(path(index))))
+
+
+## Slot salvato più di recente (0 se non ce n'è nessuno).
+static func latest() -> int:
+	var best := 0
+	var best_time := -1
+	for index in range(1, SLOTS + 1):
+		var time := saved_at(index)
+		if exists(index) and time > best_time:
+			best = index
+			best_time = time
+	return best
+
+
 static func delete(index: int) -> void:
 	if exists(index):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(path(index)))
@@ -65,9 +88,7 @@ static func summary(index: int) -> Dictionary:
 	var player: Dictionary = data.get("player", {})
 	var stats: Dictionary = player.get("stats", {})
 	var level := int(player.get("level", 1))
-	# I salvataggi vecchi non hanno l'ora: si usa quella del file.
-	var saved_at := int(data.get("saved_at", FileAccess.get_modified_time(path(index))))
-	var local := saved_at + int(Time.get_time_zone_from_system().get("bias", 0)) * 60
+	var local := saved_at(index, data) + int(Time.get_time_zone_from_system().get("bias", 0)) * 60
 	var dungeon: Dictionary = data.get("dungeon", {})
 	return {
 		"level": level, "time": Time.get_datetime_string_from_unix_time(local, true).left(16),
