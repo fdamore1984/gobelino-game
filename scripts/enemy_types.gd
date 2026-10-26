@@ -27,6 +27,26 @@ static func exists(id: String) -> bool:
 	return DATA.data.has(id)
 
 
+## Crescita dei nemici con il livello di minaccia (livello del giocatore,
+## più la profondità nelle caverne o il bonus delle sfide): vita, danno ed
+## esperienza crescono in modo lineare di una parte del valore base per
+## livello (voce "enemy_scaling" di data/world.json), più piano dei danni
+## del giocatore (+30% a livello) così salire di livello si sente ma i
+## nemici restano una minaccia.
+static func scaled(stat: String, base: float, threat_level: int) -> float:
+	var scaling: Dictionary = WORLD_DATA.data["enemy_scaling"]
+	return base * (1.0 + float(scaling[stat]) * maxi(threat_level - 1, 0))
+
+
+## Armatura (parte del danno assorbita): quella del tipo più un po' per
+## livello, fino a "armor_max".
+static func armor(base: float, threat_level: int) -> float:
+	var scaling: Dictionary = WORLD_DATA.data["enemy_scaling"]
+	if base <= 0.0:
+		return 0.0
+	return minf(base + float(scaling["armor"]) * maxi(threat_level - 1, 0), float(scaling["armor_max"]))
+
+
 ## Nemici da tenere attorno al giocatore in superficie al suo livello.
 static func population(player_level: int) -> int:
 	var data: Dictionary = WORLD_DATA.data["population"]

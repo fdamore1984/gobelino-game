@@ -73,7 +73,7 @@ static func summary(index: int) -> Dictionary:
 		"level": level, "time": Time.get_datetime_string_from_unix_time(local, true).left(16),
 		"play_time": float(data.get("play_time", -1.0)),
 		"max_health": int(stats.get("max_health", player.get("base_max_health", Player.START_HEALTH))),
-		"damage": int(stats.get("damage", Player.BASE_DAMAGE + Player.DAMAGE_PER_LEVEL * (level - 1))),
+		"damage": int(stats.get("damage", Player.damage_at(level))),
 		"gold": int(player.get("gold", 0)),
 		"potions": int(stats.get("potions", player.get("potions", 0))),
 		"kills": int(data.get("kills", 0)),

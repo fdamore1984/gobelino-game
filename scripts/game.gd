@@ -168,13 +168,13 @@ func _maintain_enemies() -> void:
 		else:
 			alive += 1
 	for i in EnemyTypes.population(_player.level) - alive:
-		_spawn_enemy(EnemyTypes.pick_random(_player.level), _random_position(SPAWN_RANGE))
+		_spawn_enemy(EnemyTypes.pick_random(_player.level), _random_position(SPAWN_RANGE), _player.level)
 
 
 ## Nemici a caso attorno al giocatore, quanti ne vuole il suo livello.
 func _populate(distance_range: Vector2) -> void:
 	for i in EnemyTypes.population(_player.level):
-		_spawn_enemy(EnemyTypes.pick_random(_player.level), _random_position(distance_range))
+		_spawn_enemy(EnemyTypes.pick_random(_player.level), _random_position(distance_range), _player.level)
 
 
 func _update_challenge(delta: float) -> void:
@@ -414,17 +414,14 @@ func _spawn_dungeon_enemies(dungeon: Dungeon) -> void:
 		var cells := dungeon.room_cells(room)
 		for k in mini(randi_range(per_room[0], per_room[1]), cells.size()):
 			var cell: Vector2i = cells.pop_at(randi() % cells.size())
-			_spawn_enemy(EnemyTypes.pick_random(_player.level + dungeon.depth - 1), World.cell_center(cell))
+			var threat := _player.level + dungeon.depth - 1
+			_spawn_enemy(EnemyTypes.pick_random(threat), World.cell_center(cell), threat)
 
 
-## Il boss al centro dell'arena, più forte quanto più alto è il livello del giocatore.
+## Il boss al centro dell'arena, più forte quanto più alto è il livello del
+## giocatore e quanto più profonda è la caverna (stessa crescita degli altri nemici).
 func _spawn_boss(dungeon: Dungeon) -> void:
-	var boss := _spawn_enemy(_dungeon_data["boss"], dungeon.arena_center())
-	var factor := 1.0 + float(_dungeon_data["boss_health_per_level"]) * (_player.level - 1)
-	boss.max_health = roundi(boss.max_health * factor)
-	boss.health = boss.max_health
-	boss.xp_reward = roundi(boss.xp_reward * factor)
-	boss.damage += floori((_player.level - 1) / float(_dungeon_data["boss_damage_per_levels"]))
+	var boss := _spawn_enemy(_dungeon_data["boss"], dungeon.arena_center(), _player.level + dungeon.depth - 1)
 	_setup_boss(boss, dungeon)
 
 
@@ -625,7 +622,8 @@ func _spawn_challenge_wave() -> void:
 	var start := randf() * TAU
 	for i in count:
 		var at := _challenge_arena + World.ground_ellipse(start + TAU * i / count, distance, squash)
-		var enemy := _spawn_enemy(EnemyTypes.pick_random(_player.level + int(data["type_level_bonus"])), at)
+		var threat := _player.level + int(data["type_level_bonus"])
+		var enemy := _spawn_enemy(EnemyTypes.pick_random(threat), at, threat)
 		enemy.alert()
 		_challenge_enemies.append(enemy)
 	Sfx.play("summon_pop", _challenge_arena)
@@ -647,9 +645,9 @@ func _random_position(distance_range: Vector2) -> Vector2:
 	return _player.position + offset
 
 
-func _spawn_enemy(type_id: String, at: Vector2) -> Enemy:
+func _spawn_enemy(type_id: String, at: Vector2, threat_level := 1) -> Enemy:
 	var enemy := Enemy.new()
-	enemy.setup(type_id)
+	enemy.setup(type_id, threat_level)
 	enemy.player = _player
 	enemy.position = _world.free_position_near(at, enemy.radius)
 	enemy.died.connect(_on_enemy_died)
@@ -661,10 +659,10 @@ func _spawn_enemy(type_id: String, at: Vector2) -> Enemy:
 func _on_summon_requested(summoner: Enemy, type_id: String, positions: Array[Vector2]) -> void:
 	var minion_xp: int = EnemyTypes.get_type(summoner.type_id)["summon"]["minion_xp"]
 	for at in positions:
-		var minion := _spawn_enemy(type_id, at)
+		var minion := _spawn_enemy(type_id, at, summoner.threat_level)
 		# I nemici evocati danno meno esperienza, altrimenti basterebbe
 		# lasciare vivo l'evocatore per farne scorta.
-		minion.xp_reward = minion_xp
+		minion.xp_reward = roundi(EnemyTypes.scaled("xp", minion_xp, summoner.threat_level))
 		minion.drops_loot = false
 		minion.is_minion = true
 		summoner.add_minion(minion)
@@ -692,8 +690,8 @@ func _show_level_up() -> void:
 	# Il livello mostrato è quello appena raggiunto da scegliere, anche
 	# se nel frattempo se ne sono guadagnati altri.
 	var reached := _player.level - _pending_level_ups + 1
-	var damage_before := Player.BASE_DAMAGE + Player.DAMAGE_PER_LEVEL * (reached - 2)
-	var damage_after := damage_before + Player.DAMAGE_PER_LEVEL
+	var damage_before := Player.damage_at(reached - 1)
+	var damage_after := Player.damage_at(reached)
 	get_tree().paused = true
 	_hud.show_level_up(reached, damage_before, damage_after)
 

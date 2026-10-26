@@ -147,8 +147,12 @@ var health := 40
 var max_health := 40
 ## Esperienza data al giocatore quando viene sconfitto.
 var xp_reward := 30
-## Danno di un colpo: quello del tipo, aumentato per il boss (vedi Game).
+## Danno di un colpo: quello del tipo, cresciuto con il livello di minaccia.
 var damage := 1
+## Livello di minaccia con cui è stato creato (vedi EnemyTypes.scaled).
+var threat_level := 1
+## Parte del danno ricevuto assorbita dall'armatura (0 = nessuna).
+var armor := 0.0
 ## Alla morte può lasciare bottino (no per i nemici evocati).
 var drops_loot := true
 ## Evocato da un altro nemico (per i salvataggi).
@@ -245,15 +249,18 @@ static var _view_frame := -1
 static var _unshaded: CanvasItemMaterial
 
 
-## Imposta il tipo prima di aggiungere il nemico alla scena.
-func setup(id: String) -> void:
+## Imposta il tipo prima di aggiungere il nemico alla scena; vita, danno,
+## esperienza e armatura crescono con il livello di minaccia.
+func setup(id: String, level := 1) -> void:
 	type_id = id
 	_type = EnemyTypes.get_type(id)
+	threat_level = maxi(level, 1)
 	radius = _type["radius"]
-	max_health = _type["health"]
+	max_health = roundi(EnemyTypes.scaled("health", _type["health"], threat_level))
 	health = max_health
-	xp_reward = _type["xp"]
-	damage = _type["damage"]
+	xp_reward = roundi(EnemyTypes.scaled("xp", _type["xp"], threat_level))
+	damage = floori(EnemyTypes.scaled("damage", _type["damage"], threat_level))
+	armor = EnemyTypes.armor(float(_type.get("armor", 0.0)), threat_level)
 	_speed = _type["speed"]
 	var color: Array = _type["color"]
 	_color = Color(color[0], color[1], color[2])
@@ -269,6 +276,7 @@ func save_state() -> Dictionary:
 	return {
 		"type": type_id, "position": SaveGame.array(position), "health": health, "max_health": max_health,
 		"xp": xp_reward, "damage": damage, "loot": drops_loot, "minion": is_minion,
+		"level": threat_level, "armor": armor,
 		"facing": SaveGame.array(_facing),
 	}
 
@@ -281,6 +289,8 @@ func load_state(data: Dictionary) -> void:
 	health = clampi(int(data.get("health", max_health)), 1, max_health)
 	xp_reward = int(data.get("xp", xp_reward))
 	damage = int(data.get("damage", damage))
+	threat_level = int(data.get("level", threat_level))
+	armor = float(data.get("armor", armor))
 	drops_loot = bool(data.get("loot", drops_loot))
 	is_minion = bool(data.get("minion", false))
 	if data.has("facing"):
@@ -601,7 +611,8 @@ func shove(velocity: Vector2) -> void:
 func take_damage(amount: int, direction: Vector2, heavy := false) -> void:
 	if _state == State.DEAD:
 		return
-	health -= amount
+	# L'armatura assorbe una parte del danno, ma almeno un punto passa sempre.
+	health -= maxi(roundi(amount * (1.0 - armor)), 1)
 	_hit_flash = 0.12
 	_knockback = direction * KNOCKBACK * (HEAVY_KNOCKBACK_FACTOR if heavy else 1.0) / float(_type["mass"])
 	GroundFx.bleed(global_position, ground_elevation + radius * 0.8, direction, BLEED_DROPS_HEAVY if heavy else BLEED_DROPS)

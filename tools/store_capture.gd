@@ -116,7 +116,7 @@ func _capture_level_up(language: String) -> void:
 	_enemy("scout", Vector2(-220, -90), Enemy.State.CHASE, 0.0)
 	_enemy("brute", Vector2(-300, 160), Enemy.State.CHASE, 0.0)
 	var hud: Hud = _game.get_node("HUD")
-	hud.show_level_up(3, Player.BASE_DAMAGE + Player.DAMAGE_PER_LEVEL, Player.BASE_DAMAGE + 2 * Player.DAMAGE_PER_LEVEL)
+	hud.show_level_up(3, Player.damage_at(2), Player.damage_at(3))
 	await get_tree().create_timer(Hud.LEVEL_UP_INPUT_DELAY + 0.1).timeout
 	await _save("%s_3_level_up.png" % language)
 	_end_game()
