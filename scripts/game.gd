@@ -139,8 +139,6 @@ func _process(delta: float) -> void:
 	# Game si ferma con la pausa: qui il tempo conta solo mentre si gioca.
 	play_time += delta
 	UiNav.update()
-	# La torcia si accende da sola al buio (notte, sotterraneo) e si spegne alla luce.
-	_player.set_torch(_day_night.is_night())
 	# I tasti si leggono con UiNav: quelli usati per chiudere un menù non contano.
 	if UiNav.game_pressed("menu") and not get_tree().paused:
 		_hud.pause_menu.open(_save_block_reason())

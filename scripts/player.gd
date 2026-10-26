@@ -9,8 +9,9 @@ extends Node2D
 ## schivate concatenate con cambio di direzione (B), salti anche multipli (A),
 ## corsa tenendo premuto R2, palla di fuoco che insegue i nemici (X, costa
 ## mana), scudo che assorbe un colpo (Y), pozioni di vita (croce sinistra),
-## di mana (croce destra) e di vigore (croce giù). La torcia si accende da
-## sola al buio e si spegne alla luce (vedi set_torch). Il colpo potente si
+## di mana (croce destra) e di vigore (croce giù). Un tocco di L3 accende o
+## spegne la corsa, tenendolo premuto si accende o spegne la torcia (vedi
+## _update_run_button). Il colpo potente si
 ## carica tenendo premuto, fino al doppio del danno. Equipaggiamento e libri
 ## dell'inventario migliorano le caratteristiche (vedi Inventory).
 ## Parata, schivata e salto sono istantanei: annullano subito qualsiasi
@@ -21,10 +22,10 @@ extends Node2D
 ## saltare o parare. Una parata perfetta potenzia gli attacchi per qualche
 ## secondo.
 ## Con R3 si aggancia il nemico più vicino: il personaggio lo guarda sempre,
-## gli attacchi e la palla di fuoco vanno verso di lui; premendo di nuovo si
-## sgancia (niente passaggio da un nemico all'altro). L'aggancio ignora muri
-## e ostacoli; se il bersaglio muore o si allontana troppo si sgancia, senza
-## passare a un altro nemico.
+## gli attacchi e la palla di fuoco vanno verso di lui; premendo di nuovo non
+## si sgancia mai, si aggancia il nemico che in quel momento è più vicino.
+## L'aggancio ignora muri e ostacoli; se il bersaglio muore o si allontana
+## troppo si sgancia, senza passare a un altro nemico.
 ## Tenendo premuto R1 si continua ad attaccare; in aria R1 fa un attacco
 ## aereo. Tenendo premuto il colpo potente il primo colpo si carica e, a
 ## carica piena (o al rilascio), i colpi potenti successivi si concatenano da
@@ -82,7 +83,7 @@ const ATTACK_ARC := deg_to_rad(150.0)
 const ATTACK_STYLES := ["slash", "backhand", "chop", "thrust"]
 ## Rotazione del corpo che accompagna fendente e rovescio.
 const ATTACK_TWIST := 0.18
-const ATTACK_LUNGE_SPEED := 85.0
+const ATTACK_LUNGE_SPEED := 210.0
 ## Durante un attacco ci si muove a questa frazione della velocità normale.
 const ATTACK_MOVE_FACTOR := 0.55
 
@@ -123,6 +124,19 @@ const SLAM_RECOVERY := 0.32
 const SLAM_MAX_TIME := 2.0
 const SLAM_RADIUS := {"plunge": 105.0, "dash": 165.0}
 const PLUNGE_DAMAGE_FACTOR := 1.6
+## Slam aereo caricato: tenendo premuto il colpo potente in aria si resta
+## fermi a mezz'aria mentre si carica (fino a HEAVY_CHARGE_TIME, poi parte da
+## solo); al rilascio si piomba giù con un'onda d'urto molto ampia, larga da
+## AIR_SLAM_MIN_RADIUS a AIR_SLAM_MAX_RADIUS secondo la carica. Conta come
+## caricato se la carica arriva almeno a AIR_SLAM_MIN_CHARGE.
+const AIR_SLAM_MIN_CHARGE := 0.2
+const AIR_SLAM_MIN_RADIUS := 230.0
+const AIR_SLAM_MAX_RADIUS := 330.0
+## Il danno della picchiata cresce con l'altezza da cui parte: questa parte
+## in più per ogni pixel (un salto ≈ +50%, un doppio salto ≈ +100%), al
+## massimo SLAM_HEIGHT_MAX_BONUS.
+const SLAM_HEIGHT_DAMAGE := 0.008
+const SLAM_HEIGHT_MAX_BONUS := 2.0
 const DASH_SLAM_DAMAGE_FACTOR := 2.4
 ## Aggancio del bersaglio: nemici entro LOCK_RANGE, anche dietro muri e
 ## ostacoli; oltre LOCK_BREAK_RANGE si sgancia. La telecamera si sposta
@@ -223,11 +237,12 @@ const SPELL_UPGRADE := 0.2
 ## massimo, che raddoppia il danno.
 const HEAVY_CHARGE_TIME := 0.9
 
-## Torcia: luce attorno al personaggio, che si accende da sola al buio
-## (di notte e nel sotterraneo, vedi Game) e si spegne alla luce.
+## Torcia: luce attorno al personaggio, accesa e spenta tenendo premuto L3
+## (o Maiusc) per TORCH_HOLD_TIME secondi; un tocco più breve è la corsa.
 const TORCH_COLOR := Color(1.0, 0.78, 0.45)
 const TORCH_ENERGY := 1.15
 const TORCH_SCALE := 1.9
+const TORCH_HOLD_TIME := 0.45
 
 ## Ogni pozione cura questi punti vita.
 const POTION_HEAL := 3
@@ -276,7 +291,7 @@ const STAMINA_UPGRADE := 0.1
 const STAMINA_REGEN := 45.0
 const STAMINA_REGEN_DELAY := 0.55
 const STAMINA_PARRY_REGEN_FACTOR := 0.35
-const STAMINA_ATTACK := 20.0
+const STAMINA_ATTACK := 12.0
 const STAMINA_HEAVY := 32.0
 const STAMINA_DODGE := 28.0
 const STAMINA_JUMP := 12.0
@@ -435,6 +450,11 @@ var _air_dash := false
 ## Attacco a terra in corso: "plunge" o "dash", e se ha già toccato terra.
 var _slam_kind := ""
 var _slam_landed := false
+## Altezza da cui parte la picchiata e se lo slam aereo è stato caricato.
+var _slam_height := 0.0
+var _slam_charged := false
+## Da quanto si tiene premuto L3 (-1: tasto non premuto o già usato).
+var _run_hold := -1.0
 ## Tremolio della telecamera (0-1).
 var _shake := 0.0
 ## Ultimo punto a terra fuori dai burroni e la sua altezza: si riappare lì.
@@ -517,10 +537,12 @@ func _physics_process(delta: float) -> void:
 		if UiNav.game_pressed("spell"):
 			_cast_fireball(input)
 	if _state != State.DEAD:
-		# R3 aggancia il nemico più vicino; premendo di nuovo si sgancia.
+		# R3 aggancia il nemico più vicino; premendo di nuovo si aggancia
+		# quello che ora è più vicino (non si sgancia mai).
 		if UiNav.game_pressed("lock_on"):
-			_toggle_lock()
+			_lock_on()
 		_update_lock()
+		_update_run_button(delta)
 
 	# La parata è istantanea: annulla subito attacchi (anche in carica),
 	# schivate, scivolate, attacchi a terra, rinculo e il bere.
@@ -544,10 +566,8 @@ func _physics_process(delta: float) -> void:
 			if input != Vector2.ZERO:
 				_target_facing = input.normalized()
 			_face_lock()
-			# La corsa si accende e si spegne con L3 (o Maiusc); si spegne da
-			# sola fermandosi.
-			if UiNav.game_pressed("run"):
-				_run_on = not _run_on
+			# La corsa si accende e si spegne con un tocco di L3 (o Maiusc, vedi
+			# _update_run_button); si spegne da sola fermandosi.
 			if input == Vector2.ZERO:
 				_run_on = false
 			var running := _run_on and stamina > 0.0 and not is_airborne()
@@ -799,7 +819,8 @@ func _update_height(delta: float) -> void:
 	if _state == State.ATTACK and _air_attack and _height_velocity < 0.0:
 		gravity *= AIR_ATTACK_GRAVITY_FACTOR
 	if _state == State.SLAM and not _slam_landed:
-		gravity = 0.0 if _state_time < SLAM_HANG else SLAM_GRAVITY
+		# Mentre si carica lo slam aereo si resta fermi a mezz'aria.
+		gravity = 0.0 if _charging or _state_time < SLAM_HANG else SLAM_GRAVITY
 	_height_velocity -= gravity * delta
 	_height += _height_velocity * delta
 	if _height <= 0.0:
@@ -1046,10 +1067,15 @@ func teleport(at: Vector2) -> void:
 
 ## Aggancia il nemico più vicino; se ce n'è già uno agganciato sgancia.
 ## Non si passa da un nemico all'altro.
-func _toggle_lock() -> void:
-	lock_target = null if lock_target else _lock_nearest()
+## Aggancia il nemico più vicino; se non ce n'è nessuno a tiro resta
+## agganciato quello di prima.
+func _lock_on() -> void:
+	var nearest := _lock_nearest()
+	if nearest == null:
+		return
+	lock_target = nearest
 	_lock_marker.target = lock_target
-	Sfx.play_ui("ui_move" if lock_target else "ui_confirm")
+	Sfx.play_ui("ui_move")
 
 
 ## Il nemico vivo più vicino entro LOCK_RANGE (null se nessuno), anche
@@ -1405,10 +1431,13 @@ func _start_slam(kind: String, input: Vector2) -> void:
 		return
 	_slam_kind = kind
 	_slam_landed = false
+	_slam_height = _height
+	_slam_charged = false
 	_attack_heavy = false
 	_attack_speed = EMPOWER_ATTACK_SPEED if is_empowered() else 1.0
 	_charge = 0.0
-	_charging = false
+	# Tenendo premuto il colpo potente la picchiata si carica a mezz'aria.
+	_charging = kind == "plunge" and UiNav.game_held("heavy_attack")
 	_queued_attack = ""
 	_combo_timer = 0.0
 	_carry_velocity = Vector2.ZERO
@@ -1427,6 +1456,27 @@ func _start_slam(kind: String, input: Vector2) -> void:
 ## Attacco a terra: sosta in aria, discesa e, toccato terra, l'impatto
 ## (vedi _land); poi un breve recupero.
 func _update_slam(input: Vector2, delta: float) -> void:
+	if _charging:
+		# Fermi a mezz'aria: ci si gira con la levetta (o verso il bersaglio)
+		# finché si tiene premuto; a carica piena la picchiata parte da sola.
+		_height_velocity = 0.0
+		_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * 2.0 * delta)
+		if input != Vector2.ZERO:
+			_target_facing = input.normalized()
+		_face_lock()
+		_state_time = 0.0
+		if UiNav.game_held("heavy_attack"):
+			_charge = minf(_charge + delta / HEAVY_CHARGE_TIME, 1.0)
+			if _charge >= 1.0:
+				Sfx.play("charge_full", global_position)
+				_charging = false
+		else:
+			_charging = false
+		if not _charging:
+			_slam_charged = _charge >= AIR_SLAM_MIN_CHARGE
+			facing = _target_facing
+			Sfx.play("heavy_swing", global_position, 0.7)
+		return
 	if not _slam_landed:
 		if _state_time >= SLAM_HANG and _height_velocity > -SLAM_DIVE_SPEED:
 			_height_velocity = -SLAM_DIVE_SPEED
@@ -1452,7 +1502,7 @@ func _slam_impact() -> void:
 	_state_time = 0.0
 	_squash = 1.0
 	_shake = 1.0
-	var radius: float = SLAM_RADIUS[_slam_kind]
+	var radius := _slam_radius()
 	var damage := _slam_damage()
 	var landed := false
 	for node in get_tree().get_nodes_in_group("enemies"):
@@ -1478,8 +1528,18 @@ func _slam_impact() -> void:
 		HitFeedback.hit(get_tree(), 0.14)
 
 
+func _slam_radius() -> float:
+	if _slam_charged:
+		return lerpf(AIR_SLAM_MIN_RADIUS, AIR_SLAM_MAX_RADIUS, _charge)
+	return SLAM_RADIUS[_slam_kind]
+
+
 func _slam_damage() -> int:
 	var multiplier := PLUNGE_DAMAGE_FACTOR if _slam_kind == "plunge" else DASH_SLAM_DAMAGE_FACTOR
+	if _slam_kind == "plunge":
+		# Più si parte in alto (salti concatenati), più la picchiata fa male;
+		# la carica raddoppia il danno, come per il colpo potente.
+		multiplier *= (1.0 + minf(_slam_height * SLAM_HEIGHT_DAMAGE, SLAM_HEIGHT_MAX_BONUS)) * (1.0 + _charge)
 	if _attack_speed > 1.0:
 		multiplier *= EMPOWER_DAMAGE_FACTOR
 	return roundi(base_damage() * multiplier * (1.0 + inventory.bonus("damage")))
@@ -1744,14 +1804,30 @@ func _refresh_stats() -> void:
 	health_changed.emit(health, max_health)
 
 
-## Torcia automatica: Game la accende al buio e la spegne alla luce.
+## L3 (o Maiusc): un tocco accende o spegne la corsa (al rilascio), tenendo
+## premuto per TORCH_HOLD_TIME si accende o spegne la torcia.
+func _update_run_button(delta: float) -> void:
+	if UiNav.game_pressed("run"):
+		_run_hold = 0.0
+	elif _run_hold < 0.0:
+		return
+	if UiNav.game_held("run"):
+		_run_hold += delta
+		if _run_hold >= TORCH_HOLD_TIME:
+			_run_hold = -1.0
+			set_torch(not torch_on)
+	else:
+		_run_hold = -1.0
+		_run_on = not _run_on
+
+
 func set_torch(on: bool) -> void:
 	if on == torch_on:
 		return
 	torch_on = on
 	_torch.enabled = on
-	if on and _state != State.DEAD:
-		Sfx.play("torch", global_position)
+	if _state != State.DEAD:
+		Sfx.play("torch", global_position, 1.0 if on else 0.7)
 
 
 func _raise_shield() -> void:
@@ -2122,6 +2198,10 @@ func _draw_slam_sword(tint: Color) -> void:
 	var raised := -PI / 2.0 - 0.5
 	var down := PI / 2.0 - 0.35
 	var angle := raised
+	if _charging and _charge > 0.0:
+		# Slam aereo in carica: un anello che si riempie e diventa bianco al massimo.
+		var ring := Color.WHITE if _charge >= 1.0 else COLOR_HEAVY
+		draw_arc(Vector2.ZERO, RADIUS + 14.0, -PI / 2.0, -PI / 2.0 + TAU * _charge, 32, ring, 4.0)
 	if _slam_landed:
 		angle = down
 	elif _height_velocity < 0.0:

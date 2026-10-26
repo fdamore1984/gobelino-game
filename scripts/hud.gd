@@ -162,7 +162,7 @@ func _process(delta: float) -> void:
 
 
 ## Riga compatta in basso a destra: un'icona per ogni effetto temporaneo
-## (parata perfetta con i secondi rimasti, scudo, torcia accesa al buio) e per ogni
+## (parata perfetta con i secondi rimasti, scudo, torcia accesa) e per ogni
 ## potenziamento scelto, con quante volte è stato preso.
 func _update_power_ups() -> void:
 	var rows := []
