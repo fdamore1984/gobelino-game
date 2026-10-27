@@ -40,8 +40,8 @@ extends Node2D
 ## Ogni colpo potente consuma mana finché si tiene premuto (HEAVY_CHARGE_MANA):
 ## senza mana la carica si interrompe. Lo slam aereo caricato fa fluttuare a
 ## mezz'aria, consuma anche vigore ed espone a dardi e frecce.
-## Col mouse: clic sinistro (move_click) per camminare verso il cursore,
-## destro per il colpo potente verso il cursore (vedi _unhandled_input).
+## Col mouse: clic sinistro per attaccare e destro per il colpo potente
+## verso il cursore, centrale (move_click) per camminarci (vedi _unhandled_input).
 ## Sconfiggere nemici dà esperienza; a ogni livello aumentano i danni
 ## base e si sceglie un potenziamento.
 
@@ -258,11 +258,11 @@ const HEAVY_CHARGE_TIME := 0.9
 const HEAVY_CHARGE_MANA := 20.0
 const COLOR_CHARGE_GLOW := Color(0.55, 0.8, 1.0)
 
-## Mouse: il tasto di "move_click" (sinistro) fa camminare verso il punto
+## Mouse: il tasto di "move_click" (centrale) fa camminare verso il punto
 ## del terreno sotto il cursore (tenendolo premuto lo si segue); ci si ferma
 ## entro CLICK_ARRIVE_DISTANCE o se si resta bloccati per CLICK_STUCK_TIME.
-## Gli attacchi partiti con un tasto del mouse (il destro è il colpo
-## potente) vanno verso il cursore.
+## Gli attacchi partiti con un tasto del mouse (il sinistro è l'attacco,
+## il destro il colpo potente) vanno verso il cursore.
 const CLICK_ARRIVE_DISTANCE := 10.0
 const CLICK_STUCK_TIME := 0.4
 

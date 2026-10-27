@@ -93,12 +93,12 @@ IN THIS PROTOTYPE
 - Stone totems stand in the middle of wide open arenas: interact with one to start a 30-second survival challenge with waves of enemies matched to your level, and earn experience and a potion
 - Earn experience to level up: the first ten levels come quickly, then each one takes a little longer. Every level raises your base damage and lets you choose an upgrade: one more combo hit, one more chained power strike, one more chained dodge, one more jump, one more health point, a faster shield recharge (5%), a faster run (5%), more stamina (10%), more mana, a stronger spell, one more potion of each kind carried (healing, mana and stamina), stronger healing potions, stronger mana potions (5%) or one more card to choose from at the next level-ups: three of them (more with that upgrade), picked at random, are offered on cards with icons. Your skill levels are always shown on screen, and the active power-ups are shown as small icons in the bottom-right corner
 
-- Play with the mouse too: left click to walk to the cursor (hold it to keep following), right click for a power strike toward the cursor
+- Play with the mouse too: left click to attack and right click for a power strike toward the cursor, middle click to walk to the cursor (hold it to keep following)
 - Every control can be remapped from Options (title screen or pause menu): keyboard, mouse and controller, each with its own column, saved for next time and reset to defaults with one button
 
 CONTROLS (defaults: change them in Options)
-- Move: left stick / WASD / on-screen stick / left click (walk to the cursor)
-- Attack (combo; hold to keep attacking): R1 / J
+- Move: left stick / WASD / on-screen stick / middle click (walk to the cursor)
+- Attack (combo; hold to keep attacking): R1 / J / left click
 - Power strike (ends the combo; hold to charge, uses mana; keep holding to chain): L2 / L / right click
 - Parry (hold): L1 / K
 - Dodge (press again to chain; cancels any action): B / Space

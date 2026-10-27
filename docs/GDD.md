@@ -41,7 +41,7 @@ Priorità di design indicata: il cuore del gioco sono sistema di gioco, inventar
 
 | Sistema | Descrizione | Stato |
 |---|---|---|
-| Movimento | Isometrico, 8 direzioni; tastiera, gamepad, touch e mouse (clic sinistro: si cammina verso il cursore). Nel prototipo il movimento segue le direzioni dello schermo, con accelerazione e frenata | prototipo |
+| Movimento | Isometrico, 8 direzioni; tastiera, gamepad, touch e mouse (clic centrale: si cammina verso il cursore; clic sinistro attacco, destro colpo potente). Nel prototipo il movimento segue le direzioni dello schermo, con accelerazione e frenata | prototipo |
 | Comandi | Tutti i tasti si possono cambiare dalle opzioni (tastiera, mouse e controller), salvati in `user://keybinds.json` | prototipo |
 | Sfide | Nel prototipo: totem al centro di arene piane che avviano una sfida di sopravvivenza di 30 secondi a ondate, tarata sul livello del giocatore | prototipo |
 | Mondo | Nel prototipo: terreno isometrico 3D a blocchi generato a caso, con piattaforme a gradini su più livelli (si sale saltando, si scende cadendo), rampe inclinate, sentieri sterrati e pochi ostacoli naturali (alberi, sassi, cespugli che rallentano) | prototipo |

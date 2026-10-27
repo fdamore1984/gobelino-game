@@ -1,8 +1,8 @@
 class_name InteractPrompt
 extends Button
 ## Suggerimento sopra l'elemento con cui si può interagire (cassa, mercante,
-## totem, caverna, scala, uscita): il tasto (A sul controller, E sulla
-## tastiera) e "Interact". Toccandolo (o cliccandolo) si interagisce
+## totem, caverna, scala, uscita): il tasto scelto per interagire (A sul
+## controller, E sulla tastiera se non cambiati) e "Interact". Toccandolo (o cliccandolo) si interagisce
 ## (segnale activated): non mentre il gioco è in pausa né nel frame in cui
 ## si chiude un menù, così il tocco che chiude la pausa non interagisce.
 
@@ -34,6 +34,12 @@ func _ready() -> void:
 	pressed.connect(_on_pressed)
 
 
+## Il clic sul suggerimento non è anche un attacco (clic sinistro).
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.is_pressed():
+		UiNav.consume(event)
+
+
 func _on_pressed() -> void:
 	if visible and not get_tree().paused and not UiNav.just_consumed():
 		activated.emit()
@@ -54,7 +60,8 @@ func _draw() -> void:
 	var controller := not Input.get_connected_joypads().is_empty()
 	var key := Vector2(PANEL_SIZE.y / 2.0 + 2.0, PANEL_SIZE.y / 2.0)
 	Shapes.disc(self, key, KEY_RADIUS, COLOR_BUTTON_A if controller else COLOR_KEY)
-	var letter := "A" if controller else "E"
+	# Il tasto scelto dal giocatore (vedi Keybinds), non quello predefinito.
+	var letter := Keybinds.primary("interact", "controller" if controller else "keyboard", true)
 	draw_string(font, key + Vector2(-KEY_RADIUS, 6.5), letter, HORIZONTAL_ALIGNMENT_CENTER, KEY_RADIUS * 2.0, FONT_SIZE,
 			Color.WHITE if controller else Color(0.1, 0.1, 0.1))
 	draw_string(font, Vector2(key.x + KEY_RADIUS + 8.0, PANEL_SIZE.y / 2.0 + 6.5), tr("INTERACT"), HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, COLOR_TEXT)
