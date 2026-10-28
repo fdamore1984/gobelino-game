@@ -135,10 +135,10 @@ CONTROLS_STAMINA_POTION,Stamina potion
 CONTROLS_INVENTORY,Inventory · sort it
 CONTROLS_MENU,"Pause menu (save, controls, options, quit)"
 CONTROLS_SPECIAL_TITLE,Special attacks
-CONTROLS_SPECIAL_MIXED,"Power strike right after a combo: a wide power strike with bonus damage"
-CONTROLS_SPECIAL_CHARGED,"Charge the first power strike: every power strike chained after it deals extra damage"
-CONTROLS_SPECIAL_AIR,"Attack in mid-air: wide aerial slashes that also reach the enemies below you"
-CONTROLS_SPECIAL_PLUNGE,"Power strike in mid-air: plunge (hold it to float and charge a magic slam: drains mana and stamina, archers can hit you)"
+CONTROLS_SPECIAL_MIXED,Power strike right after a combo: a wide power strike with bonus damage
+CONTROLS_SPECIAL_CHARGED,Charge the first power strike: every power strike chained after it deals extra damage
+CONTROLS_SPECIAL_AIR,Attack in mid-air: wide aerial slashes that also reach the enemies below you
+CONTROLS_SPECIAL_PLUNGE,"Power strike in mid-air, only with a Cataclysm rune: smash it on the ground, the blast kills the enemies around (hold it to float and widen the blast; archers can hit you)"
 CONTROLS_SPECIAL_DASH,Power strike during an air dash: dash strike that smashes a wide area
 CONTROLS_TOUCH,On touch screens use the on-screen buttons
 CONTROLS_BACK,Back
@@ -165,7 +165,7 @@ PAUSE_RESUME,Resume
 PAUSE_SAVE,Save game
 PAUSE_CONTROLS,Controls
 PAUSE_QUIT,Quit to title
-PAUSE_QUIT_CONFIRM,"Quit to title? Unsaved progress will be lost."
+PAUSE_QUIT_CONFIRM,Quit to title? Unsaved progress will be lost.
 PAUSE_QUIT_YES,Quit
 PAUSE_QUIT_NO,Cancel
 SAVE_DONE,Game saved
@@ -186,7 +186,7 @@ DUNGEON_LEVEL,Underground · level %d of %d
 BOSS_NAME,Cave Guardian
 BOSS_DEFEATED,Guardian defeated! The way out is open
 MENU_CREDITS,Created by fdamore1984 with Claude Code
-CONTROLS_LOCK,Lock on the nearest enemy (press again to switch to the nearest one)
+CONTROLS_LOCK,Lock on the nearest enemy you can see and keep it (manual lock); press again to switch to the nearest one. Without it the lock is automatic
 TOUCH_LOCK,Lock
 TOUCH_MAP,Map
 MAP_TITLE,Map
@@ -280,3 +280,43 @@ BIND_JOY_SHORT_11,↑
 BIND_JOY_SHORT_12,↓
 BIND_JOY_SHORT_13,←
 BIND_JOY_SHORT_14,→
+CONTROLS_SPECIAL_FRENZY,"Full Frenzy, %s + %s together: a flurry of strikes, teleporting from enemy to enemy"
+HUD_FRENZY_READY,FRENZY! %s + %s
+UPGRADE_FRENZY,Frenzy strikes +2
+UPGRADE_H_BOMB,Cataclysm runes carried +1
+ITEM_H_BOMB,Cataclysm rune
+ITEM_H_BOMB_DESC,for the power strike in mid-air: smash it on the ground and the blast kills the enemies around
+MENU_TUTORIAL,Tutorial
+PAUSE_TUTORIAL,Tutorial
+TUTORIAL_TITLE,Tutorial
+TUTORIAL_PREV,← Back
+TUTORIAL_NEXT,Next →
+TUTORIAL_CLOSE,Close
+TUTORIAL_PAGE,Page %d / %d
+TUTORIAL_HINT,%s / %s: previous / next page · %s: close
+TUTORIAL_MOVE_TITLE,Moving
+TUTORIAL_MOVE_TEXT,"Move with the left stick or the keyboard, or walk to the cursor holding the middle mouse button. Tap {run} to start or stop running (it stops by itself when you stand still); hold {run} to light or put out the torch, you need it at night and in the caves: it lights the way you face. {jump} jumps: you climb onto higher ground and enemy strikes pass under you. Dodge while running to slide."
+TUTORIAL_COMBO_TITLE,Sword and combos
+TUTORIAL_COMBO_TEXT,"Press {attack} to strike with the sword: the strike lands right away. Quick strikes form a combo (3 at first), each one stronger than the last; hold {attack} to keep attacking. {heavy_attack} is the power strike, wide and very strong: it ends the combo with a bonus. Hold it to charge it up to double damage (it uses mana) and to chain more power strikes."
+TUTORIAL_PARRY_TITLE,Parry
+TUTORIAL_PARRY_TEXT,"Hold {parry} to parry with the sword across your body: you block the strikes coming from the front, arrows and bolts included, but it drains stamina. A perfect parry, started right before the hit, stuns the enemy and for 4 seconds doubles your damage and speeds up your attacks. The parry is instant: it cancels whatever you are doing."
+TUTORIAL_DODGE_TITLE,Dodge and jump
+TUTORIAL_DODGE_TEXT,"{dodge} dodges: a roll on the ground, a dash in mid-air. For an instant you can't be hit and you can steer; press it again to chain more dodges (upgrades add more). Parrying, dodging and jumping cancel any action at once, even a strike halfway through. Jumps and dodges combine: jump, dash in the air and strike from above with {attack}."
+TUTORIAL_FRENZY_TITLE,Frenzy
+TUTORIAL_FRENZY_TEXT,"The red bar in the top-left panel is Frenzy. It grows with every sword hit that lands, even when the enemy blocks it with his guard; power strikes and ground attacks fill it faster. If you stop attacking for 4 seconds it slowly drains: stay in the fight! When it is full the bar pulses, {parry} + {attack} appears on it and a red ring surrounds the goblin."
+TUTORIAL_SPECIAL_TITLE,Frenzy special attack
+TUTORIAL_SPECIAL_TEXT,"With a full Frenzy bar press {parry} and {attack} together (on touch screens, the two buttons at once). Time stops: the enemies freeze, the world goes dark, the goblin roars in a red glow and the camera zooms in. Then he teleports next to the nearest enemy and strikes in a flurry; when it falls he moves on to the next one. Up to 10 hits (+2 with every ""Frenzy strikes"" upgrade); with no enemies in reach the flurry ends early. You can't be hit during the attack; at the end Frenzy drops to zero."
+TUTORIAL_SUPPLIES_TITLE,Stamina and potions
+TUTORIAL_SUPPLIES_TEXT,"The green bar is your stamina: attacking, dodging, jumping, parrying and running drain it, and it recovers by itself as soon as you stop. When it's empty you can't attack or dodge, and a parry can break your guard. Your potions are in the bar at the bottom: health {potion}, mana {mana_potion}, stamina {stamina_potion}. Drinking takes a moment: enemies rush in to punish you."
+TUTORIAL_ARSENAL_TITLE,"Fireball, shield and runes"
+TUTORIAL_ARSENAL_TEXT,"{spell} casts a fireball that chases the nearest enemy in sight: it costs mana (the blue bar), which does not come back by itself: drink mana potions. {shield} raises a magic bubble that absorbs one hit from any direction (30-second recharge). In mid-air, with a Cataclysm rune in your belt, {heavy_attack} smashes it on the ground: the blast kills the enemies around and takes a big chunk out of the boss."
+TUTORIAL_ENEMIES_TITLE,The enemies
+TUTORIAL_ENEMIES_TEXT,"Every enemy blow costs you one heart (two from the boss): a few mistakes and you're down. Before striking enemies glow red and pull back their weapon: that's the moment to parry or dodge. No more than two attack at once, the others circle around. Sometimes they raise their guard: hit them from the side or from behind. Their blows and arrows hurt the other monsters too. You lock on to the nearest enemy in sight by yourself ({lock_on} keeps the lock); it gets a red ring and your strikes and fireballs go its way."
+TUTORIAL_LOOT_TITLE,"Chests, inventory and merchants"
+TUTORIAL_LOOT_TEXT,"Walk up to chests, merchants, totems and caves and press {interact} when the prompt appears. Chests drop gold and items: swords, armor, boots, amulets, rings and spell books. {inventory} opens the inventory (the game pauses): equip your gear, read the books, sort with {inventory_sort}. Merchants buy what you don't use and sell potions, Cataclysm runes and rare gear."
+TUTORIAL_WORLD_TITLE,Exploring the lands
+TUTORIAL_WORLD_TEXT,"The lands have no borders. The minimap in the top-right corner shows enemies, chests, totems, merchants and caves; {map} opens the full map. At night you need the torch. Hold {focus} for focus mode: the world dims and only the goblin and the things to pick up keep their colors. Jump to climb the hills and ramps."
+TUTORIAL_BUILDINGS_TITLE,Caves and the boss
+TUTORIAL_BUILDINGS_TEXT,"Cave entrances open in the mountain walls: go in with {interact}. Down there it's dark and the enemies get tougher level after level: on every level look for the stairs. On the last one the Cave Guardian waits in his arena: he summons help and strikes from afar. Beat him for gold, a Cataclysm rune and gear you won't find anywhere else."
+TUTORIAL_PROGRESS_TITLE,"Challenges, levels and saves"
+TUTORIAL_PROGRESS_TEXT,"Interact with a totem for a 30-second challenge in waves: survive it for experience and a potion. Every defeated enemy gives experience; at every level your damage grows and you pick an upgrade among the cards on offer (""Frenzy strikes +2"" too; extra health only shows up now and then). The game saves by itself every 5 minutes and when you enter a cave, with no enemies nearby; from the pause menu ({menu}) you save by hand."

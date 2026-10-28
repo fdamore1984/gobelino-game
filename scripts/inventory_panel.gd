@@ -323,4 +323,7 @@ static func describe(id: String) -> String:
 			continue
 		var shown := roundi(value * 100.0) if key in ["damage", "speed", "spell", "restore_stamina"] else roundi(value)
 		effects.append(TranslationServer.translate("STAT_" + key.to_upper()) % shown)
+	# Gli oggetti senza bonus (la runa del cataclisma) hanno una descrizione a parte.
+	if effects.is_empty():
+		effects.append(TranslationServer.translate(Items.name_key(id) + "_DESC"))
 	return "%s — %s" % [TranslationServer.translate(Items.name_key(id)), ", ".join(effects)]

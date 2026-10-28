@@ -16,3 +16,6 @@
 
 # Immagini per la pagina store: piccole e rigenerate spesso, fuori da LFS
 store/**/*.png -filter -diff -merge -text
+# Immagini del tutorial (catturate da tools/store_capture.tscn): piccole e
+# rigenerate a ogni modifica visibile, fuori da LFS come quelle dello store
+assets/tutorial/*.png -filter -diff -merge -text

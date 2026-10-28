@@ -61,3 +61,5 @@ static func draw_item(canvas: CanvasItem, center: Vector2, side: float, id: Stri
 			canvas.draw_rect(Rect2(center + Vector2(-s * 0.15, -s * 0.8), Vector2(s * 0.3, s * 0.4)), Color(0.85, 0.85, 0.85))
 			canvas.draw_circle(center + Vector2(0, s * 0.15), s * 0.55, Color(0.85, 0.85, 0.85))
 			canvas.draw_circle(center + Vector2(0, s * 0.2), s * 0.44, color)
+		"bomb":
+			HBombBlast.draw_bomb(canvas, center, side * 0.95, 0.0)

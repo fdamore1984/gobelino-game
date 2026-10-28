@@ -54,6 +54,29 @@ static func population(player_level: int) -> int:
 	return clampi(floori(float(count[0]) + float(count[1]) * (player_level - 1)), 1, int(data["max"]))
 
 
+## Quanti nemici possono attaccare il giocatore nello stesso momento (voce
+## "enemy_attacks" di data/world.json): gli altri aspettano il loro turno.
+static func max_simultaneous_attacks() -> int:
+	var data: Dictionary = WORLD_DATA.data["enemy_attacks"]
+	return maxi(int(data["max_simultaneous"]), 1)
+
+
+## Punti vita tolti al giocatore da un colpo qualsiasi (fendente, slam,
+## proiettile), uguali per tutti i nemici e a ogni livello; di più per i boss.
+static func player_damage(boss: bool) -> int:
+	var data: Dictionary = WORLD_DATA.data["enemy_attacks"]
+	return int(data["boss_player_damage"] if boss else data["player_damage"])
+
+
+## Fuoco amico: danni a un altro nemico per ogni punto di danno del colpo
+## (i punti contano per la vita del giocatore, molto più bassa), cresce con
+## il livello di minaccia come la vita dei nemici, così pesa sempre allo
+## stesso modo.
+static func friendly_fire(threat_level: int) -> float:
+	var data: Dictionary = WORLD_DATA.data["enemy_attacks"]
+	return float(data["friendly_fire"]) * scaled("health", 1.0, threat_level)
+
+
 ## Sceglie un tipo a caso, pesato: salendo di livello compaiono più
 ## spesso i nemici forti.
 static func pick_random(player_level: int) -> String:

@@ -1,8 +1,8 @@
 {
 	"duration": 30,
 	"wave_times": [0, 10, 20],
-	"enemies_per_wave": [2, 0.6],
-	"max_per_wave": 8,
+	"enemies_per_wave": [1, 0.35],
+	"max_per_wave": 4,
 	"type_level_bonus": 1,
 	"spawn_distance": 0.8,
 	"spawn_squash": 0.5,

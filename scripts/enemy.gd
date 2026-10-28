@@ -29,6 +29,11 @@ extends Node2D
 ## nei burroni non entrano mai. Il boss resta sempre dentro la sua arena
 ## (vedi confine).
 
+## Tutti i nemici sono fermi (attacco speciale della Frenesia, vedi
+## Player._start_special): niente decisioni, movimenti, attacchi né
+## proiettili (vedi EnemyBolt), ma si possono colpire e chi muore cade.
+static var frozen := false
+
 signal died(enemy: Enemy)
 ## Chiede alla scena di gioco di creare i nemici evocati.
 signal summon_requested(summoner: Enemy, type_id: String, positions: Array[Vector2])
@@ -103,10 +108,26 @@ const SLAM_TRACKING := 0.7
 ## disegna GroundFx) e il nodo sparisce.
 const DEATH_FALL_TIME := 0.35
 ## Sangue perso a ogni colpo (gocce), di più con i colpi potenti.
-const BLEED_DROPS := 5
-const BLEED_DROPS_HEAVY := 10
+const BLEED_DROPS := 16
+const BLEED_DROPS_HEAVY := 32
+## Sangue sul corpo (vedi BodyBlood): ogni colpo ricevuto lo sporca di
+## BLOOD_PER_HIT (BLOOD_PER_HEAVY i colpi potenti), che si pulisce in fretta
+## (BLOOD_CLEAN al secondo: da sporco del tutto a pulito in 8 secondi).
+const BLOOD_PER_HIT := 0.3
+const BLOOD_PER_HEAVY := 0.5
+const BLOOD_CLEAN := 0.125
+const BLOOD_SPOTS := 7
+## Pozza di sangue che resta a terra alla morte, rispetto al raggio.
+const DEATH_POOL := 2.4
+## Tono della voce (vedi Voice): più grosso il nemico, più profonda la voce;
+## ognuno ha la sua, un po' diversa (VOICE_SPREAD).
+const VOICE_SPREAD := Vector2(0.9, 1.12)
+const BOSS_VOICE := 0.85
 ## I nemici evocati compaiono a questa distanza dall'evocatore.
 const SUMMON_DISTANCE := 70.0
+## Fuoco amico (vedi hurt_enemy): i colpi dei nemici feriscono anche gli
+## altri nemici nella zona d'impatto, ma non oltre questa differenza d'altezza.
+const FRIENDLY_HEIGHT_REACH := 40.0
 ## Salti sui gradini e cadute: gravità, quanti livelli si superano con un
 ## salto, quanto più in alto del gradino si arriva e attesa tra due salti.
 const GRAVITY := 1500.0
@@ -116,8 +137,11 @@ const HOP_COOLDOWN := 0.6
 ## Il salto parte se in un passo si è percorsa meno di questa parte del movimento voluto.
 const HOP_BLOCKED_SHARE := 0.5
 
-## Gambe: altezza rispetto al raggio del corpo e passo.
-const LEG_FACTOR := 0.5
+## Gambe: altezza rispetto al raggio del corpo e passo; corte e larghe,
+## distanti LEG_SPACING (rispetto al raggio) dal centro e spesse LEG_WIDTH (rispetto al raggio, almeno 4,5 pixel).
+const LEG_FACTOR := 0.4
+const LEG_SPACING := 0.38
+const LEG_WIDTH := 0.25
 const WALK_CYCLE := 0.08
 
 ## Prestazioni con tanti nemici: la spinta di separazione guarda solo i
@@ -146,6 +170,14 @@ const COLOR_STUNNED := Color(0.55, 0.55, 0.8)
 const COLOR_DANGER := Color(1.0, 0.25, 0.15)
 const COLOR_SUMMON := Color(0.4, 1.0, 0.9)
 const COLOR_DAMAGE := Color(1.0, 1.0, 1.0)
+## Tinta del nemico agganciato dal giocatore (vedi set_locked): i valori
+## sopra 1 lo illuminano di rosso invece di scurirlo.
+const COLOR_LOCKED := Color(1.7, 0.5, 0.45)
+## Aspetto casuale (vedi _apply_look): taglia (moltiplica il raggio del
+## tipo), sfumatura del colore del tipo e copricapo con il suo colore.
+const SIZE_RANGE := Vector2(0.8, 1.25)
+const HEADWEARS := ["", "", "helmet", "hood", "horns", "headband"]
+const GEAR_COLORS := [Color(0.55, 0.57, 0.62), Color(0.45, 0.3, 0.18), Color(0.25, 0.22, 0.35), Color(0.6, 0.15, 0.12), Color(0.85, 0.82, 0.7), Color(0.2, 0.35, 0.2)]
 
 var player: Player
 var type_id := "warrior"
@@ -169,6 +201,10 @@ var is_minion := false
 
 var _type: Dictionary
 var _color := Color.WHITE
+## Seme dell'aspetto (vedi _apply_look), copricapo scelto e il suo colore.
+var _look_seed := 0
+var _headwear := ""
+var _headwear_color := Color.WHITE
 var _speed := 125.0
 var _state := State.WANDER
 var _state_time := 0.0
@@ -193,6 +229,8 @@ var _guard_cooldown := 0.0
 var _seen_attack := -1
 var _guard_flash := 0.0
 var _strike_resolved := false
+## Nemici già feriti dal fuoco amico in questo colpo (uno per colpo).
+var _friendly_struck: Array[Enemy] = []
 ## Salto con colpo a terra: punto di partenza e d'arrivo, attesa prima di
 ## riprovarlo e altezza attuale del salto.
 var _slam_from := Vector2.ZERO
@@ -223,6 +261,10 @@ var _minions: Array[Enemy] = []
 ## Verso del fendente (+1 o -1): cambia a ogni attacco.
 var _swing_sign := 1.0
 var _walk_phase := 0.0
+## Sangue sul corpo, ferite dei colpi ricevuti e voce.
+var _blood := BodyBlood.new(randi(), BLOOD_SPOTS, BLOOD_CLEAN)
+var _wounds := Wounds.new()
+var _voice := Voice.new()
 ## La zona di pericolo va disegnata sotto i personaggi, non sopra.
 var _telegraph := Node2D.new()
 ## Effetti rossi dell'attacco su nodi propri: dietro al corpo il bagliore
@@ -277,6 +319,7 @@ func setup(id: String, level := 1) -> void:
 		_summon_cooldown = randf_range(1.0, 2.5)
 	if _type.has("magic"):
 		_magic_cooldown = randf_range(1.5, 3.0)
+	_apply_look(randi())
 
 
 ## Stato da salvare: tipo, posizione esatta, vita e valori cambiati dalla
@@ -286,7 +329,7 @@ func save_state() -> Dictionary:
 		"type": type_id, "position": SaveGame.array(position), "health": health, "max_health": max_health,
 		"xp": xp_reward, "damage": damage, "loot": drops_loot, "minion": is_minion,
 		"level": threat_level, "armor": armor,
-		"facing": SaveGame.array(_facing),
+		"facing": SaveGame.array(_facing), "look": _look_seed,
 	}
 
 
@@ -306,6 +349,27 @@ func load_state(data: Dictionary) -> void:
 		var facing := SaveGame.vector(data["facing"])
 		if facing != Vector2.ZERO:
 			_facing = facing.normalized()
+	# Salvataggi precedenti all'aspetto casuale: resta quello scelto in setup.
+	if data.has("look"):
+		_apply_look(int(data["look"]))
+
+
+## Aspetto casuale ma ripetibile dal seme (salvato con il nemico): taglia,
+## sfumatura del colore e copricapo (elmo, cappuccio, corna o fascia).
+## Il boss tiene taglia e colore del tipo e solo la corona.
+func _apply_look(look_seed: int) -> void:
+	_look_seed = look_seed
+	var rng := RandomNumberGenerator.new()
+	rng.seed = look_seed
+	var size := 1.0 if is_boss() else rng.randf_range(SIZE_RANGE.x, SIZE_RANGE.y)
+	radius = float(_type["radius"]) * size
+	var color: Array = _type["color"]
+	var base := Color(color[0], color[1], color[2])
+	_color = base if is_boss() else Color.from_hsv(wrapf(base.h + rng.randf_range(-0.03, 0.03), 0.0, 1.0),
+			clampf(base.s * rng.randf_range(0.85, 1.15), 0.0, 1.0), clampf(base.v * rng.randf_range(0.88, 1.1), 0.0, 1.0))
+	_headwear = "" if is_boss() else HEADWEARS[rng.randi() % HEADWEARS.size()]
+	_headwear_color = GEAR_COLORS[rng.randi() % GEAR_COLORS.size()]
+	_shape_radius = -1.0
 
 
 ## Il nemico non esce mai dal cerchio di rombi (raggio in rombi) attorno a
@@ -346,12 +410,23 @@ func _ready() -> void:
 	add_child(_danger_front)
 	for fx: CanvasItem in [_telegraph, _danger_back, _danger_front]:
 		fx.material = _unshaded_material()
+	_voice.tone = (BOSS_VOICE if is_boss() else randf_range(VOICE_SPREAD.x, VOICE_SPREAD.y)) / pow(float(_type["mass"]), 0.25)
+	add_child(_voice)
 	if World.current:
 		ground_elevation = World.current.elevation_at(position)
 		_telegraph.position.y = -ground_elevation
 
 
 func _physics_process(delta: float) -> void:
+	if frozen and _state != State.DEAD:
+		# Fermi come statue: i colpi li fanno sanguinare ma non li spostano.
+		_knockback = Vector2.ZERO
+		_hit_flash = maxf(_hit_flash - delta, 0.0)
+		_blood.update(delta)
+		_wounds.update(delta)
+		if _on_screen():
+			queue_redraw()
+		return
 	# Lontano dal giocatore ci si aggiorna un passo sì e uno no (molto lontano
 	# uno su quattro), con il tempo di quelli saltati: non si vede e costa meno.
 	if player and _state != State.DEAD:
@@ -371,6 +446,8 @@ func _physics_process(delta: float) -> void:
 	_slam_cooldown = maxf(_slam_cooldown - delta, 0.0)
 	_magic_cooldown = maxf(_magic_cooldown - delta, 0.0)
 	_hop_cooldown = maxf(_hop_cooldown - delta, 0.0)
+	_blood.update(delta)
+	_wounds.update(delta)
 
 	var target_velocity := Vector2.ZERO
 	var to_player := player.global_position - global_position if player else Vector2.INF
@@ -393,22 +470,25 @@ func _physics_process(delta: float) -> void:
 				_change_state(State.WANDER)
 			elif _punishing(to_player, distance):
 				_attack_cooldown = 0.0
-				if distance <= _attack_trigger_range():
+				if distance > _attack_trigger_range():
+					target_velocity = to_player.normalized() * _speed * PUNISH_SPEED_FACTOR
+				elif _attack_slot_free():
 					_strikes = 0
 					_begin_windup(_type["windup"][0], _type["windup"][1], true)
 				else:
-					target_velocity = to_player.normalized() * _speed * PUNISH_SPEED_FACTOR
-			elif _exposed_shot(distance):
+					# Troppi attacchi in corso: si aspetta girando attorno.
+					target_velocity = _chase_direction(to_player) * _speed
+			elif _exposed_shot(distance) and _attack_slot_free():
 				_begin_exposed_shot()
 			elif _should_guard(distance):
 				_begin_guard()
-			elif _can_slam(distance):
+			elif _can_slam(distance) and _attack_slot_free():
 				_begin_slam()
-			elif _can_cast(distance):
+			elif _can_cast(distance) and _attack_slot_free():
 				_begin_cast()
 			elif _can_summon(distance):
 				_begin_summon()
-			elif _attack_cooldown == 0.0 and distance <= _attack_trigger_range() and _can_shoot_player():
+			elif _attack_cooldown == 0.0 and distance <= _attack_trigger_range() and _can_shoot_player() and _attack_slot_free():
 				_strikes = 0
 				_begin_windup(_type["windup"][0], _type["windup"][1], true)
 			else:
@@ -439,6 +519,7 @@ func _physics_process(delta: float) -> void:
 				_start_dash(to_player)
 			elif _state_time >= _windup_time:
 				_strike_resolved = false
+				_friendly_struck.clear()
 				Sfx.play("enemy_strike", global_position, 1.0 / sqrt(_type["mass"]))
 				_change_state(State.STRIKE)
 
@@ -447,9 +528,11 @@ func _physics_process(delta: float) -> void:
 			var shooting := _is_ranged() or _casting
 			_velocity = Vector2.ZERO if shooting else _attack_direction * float(_type["lunge_speed"])
 			target_velocity = _velocity
+			if not shooting:
+				_strike_enemies()
 			if not shooting and not _strike_resolved and player_active and _player_in_strike_zone():
 				_strike_resolved = true
-				var result := player.receive_hit(global_position, damage)
+				var result := player.receive_hit(global_position, EnemyTypes.player_damage(is_boss()))
 				if result == "parried":
 					Sfx.play("stun", global_position)
 					_change_state(State.STUNNED)
@@ -481,7 +564,7 @@ func _physics_process(delta: float) -> void:
 			_update_slam(player_active)
 
 		State.RECOVER:
-			if _state_time >= RECOVER_TIME * EXPOSED_RECOVER_SHARE and _exposed_shot(distance):
+			if _state_time >= RECOVER_TIME * EXPOSED_RECOVER_SHARE and _exposed_shot(distance) and _attack_slot_free():
 				_begin_exposed_shot()
 			elif _state_time >= RECOVER_TIME:
 				_attack_cooldown = randf_range(ATTACK_COOLDOWN.x, ATTACK_COOLDOWN.y)
@@ -629,15 +712,20 @@ func take_damage(amount: int, direction: Vector2, heavy := false) -> void:
 	_hit_flash = 0.12
 	_knockback = direction * KNOCKBACK * (HEAVY_KNOCKBACK_FACTOR if heavy else 1.0) / float(_type["mass"])
 	GroundFx.bleed(global_position, ground_elevation + radius * 0.8, direction, BLEED_DROPS_HEAVY if heavy else BLEED_DROPS)
+	_wounds.add(-direction)
+	_blood.add(BLOOD_PER_HEAVY if heavy else BLOOD_PER_HIT)
 	if health <= 0:
 		_fall_side = 1.0 if direction.x >= 0.0 else -1.0
 		_trail.clear()
-		GroundFx.pool(global_position, radius * 0.9)
+		GroundFx.pool(global_position, radius * DEATH_POOL)
 		_change_state(State.DEAD)
 		remove_from_group("enemies")
 		Sfx.play("enemy_death", global_position, 1.0 / sqrt(_type["mass"]))
+		_voice.scream()
 		died.emit(self)
-	elif _state == State.SUMMON:
+		return
+	_voice.pain()
+	if _state == State.SUMMON:
 		# Colpire un evocatore mentre evoca interrompe l'evocazione.
 		_finish_summon()
 	elif _state == State.WANDER:
@@ -660,6 +748,29 @@ func is_boss() -> bool:
 
 
 ## Corona d'oro sopra la testa del boss.
+## Copricapo scelto a caso (vedi _apply_look), sempre in cima alla testa.
+func _draw_headwear() -> void:
+	var top := Vector2(0, -radius)
+	match _headwear:
+		"helmet":
+			var dome := PackedVector2Array()
+			for k in 9:
+				dome.append(top + Vector2.from_angle(PI + PI * k / 8.0) * Vector2(radius * 0.8, radius * 0.55) + Vector2(0, radius * 0.45))
+			draw_colored_polygon(dome, _headwear_color)
+			draw_line(top + Vector2(-radius * 0.85, radius * 0.45), top + Vector2(radius * 0.85, radius * 0.45), _headwear_color.darkened(0.35), radius * 0.12)
+			draw_line(top + Vector2(0, -radius * 0.12), top + Vector2(0, radius * 0.45), _headwear_color.lightened(0.25), maxf(radius * 0.08, 1.5))
+		"hood":
+			draw_colored_polygon(PackedVector2Array([top + Vector2(-radius * 0.9, radius * 0.6), top + Vector2(-radius * 0.55, -radius * 0.05),
+					top + Vector2(0, -radius * 0.3), top + Vector2(radius * 0.55, -radius * 0.05), top + Vector2(radius * 0.9, radius * 0.6)]), _headwear_color)
+		"horns":
+			for side: float in [-1.0, 1.0]:
+				var base := top + Vector2(side * radius * 0.45, radius * 0.25)
+				draw_colored_polygon(PackedVector2Array([base + Vector2(-radius * 0.12, 0), base + Vector2(side * radius * 0.35, -radius * 0.55),
+						base + Vector2(radius * 0.12, 0)]), Color(0.92, 0.88, 0.75))
+		"headband":
+			draw_line(Vector2(-radius * 0.92, -radius * 0.45), Vector2(radius * 0.92, -radius * 0.45), _headwear_color, radius * 0.2)
+
+
 func _draw_crown() -> void:
 	var top := Vector2(0, -radius * 1.05)
 	var width := radius * 0.7
@@ -775,12 +886,15 @@ func _shoot_bolt(direction: Vector2, ranged: Dictionary) -> void:
 	bolt.direction = direction
 	bolt.speed = ranged["bolt_speed"]
 	bolt.damage = damage + int(ranged.get("damage_bonus", 0))
+	bolt.player_damage = EnemyTypes.player_damage(is_boss())
 	bolt.max_distance = float(ranged["range"]) * 1.3
 	bolt.altitude = ground_elevation
 	bolt.radius = float(ranged.get("bolt_radius", EnemyBolt.RADIUS))
 	bolt.color = World._color(ranged["color"]) if ranged.has("color") else _color.lightened(0.3)
 	bolt.arrow = ranged.get("arrow", false)
 	bolt.position = position + direction * radius
+	bolt.shooter = self
+	bolt.threat_level = threat_level
 	get_parent().add_child(bolt)
 	if bolt.arrow:
 		Sfx.play("bow", global_position)
@@ -893,7 +1007,7 @@ func blocks(from: Vector2) -> bool:
 	if _state != State.GUARD or absf(_facing.angle_to(from - global_position)) > GUARD_ARC / 2.0:
 		return false
 	_guard_flash = 0.25
-	if randf() < COUNTER_CHANCE:
+	if randf() < COUNTER_CHANCE and _attack_slot_free():
 		_guard_cooldown = randf_range(GUARD_COOLDOWN.x, GUARD_COOLDOWN.y)
 		_strikes = 0
 		_attack_direction = (from - global_position).normalized()
@@ -973,10 +1087,12 @@ func _land_slam(player_active: bool, slam: Dictionary) -> void:
 	var impact_radius := float(slam["radius"])
 	GroundFx.shockwave(global_position, ground_elevation, impact_radius)
 	Sfx.play("fireball_hit", global_position, 0.5 / sqrt(_type["mass"]))
+	for other in _enemies_near(impact_radius):
+		hurt_enemy(other, damage + int(slam["damage_bonus"]), threat_level, other.global_position - global_position, true)
 	if player_active and player.global_position.distance_to(global_position) <= impact_radius + Player.RADIUS:
 		# Anche il colpo a terra si può parare: con una parata perfetta
 		# (istantanea, appena prima dell'impatto) si resta storditi.
-		if player.receive_hit(global_position, damage + int(slam["damage_bonus"])) == "parried":
+		if player.receive_hit(global_position, EnemyTypes.player_damage(is_boss())) == "parried":
 			Sfx.play("stun", global_position)
 			_slam_cooldown = randf_range(SLAM_RETRY.x, SLAM_RETRY.y) * 2.0
 			_change_state(State.STUNNED)
@@ -1017,6 +1133,71 @@ func _player_in_strike_zone() -> bool:
 	if offset.length() > radius + float(_type["strike_reach"]) + Player.RADIUS:
 		return false
 	return offset.length() <= radius + Player.RADIUS or absf(_attack_direction.angle_to(offset)) <= _strike_arc() / 2.0
+
+
+## Sta attaccando il giocatore (carica, colpo o salto con colpo a terra)?
+## Al più EnemyTypes.max_simultaneous_attacks nemici attaccano insieme: gli
+## altri girano attorno finché uno degli attacchi non finisce (vedi
+## _attack_slot_free).
+func is_attacking() -> bool:
+	return _state in [State.WINDUP, State.STRIKE, State.SLAM]
+
+
+## C'è posto per un nuovo attacco? Al più EnemyTypes.max_simultaneous_attacks
+## nemici attaccano insieme; il controllo avviene quando si decide, uno dopo
+## l'altro, così due nemici nello stesso passo non prendono lo stesso posto.
+func _attack_slot_free() -> bool:
+	var limit := EnemyTypes.max_simultaneous_attacks()
+	var busy := 0
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as Enemy
+		if enemy != null and enemy != self and enemy.is_attacking():
+			busy += 1
+			if busy >= limit:
+				return false
+	return true
+
+
+## Gli altri nemici vivi entro reach (più il loro raggio) e più o meno alla
+## stessa altezza.
+func _enemies_near(reach: float) -> Array[Enemy]:
+	var found: Array[Enemy] = []
+	var altitude := ground_elevation + _height + _air
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as Enemy
+		if enemy == null or enemy == self or enemy.is_dead():
+			continue
+		if absf(enemy.ground_elevation + enemy._height + enemy._air - altitude) > FRIENDLY_HEIGHT_REACH:
+			continue
+		if enemy.global_position.distance_to(global_position) <= reach + enemy.radius:
+			found.append(enemy)
+	return found
+
+
+## Fuoco amico del fendente: ferisce una volta per colpo gli altri nemici
+## nella zona colpita (stessa portata e stesso arco del colpo al giocatore).
+func _strike_enemies() -> void:
+	for other in _enemies_near(radius + float(_type["strike_reach"])):
+		if other in _friendly_struck:
+			continue
+		var offset := other.global_position - global_position
+		if offset.length() > radius + other.radius and absf(_attack_direction.angle_to(offset)) > _strike_arc() / 2.0:
+			continue
+		_friendly_struck.append(other)
+		hurt_enemy(other, damage, threat_level, offset, false)
+
+
+## Danno di un colpo nemico a un altro nemico (fuoco amico): points sono i
+## punti di danno del colpo, level il livello di minaccia di chi colpisce.
+static func hurt_enemy(other: Enemy, points: int, level: int, direction: Vector2, heavy: bool) -> void:
+	var amount := roundi(points * EnemyTypes.friendly_fire(level))
+	other.take_damage(amount, direction.normalized() if direction != Vector2.ZERO else Vector2.DOWN, heavy)
+	Sfx.play("hit", other.global_position, 0.8, -6.0)
+
+
+## Il giocatore l'ha agganciato (vedi Player.lock_target): si colora di rosso.
+func set_locked(locked: bool) -> void:
+	self_modulate = COLOR_LOCKED if locked else Color.WHITE
 
 
 ## Spinta per non sovrapporsi agli altri nemici.
@@ -1114,24 +1295,26 @@ func _draw() -> void:
 	# I salti (attacco speciale, gradini) sollevano tutto tranne l'ombra.
 	draw_set_transform(Vector2(0, -ground_elevation - lift))
 	var walking := _velocity.length() > 15.0 and _state != State.DEAD
-	BodyParts.draw_legs(self, -leg + radius * 0.55, radius * 0.85, radius * 0.35, maxf(4.0, radius * 0.22),
+	BodyParts.draw_legs(self, -leg + radius * 0.55, radius * 0.85, radius * LEG_SPACING, maxf(4.5, radius * LEG_WIDTH),
 			_walk_phase, _velocity.normalized(), radius * 0.3 if walking else 0.0, _color.darkened(0.4))
 	draw_set_transform(_body_offset())
 	_prepare_meshes()
+	if _hit_flash <= 0.0:
+		body = _blood.tint(body)
+	# Guardando verso nord "occhio" e arma sono dietro al corpo, che li
+	# copre (vedi BodyParts.gear_behind); la corona resta sempre in cima.
+	var behind := BodyParts.gear_behind(_facing)
+	if behind:
+		_draw_gear()
 	draw_mesh(_body_mesh, null, Transform2D.IDENTITY, body)
+	_blood.draw(self, radius, 1.0)
+	_wounds.draw(self, radius, 1.0)
 	draw_mesh(_outline_mesh, null, Transform2D.IDENTITY, body.darkened(0.35))
-	Shapes.disc(self, _facing * radius * 0.5, maxf(radius * 0.2, 4.0), Color(0.1, 0.05, 0.1))
+	if not behind:
+		_draw_gear()
+	_draw_headwear()
 	if is_boss():
 		_draw_crown()
-	if is_casting():
-		_draw_magic()
-	if _is_ranged():
-		if _type["ranged"].get("arrow", false):
-			_draw_bow()
-		else:
-			_draw_staff()
-	else:
-		_draw_sword()
 
 	if _state == State.STUNNED:
 		for i in 3:
@@ -1144,6 +1327,20 @@ func _draw() -> void:
 		var origin := Vector2(-width / 2.0, -radius * 1.2 - 14.0)
 		draw_rect(Rect2(origin, Vector2(width, 6)), Color(0, 0, 0, 0.5))
 		draw_rect(Rect2(origin, Vector2(width * health / max_health, 6)), COLOR_DANGER)
+
+
+## "Occhio" che indica la direzione, magia e arma.
+func _draw_gear() -> void:
+	Shapes.disc(self, _facing * radius * 0.5, maxf(radius * 0.2, 4.0), Color(0.1, 0.05, 0.1))
+	if is_casting():
+		_draw_magic()
+	if _is_ranged():
+		if _type["ranged"].get("arrow", false):
+			_draw_bow()
+		else:
+			_draw_staff()
+	else:
+		_draw_sword()
 
 
 ## Posizione del corpo sopra le gambe: salto, ondeggiare del passo e

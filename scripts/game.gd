@@ -114,6 +114,8 @@ func _ready() -> void:
 	_player.experience_changed.connect(_hud.set_experience)
 	_player.leveled_up.connect(_on_player_leveled_up)
 	_player.died.connect(_on_player_died)
+	_player.frenzy_changed.connect(_hud.set_frenzy)
+	_player.special_finished.connect(_on_special_finished)
 	_hud.upgrade_chosen.connect(_on_upgrade_chosen)
 	_hud.interact_pressed.connect(_interact)
 	_hud.player = _player
@@ -230,7 +232,7 @@ func _update_interaction() -> void:
 
 
 func _find_interactable() -> Dictionary:
-	if _player.is_dead() or _challenge_arena != Vector2.INF:
+	if _player.is_dead() or _player.is_special_active() or _challenge_arena != Vector2.INF:
 		return {}
 	var at := _player.position
 	var reach := Player.RADIUS + INTERACT_REACH
@@ -435,7 +437,7 @@ func _setup_boss(boss: Enemy, dungeon: Dungeon) -> void:
 	_hud.show_boss(boss)
 
 
-## Boss sconfitto: monete, oggetti speciali e uno raro; il goblin ride, la
+## Boss sconfitto: monete, oggetti speciali, uno raro e una runa del cataclisma (h_bomb); il goblin ride, la
 ## caverna è completata e nella parete dell'arena compare l'uscita.
 func _on_boss_died(boss: Enemy) -> void:
 	_world.cleared_caves[_cave] = true
@@ -448,6 +450,7 @@ func _on_boss_died(boss: Enemy) -> void:
 		drops.append([special[k], 1])
 	var rare := Items.shop_items()
 	drops.append([rare[randi() % rare.size()], 1])
+	drops.append(["h_bomb", int(_dungeon_data.get("boss_reward_h_bombs", 1))])
 	_drop_loot(boss.global_position, drops)
 	var dungeon := _world.dungeon
 	_world.add_obstacle(_world.make_wall_obstacle("exit", dungeon.arena_exit, dungeon.arena_exit_side))
@@ -682,7 +685,14 @@ func _on_enemy_died(enemy: Enemy) -> void:
 
 func _on_player_leveled_up(_level: int) -> void:
 	_pending_level_ups += 1
-	if _pending_level_ups == 1:
+	# Durante l'attacco speciale la scelta aspetta la fine della raffica.
+	if _pending_level_ups == 1 and not _player.is_special_active():
+		_show_level_up()
+
+
+## Finito l'attacco speciale si scelgono i potenziamenti guadagnati nel frattempo.
+func _on_special_finished() -> void:
+	if _pending_level_ups > 0 and not _hud.is_level_up_open():
 		_show_level_up()
 
 
@@ -714,9 +724,12 @@ func _on_player_died() -> void:
 
 func _exit_tree() -> void:
 	HitFeedback.reset()
+	# I nemici della prossima partita non devono restare fermi.
+	Enemy.frozen = false
 
 
 func _back_to_menu() -> void:
 	get_tree().paused = false
 	HitFeedback.reset()
+	Enemy.frozen = false
 	get_tree().change_scene_to_file(MENU_SCENE)

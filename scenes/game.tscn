@@ -215,12 +215,22 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(222, 176)
 layout_mode = 2
 
+[node name="UpgradeHBomb" type="Button" parent="HUD/LevelUp/Center/VBox/Upgrades"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(222, 176)
+layout_mode = 2
+
 [node name="UpgradePotionHeal" type="Button" parent="HUD/LevelUp/Center/VBox/Upgrades"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(222, 176)
 layout_mode = 2
 
 [node name="UpgradeManaRestore" type="Button" parent="HUD/LevelUp/Center/VBox/Upgrades"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(222, 176)
+layout_mode = 2
+
+[node name="UpgradeFrenzy" type="Button" parent="HUD/LevelUp/Center/VBox/Upgrades"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(222, 176)
 layout_mode = 2

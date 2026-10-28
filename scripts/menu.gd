@@ -1,8 +1,9 @@
 extends Control
 ## Menù iniziale: Continua riprende subito la partita salvata più di
 ## recente (se ce n'è), Nuova partita ne avvia una scegliendo uno dei tre
-## slot (SlotPanel); mostra i comandi (ControlsPanel), le opzioni con la
-## rimappatura dei tasti (OptionsPanel) o chiude il gioco. Si usa con mouse, touch, tastiera o controller.
+## slot (SlotPanel); mostra i comandi (ControlsPanel), il tutorial a pagine
+## (TutorialPanel), le opzioni con la rimappatura dei tasti (OptionsPanel) o
+## chiude il gioco. Si usa con mouse, touch, tastiera o controller.
 ## In basso a sinistra mostra la versione (per riconoscere a colpo
 ## d'occhio le build scaricate da itch.io) e chi ha fatto il gioco.
 
@@ -12,11 +13,13 @@ const GAME_SCENE := "res://scenes/game.tscn"
 @onready var _start: Button = %Start
 @onready var _quit: Button = %Quit
 @onready var _controls: Button = %Controls
+@onready var _tutorial: Button = %Tutorial
 @onready var _options: Button = %Options
 @onready var _info: Label = %Info
 
 var _controls_panel := ControlsPanel.new()
 var _options_panel := OptionsPanel.new()
+var _tutorial_panel := TutorialPanel.new()
 var _slot_panel := SlotPanel.new()
 
 
@@ -28,6 +31,9 @@ func _ready() -> void:
 	_controls.pressed.connect(_on_controls_pressed)
 	add_child(_controls_panel)
 	_controls_panel.closed.connect(_on_controls_closed)
+	_tutorial.pressed.connect(_on_tutorial_pressed)
+	add_child(_tutorial_panel)
+	_tutorial_panel.closed.connect(_on_tutorial_closed)
 	_options.pressed.connect(_on_options_pressed)
 	add_child(_options_panel)
 	_options_panel.closed.connect(_on_options_closed)
@@ -40,7 +46,7 @@ func _ready() -> void:
 	_quit.focus_neighbor_bottom = first.get_path()
 	first.focus_neighbor_top = _quit.get_path()
 
-	for button: Button in [_continue, _start, _controls, _options, _quit]:
+	for button: Button in [_continue, _start, _controls, _tutorial, _options, _quit]:
 		button.focus_entered.connect(Sfx.play_ui.bind("ui_move"))
 	first.grab_focus()
 	_update_info()
@@ -54,7 +60,7 @@ func _notification(what: int) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	# Il pulsante premuto può aver già cambiato scena: in quel caso questo
 	# nodo non è più nell'albero e non c'è niente da segnare.
-	if _controls_panel.visible or _options_panel.visible or _slot_panel.visible:
+	if _controls_panel.visible or _options_panel.visible or _slot_panel.visible or _tutorial_panel.visible:
 		return
 	if UiNav.handle(event, get_viewport(), _continue if _continue.visible else _start) and is_inside_tree():
 		get_viewport().set_input_as_handled()
@@ -92,7 +98,7 @@ func _on_continue_pressed() -> void:
 ## Con un pannello aperto i pulsanti del menù sotto non si possono
 ## selezionare né premere: la navigazione resta dentro il pannello.
 func _set_buttons_active(active: bool) -> void:
-	for button: Button in [_continue, _start, _controls, _options, _quit]:
+	for button: Button in [_continue, _start, _controls, _tutorial, _options, _quit]:
 		button.focus_mode = Control.FOCUS_ALL if active else Control.FOCUS_NONE
 		button.disabled = not active
 
@@ -130,6 +136,17 @@ func _on_controls_pressed() -> void:
 func _on_controls_closed() -> void:
 	_set_buttons_active(true)
 	_controls.grab_focus()
+
+
+func _on_tutorial_pressed() -> void:
+	Sfx.play_ui("ui_confirm")
+	_set_buttons_active(false)
+	_tutorial_panel.open()
+
+
+func _on_tutorial_closed() -> void:
+	_set_buttons_active(true)
+	_tutorial.grab_focus()
 
 
 func _on_options_pressed() -> void:

@@ -1,7 +1,8 @@
 class_name HudActions
 extends Control
 ## Barra delle azioni in basso a sinistra: pozioni (vita, mana, vigore),
-## scudo, palla di fuoco e inventario, ognuno con la sua icona, il tasto del
+## scudo, palla di fuoco, rune del cataclisma (h_bomb, colpo potente in aria)
+## e inventario, ognuno con la sua icona, il tasto del
 ## controller scelto dal giocatore (vedi Keybinds),
 ## quante ne restano o la ricarica. Sui dispositivi touch non serve: ci
 ## sono già i pulsanti a schermo.
@@ -16,7 +17,7 @@ const COLOR_KEY := Color(1, 1, 1, 0.85)
 ## Azioni: icona e azione dell'Input Map (per il tasto del controller).
 const ACTIONS := [
 	["potion", "potion"], ["mana", "mana_potion"], ["shield", "shield"], ["spell", "spell"],
-	["stamina_potion", "stamina_potion"], ["bag", "inventory"],
+	["stamina_potion", "stamina_potion"], ["h_bomb", "heavy_attack"], ["bag", "inventory"],
 ]
 
 var player: Player
@@ -80,6 +81,8 @@ func _is_ready(kind: String) -> bool:
 			return player.shield_active or player.shield_cooldown <= 0.0
 		"spell":
 			return player.mana >= Player.SPELL_COST
+		"h_bomb":
+			return player.h_bombs > 0
 	return true
 
 
@@ -91,6 +94,8 @@ func _count(kind: String) -> String:
 			return str(player.mana_potions)
 		"stamina_potion":
 			return str(player.stamina_potions)
+		"h_bomb":
+			return str(player.h_bombs)
 		"spell":
 			return str(roundi(Player.SPELL_COST))
 		"bag":
