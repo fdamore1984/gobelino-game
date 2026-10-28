@@ -676,6 +676,7 @@ func _on_enemy_died(enemy: Enemy) -> void:
 	_hud.set_kills(_kills)
 	Sfx.play("xp", enemy.global_position)
 	_player.add_experience(enemy.xp_reward)
+	_player.stain_with_blood()
 	# Ogni tanto un nemico lascia monete o un oggetto (il boss ha il suo bottino).
 	if enemy.drops_loot and not enemy.is_boss():
 		var drops := Items.enemy_drops(_player.level)
