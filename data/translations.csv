@@ -133,12 +133,12 @@ CONTROLS_POTION,Health potion
 CONTROLS_MANA,Mana potion
 CONTROLS_STAMINA_POTION,Stamina potion
 CONTROLS_INVENTORY,Inventory · sort it
-CONTROLS_MENU,"Pause menu (save, controls, options, quit)"
+CONTROLS_MENU,"Pause menu (save, controls, tutorial, options, quit)"
 CONTROLS_SPECIAL_TITLE,Special attacks
 CONTROLS_SPECIAL_MIXED,Power strike right after a combo: a wide power strike with bonus damage
 CONTROLS_SPECIAL_CHARGED,Charge the first power strike: every power strike chained after it deals extra damage
 CONTROLS_SPECIAL_AIR,Attack in mid-air: wide aerial slashes that also reach the enemies below you
-CONTROLS_SPECIAL_PLUNGE,"Power strike in mid-air, only with a Cataclysm rune: smash it on the ground, the blast kills the enemies around (hold it to float and widen the blast; archers can hit you)"
+CONTROLS_SPECIAL_PLUNGE,"Power strike in mid-air, with a Cataclysm rune: smash it, the blast kills the enemies around (hold to float and widen it)"
 CONTROLS_SPECIAL_DASH,Power strike during an air dash: dash strike that smashes a wide area
 CONTROLS_TOUCH,On touch screens use the on-screen buttons
 CONTROLS_BACK,Back
@@ -186,7 +186,7 @@ DUNGEON_LEVEL,Underground · level %d of %d
 BOSS_NAME,Cave Guardian
 BOSS_DEFEATED,Guardian defeated! The way out is open
 MENU_CREDITS,Created by fdamore1984 with Claude Code
-CONTROLS_LOCK,Lock on the nearest enemy you can see and keep it (manual lock); press again to switch to the nearest one. Without it the lock is automatic
+CONTROLS_LOCK,Manual lock on the nearest enemy in sight (again: switch target)
 TOUCH_LOCK,Lock
 TOUCH_MAP,Map
 MAP_TITLE,Map
