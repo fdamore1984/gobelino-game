@@ -9,10 +9,17 @@ const MIX_RATE := 22050
 const POOL_SIZE := 16
 ## Oltre questa distanza i suoni posizionali non si sentono più.
 const MAX_DISTANCE := 1400.0
+## Voci (versi brevi a onda quadra quando si è colpiti e abbattuti, vedi
+## Voice): quante varianti di ciascuna e i lettori riservati ai versi di
+## morte, che continuano anche dopo che il nemico morto è sparito.
+const VOICES := {"pain": 4, "scream": 3}
+const VOICE_POOL_SIZE := 6
 
 var _streams := {}
 var _pool: Array[AudioStreamPlayer2D] = []
 var _next := 0
+var _voice_pool: Array[AudioStreamPlayer2D] = []
+var _next_voice := 0
 var _ui_player := AudioStreamPlayer.new()
 
 
@@ -25,6 +32,12 @@ func _ready() -> void:
 		player.attenuation = 1.5
 		add_child(player)
 		_pool.append(player)
+	for i in VOICE_POOL_SIZE:
+		var player := AudioStreamPlayer2D.new()
+		player.max_distance = MAX_DISTANCE
+		player.attenuation = 1.5
+		add_child(player)
+		_voice_pool.append(player)
 	add_child(_ui_player)
 
 
@@ -36,6 +49,26 @@ func play(sound: String, at: Vector2, pitch := 1.0, volume_db := 0.0) -> void:
 	var player := _pool[_next]
 	_next = (_next + 1) % POOL_SIZE
 	player.stream = _streams[sound]
+	player.global_position = at
+	player.pitch_scale = pitch * randf_range(0.95, 1.05)
+	player.volume_db = volume_db
+	player.play()
+
+
+## Una variante a caso di una voce (kind: "pain" o "scream", vedi VOICES).
+func voice(kind: String) -> AudioStream:
+	return _streams.get("%s_%d" % [kind, randi() % int(VOICES.get(kind, 1))])
+
+
+## Voce nel mondo di gioco su un lettore riservato (vedi VOICE_POOL_SIZE):
+## pitch è il tono della voce di chi la emette.
+func play_voice(kind: String, at: Vector2, pitch := 1.0, volume_db := 0.0) -> void:
+	var stream := voice(kind)
+	if stream == null:
+		return
+	var player := _voice_pool[_next_voice]
+	_next_voice = (_next_voice + 1) % VOICE_POOL_SIZE
+	player.stream = stream
 	player.global_position = at
 	player.pitch_scale = pitch * randf_range(0.95, 1.05)
 	player.volume_db = volume_db
@@ -98,6 +131,18 @@ func _build_sounds() -> void:
 		return _noise() * 0.5 * _env(t, d, 0.02))
 	_streams["xp"] = _render(0.08, func(t: float, d: float) -> float:
 		return sin(TAU * lerpf(1200.0, 1600.0, t / d) * t) * 0.25 * _env(t, d, 0.005))
+	# Urlo della Frenesia: un ruggito a onda quadra che sale e trema, con un
+	# rombo grave sotto, come i versi 8 bit ma più lungo.
+	_streams["frenzy_roar"] = _render_filtered(0.9, Vector2(0.8, 0.35), func(t: float, d: float) -> float:
+		var pitch := lerpf(110.0, 190.0, minf(t / 0.3, 1.0)) * (1.0 + 0.06 * sin(TAU * 9.0 * t))
+		var growl := (1.0 if fmod(pitch * t, 1.0) < 0.35 else -1.0) * 0.35
+		var rev := _triangle(lerpf(70.0, 140.0, t / d) * t) * 0.3
+		return (growl + rev + _noise() * 0.25) * (0.75 + 0.25 * absf(sin(TAU * 18.0 * t))) * _env(t, d, 0.03))
+	# Frenesia piena: due note che salgono, squillanti.
+	_streams["frenzy_ready"] = _render(0.3, func(t: float, _d: float) -> float:
+		var note := 660.0 if t < 0.1 else 990.0
+		var local := t if t < 0.1 else t - 0.1
+		return (1.0 if fmod(note * t, 1.0) < 0.5 else -1.0) * 0.18 * exp(-local * 10.0))
 	_streams["charge_full"] = _render(0.25, func(t: float, d: float) -> float:
 		return (sin(TAU * 1500.0 * t) + sin(TAU * 2250.0 * t) * 0.5) * 0.18 * _env(t, d, 0.003))
 	_streams["mana_potion"] = _render(0.5, func(t: float, d: float) -> float:
@@ -111,6 +156,16 @@ func _build_sounds() -> void:
 	_streams["fireball"] = _render_filtered(0.45, Vector2(0.15, 0.4), func(t: float, d: float) -> float:
 		var roar := sin(TAU * lerpf(120.0, 220.0, t / d) * t) * 0.4
 		return (_noise() * 0.6 + roar) * _env(t, d, 0.03))
+	# Runa del cataclisma: la pietra che si spacca e un boato lungo e profondo.
+	_streams["h_bomb"] = _render_filtered(2.2, Vector2(0.6, 0.02), func(t: float, d: float) -> float:
+		var crack := (_noise() + sin(TAU * 1500.0 * t) * 0.4) * exp(-t * 40.0)
+		var boom := sin(TAU * lerpf(70.0, 22.0, t / d) * t) * exp(-t * 1.6)
+		var rumble := _noise() * 0.6 * exp(-t * 1.2)
+		return clampf((crack + boom + rumble) * 1.4, -1.0, 1.0) * _env(t, d, 0.002))
+	# La runa alzata sopra la testa: un rintocco cristallino.
+	_streams["h_bomb_lift"] = _render(0.25, func(t: float, d: float) -> float:
+		var metal := sin(TAU * 220.0 * t) + sin(TAU * 347.0 * t) * 0.6
+		return (metal * 0.3 + _noise() * 0.2 * exp(-t * 30.0)) * exp(-t * 9.0) * _env(t, d, 0.002))
 	_streams["fireball_hit"] = _render_filtered(0.5, Vector2(0.5, 0.05), func(t: float, d: float) -> float:
 		var boom := sin(TAU * lerpf(110.0, 40.0, t / d) * t) * 0.6
 		return (_noise() * 0.7 + boom) * _env(t, d, 0.004))
@@ -163,6 +218,23 @@ func _build_sounds() -> void:
 		return sin(TAU * 900.0 * t) * 0.2 * _env(t, d, 0.002))
 	_streams["ui_confirm"] = _render(0.1, func(t: float, d: float) -> float:
 		return _triangle(lerpf(600.0, 950.0, t / d) * t) * 0.3 * _env(t, d, 0.003))
+	_build_voices()
+
+
+## Voci di giocatore e nemici (vedi Voice): versi brevi e secchi a onda
+## quadra, come nei vecchi giochi a 8 bit; ognuno li sente con il suo tono.
+## notes: le note in Hz, una dopo l'altra (ognuna lunga step secondi, senza
+## scivolare dall'una all'altra), duty la larghezza dell'impulso.
+func _build_voices() -> void:
+	# Colpiti: due note che scendono di colpo.
+	_streams["pain_0"] = _render_chip([440.0, 330.0], 0.035, 0.5)
+	_streams["pain_1"] = _render_chip([523.0, 392.0], 0.035, 0.25)
+	_streams["pain_2"] = _render_chip([392.0, 262.0], 0.04, 0.5)
+	_streams["pain_3"] = _render_chip([494.0, 370.0, 330.0], 0.028, 0.25)
+	# Abbattuti: un arpeggio che precipita, appena più lungo ma sempre corto.
+	_streams["scream_0"] = _render_chip([587.0, 440.0, 330.0, 220.0], 0.04, 0.5)
+	_streams["scream_1"] = _render_chip([659.0, 494.0, 370.0, 247.0], 0.04, 0.25)
+	_streams["scream_2"] = _render_chip([523.0, 392.0, 262.0, 196.0], 0.045, 0.125)
 
 
 ## Genera un AudioStreamWAV mono a 16 bit campionando generator(t, durata).
@@ -188,6 +260,16 @@ func _render_filtered(duration: float, lowpass: Vector2, generator: Callable) ->
 	stream.stereo = false
 	stream.data = data
 	return stream
+
+
+## Verso a onda quadra: le note una dopo l'altra, a gradini, con un attacco
+## istantaneo e uno smorzamento rapido alla fine (niente code lunghe).
+func _render_chip(notes: Array, step: float, duty: float) -> AudioStreamWAV:
+	var duration := step * notes.size()
+	return _render(duration, func(t: float, d: float) -> float:
+		var note: float = notes[mini(int(t / step), notes.size() - 1)]
+		var pulse := 1.0 if fmod(note * t, 1.0) < duty else -1.0
+		return pulse * 0.32 * _env(t, d, 0.002))
 
 
 ## Inviluppo: attacco rapido e poi decadimento fino a zero alla fine.

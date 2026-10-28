@@ -5,7 +5,8 @@ class_name Items
 ##
 ## Categorie: "gold" (monete), armi ("weapon"), equipaggiamento ("armor",
 ## "boots", "amulet", "ring": uno per tipo), libri di magia ("book", si
-## leggono una volta e migliorano per sempre) e pozioni ("potion").
+## leggono una volta e migliorano per sempre) pozioni ("potion") e rune del cataclisma
+## ("bomb", id "h_bomb": per il colpo potente in aria, vedi Player.h_bombs).
 ## Bonus possibili: damage (danni +%), health (vita massima), speed
 ## (velocità +%), mana (mana massimo), spell (potenza della magia +%),
 ## heal e restore_mana per le pozioni.
@@ -82,8 +83,8 @@ static func _random_kind(item: Dictionary) -> bool:
 
 
 ## Quello che lascia un nemico abbattuto: ogni tanto monete o una pozione
-## (di vita, di mana o di vigore), di rado un oggetto e molto di rado un oggetto raro
-## dei mercanti.
+## (di vita, di mana o di vigore), a volte una runa del cataclisma, di rado
+## un oggetto e molto di rado un oggetto raro dei mercanti.
 static func enemy_drops(level: int) -> Array[Array]:
 	var data: Dictionary = DATA.data["enemy_drop"]
 	var drops: Array[Array] = []
@@ -96,6 +97,8 @@ static func enemy_drops(level: int) -> Array[Array]:
 		drops.append(["potion_mana", 1])
 	elif randf() < float(data.get("stamina_potion_chance", 0.0)):
 		drops.append(["potion_stamina", 1])
+	if randf() < float(data.get("h_bomb_chance", 0.0)):
+		drops.append(["h_bomb", 1])
 	if randf() < float(data["rare_chance"]):
 		var rare := shop_items()
 		drops.append([rare[randi() % rare.size()], 1])

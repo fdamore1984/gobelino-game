@@ -8,7 +8,9 @@
 - **Pagina itch.io sempre aggiornata**: a ogni modifica che cambia ciò che il
   gioco fa o mostra, aggiorna `store/itch/README.md` (descrizione, comandi,
   tag) e rigenera copertina e screenshot con `tools/store_capture.tscn`
-  (istruzioni nel README della cartella). itch.io non ha API per la pagina:
+  (istruzioni nel README della cartella); con la stessa scena (`-- tutorial`)
+  rigenera anche le immagini del tutorial in `assets/tutorial/` e, se cambia
+  una meccanica, aggiorna i testi delle sue pagine (`TUTORIAL_*`). itch.io non ha API per la pagina:
   segnala all'utente cosa ricaricare a mano.
 - **Contenuti nei dati**: caratteristiche di nemici e simili in `data/`
   (per esempio `data/enemies.json`), separate dal codice.

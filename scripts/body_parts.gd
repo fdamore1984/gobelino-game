@@ -7,6 +7,17 @@ const COLOR_BLADE := Color(0.86, 0.88, 0.92)
 const COLOR_EDGE := Color(1.0, 1.0, 1.0)
 const COLOR_GUARD := Color(0.55, 0.42, 0.2)
 const COLOR_GRIP := Color(0.32, 0.2, 0.12)
+## Prospettiva isometrica: chi guarda verso nord (verso l'alto dello
+## schermo, sguardo con y sotto questa soglia) ha davanti a sé la parte del
+## corpo lontana dalla telecamera, e gli elementi montati sul corpo (armi,
+## braccia, torcia, scorte, faccia) vanno disegnati prima del corpo, che li
+## copre; guardando a sud restano davanti al corpo.
+const BEHIND_FACING := -0.2
+
+
+## True se gli elementi montati sul corpo vanno dietro al corpo (vedi BEHIND_FACING).
+static func gear_behind(facing: Vector2) -> bool:
+	return facing.y < BEHIND_FACING
 
 
 ## Due gambe dai fianchi ai piedi. phase avanza camminando: i piedi si

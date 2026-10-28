@@ -18,7 +18,7 @@ const ROWS := [
 	["CONTROLS_MAP", [["map"]]], ["CONTROLS_LOCK", [["lock_on"]]], ["CONTROLS_MENU", [["menu"]]],
 ]
 const MOVE_ACTIONS := ["move_up", "move_left", "move_down", "move_right"]
-const SPECIALS := ["CONTROLS_SPECIAL_MIXED", "CONTROLS_SPECIAL_CHARGED", "CONTROLS_SPECIAL_AIR", "CONTROLS_SPECIAL_PLUNGE", "CONTROLS_SPECIAL_DASH"]
+const SPECIALS := ["CONTROLS_SPECIAL_FRENZY", "CONTROLS_SPECIAL_MIXED", "CONTROLS_SPECIAL_CHARGED", "CONTROLS_SPECIAL_AIR", "CONTROLS_SPECIAL_PLUNGE", "CONTROLS_SPECIAL_DASH"]
 const COLOR_TITLE := Color(0.85, 0.75, 0.4)
 const COLOR_HEADER := Color(1.0, 0.85, 0.4)
 const COLOR_TEXT := Color(1, 1, 1, 0.85)
@@ -53,7 +53,12 @@ func _ready() -> void:
 	specials.add_theme_constant_override("separation", 0)
 	box.add_child(specials)
 	for key: String in SPECIALS:
-		specials.add_child(_label(key, 17, COLOR_TEXT, true))
+		var label := _label(key, 17, COLOR_TEXT, true)
+		if key == "CONTROLS_SPECIAL_FRENZY":
+			# L'attacco speciale è parata + attacco insieme: tasti dall'Input Map.
+			label.text = tr(key) % [Keybinds.hint("parry"), Keybinds.hint("attack")]
+			label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+		specials.add_child(label)
 	if Platform.use_touch_controls():
 		specials.add_child(_label("CONTROLS_TOUCH", 17, COLOR_KEY, true))
 	_back.text = "CONTROLS_BACK"

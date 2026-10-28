@@ -73,6 +73,13 @@ static func game_held(action: StringName) -> bool:
 	return Input.is_action_pressed(action) and not _is_consumed(action)
 
 
+## Combinazione di due azioni (per esempio L1 + R1 per l'attacco speciale):
+## tutte e due tenute premute e almeno una appena premuta, in qualsiasi
+## ordine; i tasti consumati da un menù non contano.
+static func game_chord(first: StringName, second: StringName) -> bool:
+	return game_held(first) and game_held(second) and (game_pressed(first) or game_pressed(second))
+
+
 ## Da un menù si è appena tornati in gioco (questo frame o il precedente):
 ## i tocchi sullo schermo che hanno chiuso il menù non devono contare.
 static func just_consumed() -> bool:

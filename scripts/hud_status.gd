@@ -1,10 +1,11 @@
 class_name HudStatus
 extends Control
 ## Pannello di stato in alto a sinistra: ritratto con il livello, barre di
-## vita (a segmenti), stamina, mana ed esperienza, livelli delle abilità, monete e
-## nemici sconfitti. Tutto disegnato con forme geometriche.
+## vita (a segmenti), stamina, mana, esperienza e Frenesia, livelli delle abilità, monete e
+## nemici sconfitti. Tutto disegnato con forme geometriche. La barra della
+## Frenesia, piena, pulsa e mostra i tasti dell'attacco speciale (parata + attacco).
 
-const PANEL_SIZE := Vector2(460, 146)
+const PANEL_SIZE := Vector2(460, 168)
 ## Il pannello è disegnato a questa scala, per coprire meno l'area di gioco;
 ## i testi invece si disegnano alla loro grandezza vera, così restano nitidi.
 const PANEL_SCALE := 0.82
@@ -25,6 +26,7 @@ const COLOR_STAMINA := Color(0.4, 0.85, 0.35)
 const COLOR_STAMINA_EMPTY := Color(1.0, 0.3, 0.2)
 const COLOR_MANA := Color(0.35, 0.55, 1.0)
 const COLOR_XP := Color(1.0, 0.8, 0.3)
+const COLOR_FRENZY := Player.COLOR_FRENZY
 const COLOR_TEXT := Color(1, 1, 1, 0.92)
 const COLOR_DIM_TEXT := Color(1, 1, 1, 0.82)
 ## Il pannello si ridisegna da solo a questo intervallo (mana, monete, nemici
@@ -53,7 +55,8 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_redraw_timer -= delta
-	if _redraw_timer <= 0.0:
+	# La barra della Frenesia piena pulsa: si ridisegna a ogni frame.
+	if _redraw_timer <= 0.0 or (player and player.is_frenzy_full()):
 		_redraw_timer = REDRAW_INTERVAL
 		queue_redraw()
 
@@ -86,23 +89,36 @@ func _draw() -> void:
 	# vedi Player.experience_for).
 	var needed := maxi(player.experience_needed(), 1)
 	_draw_bar(Rect2(BAR_X + 24, 76, BAR_WIDTH - 24, 6), clampf(float(player.experience) / needed, 0.0, 1.0), COLOR_XP)
-	_text(font, tr("HUD_XP") % [player.experience, needed], Vector2(BAR_X + 24, 99), SMALL_FONT_SIZE, COLOR_DIM_TEXT)
+
+	# Frenesia: cresce colpendo e cala se si smette di attaccare; piena pulsa
+	# e indica i tasti dell'attacco speciale.
+	UpgradeIcon.draw_icon(self, Vector2(BAR_X + 9, 94), 18.0, "frenzy", false)
+	draw_set_transform(Vector2.ZERO)
+	var frenzy_rect := Rect2(BAR_X + 24, 88, BAR_WIDTH - 24, 12)
+	var full := player.is_frenzy_full()
+	var beat := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.012) if full else 0.0
+	_draw_bar(frenzy_rect, player.frenzy / Player.FRENZY_MAX, COLOR_FRENZY.lightened(0.35 * beat))
+	if full:
+		draw_rect(frenzy_rect.grow(1.0 + beat), Color(1.0, 0.85, 0.4, 0.6 + 0.4 * beat), false, 2.0)
+		_text(font, tr("HUD_FRENZY_READY") % [Keybinds.primary("parry", "controller", true), Keybinds.primary("attack", "controller", true)],
+				frenzy_rect.get_center() + Vector2(0, 7), SMALL_FONT_SIZE, COLOR_TEXT, HORIZONTAL_ALIGNMENT_CENTER)
+	_text(font, tr("HUD_XP") % [player.experience, needed], Vector2(BAR_X + 24, 121), SMALL_FONT_SIZE, COLOR_DIM_TEXT)
 
 	# Abilità (si leggono anche nell'elenco dei potenziamenti a destra).
 	var x := 18.0
 	var values := [player.max_combo_hits, player.max_heavy_chain, player.max_chained_dodges, player.max_jumps,
 			"%d%%" % roundi(100.0 * (1.0 + player.run_speed_bonus))]
 	for i in SKILLS.size():
-		UpgradeIcon.draw_icon(self, Vector2(x + 11, 122), 22.0, SKILLS[i])
+		UpgradeIcon.draw_icon(self, Vector2(x + 11, 144), 22.0, SKILLS[i])
 		draw_set_transform(Vector2.ZERO)
-		_text(font, str(values[i]), Vector2(x + 26, 128), FONT_SIZE, COLOR_TEXT)
+		_text(font, str(values[i]), Vector2(x + 26, 150), FONT_SIZE, COLOR_TEXT)
 		x += 52.0
 	# Monete e nemici sconfitti, a destra.
-	var coin := Vector2(size.x - 112, 122)
+	var coin := Vector2(size.x - 112, 144)
 	draw_circle(coin, 9.0, Items.color("gold").darkened(0.25))
 	draw_circle(coin, 7.0, Items.color("gold"))
 	_text(font, str(player.inventory.gold), coin + Vector2(14, 6), FONT_SIZE, COLOR_TEXT)
-	var sword := Vector2(size.x - 46, 122)
+	var sword := Vector2(size.x - 46, 144)
 	BodyParts.draw_sword(self, sword + Vector2(-8, 8), -PI / 4.0, 22.0, 3.0)
 	_text(font, str(kills), sword + Vector2(12, 6), FONT_SIZE, COLOR_TEXT)
 

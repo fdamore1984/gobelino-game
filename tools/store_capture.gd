@@ -1,10 +1,12 @@
 extends Node
 ## Genera copertina e screenshot per la pagina itch.io (store/itch/), in
-## inglese (l'unica lingua del gioco per ora), componendo scene di gioco reali. Va rilanciato a
-## ogni modifica visibile del gioco. Serve una finestra (non --headless):
+## inglese (l'unica lingua del gioco per ora), componendo scene di gioco reali, e
+## le immagini delle pagine del tutorial (assets/tutorial/, vedi TutorialPanel).
+## Va rilanciato a ogni modifica visibile del gioco. Serve una finestra (non --headless):
 ##
 ##   godot --path . --resolution 1280x720 res://tools/store_capture.tscn -- screenshots
 ##   godot --path . --resolution 1260x1000 res://tools/store_capture.tscn -- cover
+##   godot --path . --resolution 1280x720 res://tools/store_capture.tscn -- tutorial
 ##
 ## Non fa parte del gioco: la cartella tools/ è esclusa dagli export.
 
@@ -12,11 +14,24 @@ const OUTPUT := "res://store/itch/"
 const LANGUAGES := ["en"]
 const SUBTITLE := {"en": "Action RPG · prototype"}
 const COVER_SIZE := Vector2i(630, 500)
+## Immagini del tutorial: più piccole, e quali scene diventano quale pagina
+## (nome dello screenshot senza la lingua -> immagine del tutorial).
+const TUTORIAL_OUTPUT := "res://assets/tutorial/"
+const TUTORIAL_SIZE := Vector2i(640, 360)
+const TUTORIAL_IMAGES := {
+	"move.png": "move.png", "1_combat.png": "combo.png", "2_parry.png": "parry.png",
+	"dodge.png": "dodge.png", "frenzy_bar.png": "frenzy_bar.png", "16_frenzy.png": "frenzy_special.png",
+	"supplies.png": "supplies.png", "15_h_bomb.png": "arsenal.png", "enemies.png": "enemies.png",
+	"6_inventory.png": "loot.png", "13_map.png": "world.png", "12_dungeon.png": "buildings.png",
+	"3_level_up.png": "progress.png",
+}
 ## Seme del mondo usato per le immagini, così il terreno è sempre lo stesso.
 const WORLD_SEED := 1234
 
 var _game: Node2D
 var _player: Player
+## Si stanno catturando le immagini del tutorial (vedi _save).
+var _tutorial := false
 
 
 func _ready() -> void:
@@ -30,6 +45,13 @@ func _ready() -> void:
 		TranslationServer.set_locale(language)
 		if mode == "cover":
 			await _capture_cover(language)
+		elif mode == "tutorial":
+			_tutorial = true
+			DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(TUTORIAL_OUTPUT))
+			for capture: Callable in [_capture_move, _capture_combat, _capture_parry, _capture_dodge, _capture_frenzy_bar,
+					_capture_frenzy, _capture_supplies, _capture_h_bomb, _capture_enemies, _capture_inventory, _capture_cave,
+					_capture_dungeon, _capture_level_up]:
+				await capture.call(language)
 		else:
 			await _capture_menu(language)
 			await _capture_combat(language)
@@ -40,6 +62,8 @@ func _ready() -> void:
 			await _capture_merchant(language)
 			await _capture_slam(language)
 			await _capture_air_charge(language)
+			await _capture_h_bomb(language)
+			await _capture_frenzy(language)
 			await _capture_cave(language)
 			await _capture_dungeon(language)
 	get_tree().quit()
@@ -63,8 +87,9 @@ func _capture_menu(language: String) -> void:
 	await _frames(2)
 
 
-## Colpo potente in fondo alla combo, un bruto che carica, un evocatore
-## che evoca, nemici attorno; scudo attivo.
+## Colpo potente in fondo alla combo sul nemico agganciato (in rosso), un
+## bruto e uno stregone che caricano (al più due attacchi insieme), un
+## colosso in arrivo; scudo attivo e Frenesia quasi piena.
 func _capture_combat(language: String) -> void:
 	await _start_game(Vector2(0, 20), 1.15)
 	_player.level = 3
@@ -78,18 +103,15 @@ func _capture_combat(language: String) -> void:
 	_player.shield_active = true
 	_player.shield_cooldown = 21.0
 	_player.potions = 1
+	_player.frenzy = 70.0
 	_player.apply_upgrade("combo")
 	_player.apply_upgrade("dodge")
 	_hud_stats()
 	var warrior := _enemy("warrior", Vector2(95, -25), Enemy.State.CHASE, 0.0)
-	warrior.health = 15
-	warrior._hit_flash = 0.1
+	warrior.health = 40
+	_player._set_lock_target(warrior)
 	_enemy("brute", Vector2(-170, 90), Enemy.State.WINDUP, 0.6)
-	var summoner := _enemy("summoner", Vector2(330, 150), Enemy.State.SUMMON, 0.8)
-	summoner._summon_positions = [Vector2(-70, 0), Vector2(70, 0)]
 	_enemy("caster", Vector2(-330, -140), Enemy.State.WINDUP, 0.6)
-	_enemy("lancer", Vector2(250, -190), Enemy.State.CHASE, 0.0)
-	_enemy("whirler", Vector2(-420, 200), Enemy.State.WINDUP, 0.7)
 	_enemy("golem", Vector2(470, -40), Enemy.State.CHASE, 0.0)
 	await _save("%s_1_combat.png" % language)
 	_end_game()
@@ -105,9 +127,8 @@ func _capture_parry(language: String) -> void:
 	_player._state_time = 0.05
 	_player._empowered_time = Player.EMPOWER_TIME
 	_hud_stats()
-	_enemy("brute", Vector2(95, 10), Enemy.State.STUNNED, 0.4)
+	_player._set_lock_target(_enemy("brute", Vector2(95, 10), Enemy.State.STUNNED, 0.4))
 	_enemy("warrior", Vector2(-160, -60), Enemy.State.WINDUP, 0.5)
-	_enemy("scout", Vector2(-260, 150), Enemy.State.CHASE, 0.0)
 	_enemy("summoner", Vector2(330, -170), Enemy.State.CHASE, 0.0)
 	await _save("%s_2_parry.png" % language)
 	_end_game()
@@ -154,8 +175,8 @@ func _capture_challenge(language: String) -> void:
 	_hud_stats()
 	world.set_totem_state(arena, "active")
 	var hud: Hud = _game.get_node("HUD")
-	hud.show_challenge(tr("CHALLENGE_STATUS") % [21, 5])
-	_enemy("warrior", _player.position + Vector2(-110, 20), Enemy.State.STRIKE, 0.15)
+	hud.show_challenge(tr("CHALLENGE_STATUS") % [21, 4])
+	_player._set_lock_target(_enemy("warrior", _player.position + Vector2(-110, 20), Enemy.State.STRIKE, 0.15))
 	_enemy("scout", _player.position + Vector2(170, -120), Enemy.State.CHASE, 0.0)
 	_enemy("brute", _player.position + Vector2(230, 90), Enemy.State.WINDUP, 0.9)
 	_enemy("scout", _player.position + Vector2(-300, -150), Enemy.State.CHASE, 0.0)
@@ -165,6 +186,7 @@ func _capture_challenge(language: String) -> void:
 	_player.torch_on = true
 	_player._torch.enabled = true
 	_player._torch.position = Vector2(0, -_player.ground_elevation + Player.RADIUS * 0.6)
+	_player._torch.aim(_player.facing)
 	var fireball := Fireball.new()
 	fireball.position = _player.position + Vector2(120, -70)
 	fireball.direction = Vector2(1, -0.4).normalized()
@@ -325,6 +347,156 @@ func _capture_air_charge(language: String) -> void:
 	_end_game()
 
 
+## La runa del cataclisma esplode: onda di magia, nemici abbattuti attorno
+## e il goblin annerito dalla fuliggine.
+func _capture_h_bomb(language: String) -> void:
+	await _start_game(Vector2(0, -70), 1.0)
+	_player.level = 6
+	_hud_stats()
+	_player.h_bombs = 1
+	var origin := _player.position
+	for spot: Array in [["warrior", Vector2(130, 40)], ["brute", Vector2(-150, 60)], ["scout", Vector2(60, -110)], ["lancer", Vector2(-90, -80)]]:
+		var enemy := _enemy(spot[0], origin + spot[1], Enemy.State.CHASE, 0.0)
+		enemy.take_damage(99999, (spot[1] as Vector2).normalized(), true)
+		enemy._state_time = 0.2
+		enemy._hit_flash = 0.0
+		enemy.queue_redraw()
+	_player._state = Player.State.SLAM
+	_player._slam_kind = "plunge"
+	_player._slam_landed = true
+	_player._state_time = 0.1
+	_player.soot = 0.95
+	_player.facing = Vector2(1, 0.3).normalized()
+	_player.queue_redraw()
+	var blast := HBombBlast.new()
+	blast.radius = Player.H_BOMB_MAX_RADIUS
+	blast.position = origin
+	blast.altitude = _player.ground_elevation
+	_entities().add_child(blast)
+	blast._age = 0.3
+	blast.set_process(false)
+	# Di giorno la luce dell'esplosione coprirebbe la fuliggine sul goblin.
+	blast._light.energy = 0.4
+	blast.queue_redraw()
+	await _save("%s_16_rune.png" % language)
+	_end_game()
+
+
+## Frenesia: il goblin scatena l'attacco speciale. I nemici sono fermi, lo
+## sfondo è scuro tranne attorno a lui, che urla avvolto dal bagliore rosso;
+## la telecamera è avvicinata.
+func _capture_frenzy(language: String) -> void:
+	await _start_game(Vector2(0, -10), 1.0 * Player.SPECIAL_ZOOM)
+	_player.level = 5
+	_hud_stats()
+	var origin := _player.position
+	_player._set_lock_target(_enemy("warrior", origin + Vector2(120, 20), Enemy.State.WINDUP, 0.5))
+	_enemy("brute", origin + Vector2(-150, 70), Enemy.State.CHASE, 0.0)
+	_enemy("scout", origin + Vector2(60, -120), Enemy.State.CHASE, 0.0)
+	_enemy("lancer", origin + Vector2(-110, -90), Enemy.State.WINDUP, 0.3)
+	Enemy.frozen = true
+	_player.facing = Vector2(1, 0.15).normalized()
+	_player._state = Player.State.SPECIAL
+	_player._state_time = 0.45
+	_player._special_dark = 1.0
+	_player.frenzy = Player.FRENZY_MAX
+	_player.queue_redraw()
+	await _frames(4)
+	await _save("%s_17_frenzy.png" % language)
+	_end_game()
+
+
+## Tutorial: corsa di notte con la torcia accesa.
+func _capture_move(_language: String) -> void:
+	await _start_game(Vector2(0, -20), 1.3)
+	_player.level = 2
+	_hud_stats()
+	(_game.get_node("DayNight") as DayNight).time = 0.7
+	_player.facing = Vector2(1, 0.25).normalized()
+	_player._velocity = _player.facing * _player.run_speed()
+	_player._run_on = true
+	_player._walk_phase = 1.3
+	_player.torch_on = true
+	_player._torch.enabled = true
+	_player._torch.position = Vector2(0, -_player.ground_elevation + Player.RADIUS * 0.6)
+	_player._torch.aim(_player.facing)
+	_player.queue_redraw()
+	_enemy("scout", _player.position + Vector2(330, 60), Enemy.State.CHASE, 0.0)
+	await _save("t_move.png")
+	_end_game()
+
+
+## Tutorial: capriola sotto il colpo di un bruto.
+func _capture_dodge(_language: String) -> void:
+	await _start_game(Vector2(0, 0), 1.4)
+	_player.level = 3
+	_hud_stats()
+	var origin := _player.position
+	_enemy("brute", origin + Vector2(110, -20), Enemy.State.STRIKE, 0.12)
+	_player._state = Player.State.DODGE
+	_player._state_time = Player.DODGE_TIME * 0.45
+	_player._dodge_direction = Vector2(-1, 0.3).normalized()
+	_player.facing = Vector2(-1, 0.3).normalized()
+	_player.queue_redraw()
+	await _save("t_dodge.png")
+	_end_game()
+
+
+## Tutorial: la barra della Frenesia piena (pulsa e mostra i tasti) e
+## l'anello rosso attorno al goblin, in mezzo alla mischia.
+func _capture_frenzy_bar(_language: String) -> void:
+	await _start_game(Vector2(0, 20), 1.2)
+	_player.level = 4
+	_hud_stats()
+	_player.frenzy = Player.FRENZY_MAX
+	_player.facing = Vector2(1, -0.1).normalized()
+	_player._combo_step = 2
+	_player._state = Player.State.ATTACK
+	_player._state_time = Player.ATTACK_WINDUP + 0.05
+	_player.queue_redraw()
+	_player._set_lock_target(_enemy("warrior", _player.position + Vector2(95, -15), Enemy.State.GUARD, 0.1))
+	_enemy("scout", _player.position + Vector2(-180, 80), Enemy.State.CHASE, 0.0)
+	_enemy("caster", _player.position + Vector2(260, -150), Enemy.State.WINDUP, 0.5)
+	await _save("t_frenzy_bar.png")
+	_end_game()
+
+
+## Tutorial: il goblin beve una pozione con poca vita e poco vigore, un
+## guerriero gli corre addosso.
+func _capture_supplies(_language: String) -> void:
+	await _start_game(Vector2(0, 0), 1.3)
+	_player.level = 3
+	_hud_stats()
+	_player.health = 1
+	_player.stamina = _player.max_stamina * 0.15
+	_player._state = Player.State.DRINK
+	_player._drinking = "potion"
+	_player._state_time = 0.35
+	_player.facing = Vector2(1, 0.2).normalized()
+	_player.queue_redraw()
+	(_game.get_node("HUD") as Hud).set_health(_player.health, _player.max_health)
+	_enemy("warrior", _player.position + Vector2(170, 40), Enemy.State.CHASE, 0.0)
+	await _frames(30)
+	await _save("t_supplies.png")
+	_end_game()
+
+
+## Tutorial: nemici che caricano l'attacco (bagliore rosso, arco teso)
+## e uno con la guardia alzata.
+func _capture_enemies(_language: String) -> void:
+	await _start_game(Vector2(0, 0), 1.15)
+	_player.level = 4
+	_hud_stats()
+	var origin := _player.position
+	_player.facing = Vector2(1, 0).normalized()
+	_player._set_lock_target(_enemy("warrior", origin + Vector2(100, 10), Enemy.State.GUARD, 0.1))
+	_enemy("brute", origin + Vector2(-140, 60), Enemy.State.WINDUP, 0.7)
+	_enemy("archer", origin + Vector2(300, -140), Enemy.State.WINDUP, 0.7)
+	_enemy("golem", origin + Vector2(-260, -130), Enemy.State.CHASE, 0.0)
+	await _save("t_enemies.png")
+	_end_game()
+
+
 ## Ingresso di una caverna nella parete di una montagna.
 func _capture_cave(language: String) -> void:
 	await _start_game(Vector2(0, -60), 1.0)
@@ -367,6 +539,7 @@ func _capture_dungeon(language: String) -> void:
 	_player.torch_on = true
 	_player._torch.enabled = true
 	_player._torch.position = Vector2(0, -_player.ground_elevation + Player.RADIUS * 0.6)
+	_player._torch.aim(_player.facing)
 	var boss: Enemy = _game._boss
 	boss.position = arena
 	boss._change_state(Enemy.State.WINDUP)
@@ -423,11 +596,10 @@ func _capture_cover(language: String) -> void:
 	_player.facing = Vector2(1, 0.15).normalized()
 	_player._state = Player.State.PARRY
 	_player._state_time = 0.05
-	_enemy("warrior", Vector2(140, 25), Enemy.State.WINDUP, 0.75)
+	_player._set_lock_target(_enemy("warrior", Vector2(140, 25), Enemy.State.WINDUP, 0.75))
 	_enemy("brute", Vector2(-160, 70), Enemy.State.STUNNED, 0.3).health = 40
 	_enemy("scout", Vector2(-300, -120), Enemy.State.CHASE, 0.0)
 	_enemy("summoner", Vector2(300, -110), Enemy.State.CHASE, 0.0)
-	_enemy("scout", Vector2(250, 175), Enemy.State.CHASE, 0.0)
 
 	var layer := CanvasLayer.new()
 	_game.add_child(layer)
@@ -484,6 +656,7 @@ func _hud_stats() -> void:
 	hud.set_health(_player.health, _player.max_health)
 	hud.set_experience(_player.experience, _player.experience_needed(), _player.level)
 	hud.set_kills(_player.level * 4 + 3)
+	_player.h_bombs = 2
 
 
 ## Nemico fermo in uno stato preciso, rivolto verso il giocatore.
@@ -519,7 +692,16 @@ func _label(text: String, size: int, color: Color, width: float, y: float) -> La
 
 func _save(file: String) -> void:
 	await _frames(6)
-	get_viewport().get_texture().get_image().save_png(OUTPUT + file)
+	var image := get_viewport().get_texture().get_image()
+	if not _tutorial:
+		image.save_png(OUTPUT + file)
+		return
+	# Per il tutorial servono solo alcune scene, rimpicciolite.
+	var page: String = TUTORIAL_IMAGES.get(file.substr(file.find("_") + 1), "")
+	if page == "":
+		return
+	image.resize(TUTORIAL_SIZE.x, TUTORIAL_SIZE.y, Image.INTERPOLATE_LANCZOS)
+	image.save_png(TUTORIAL_OUTPUT + page)
 
 
 func _frames(count: int) -> void:
