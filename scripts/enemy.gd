@@ -24,6 +24,10 @@ extends Node2D
 ## I tipi con "magic" (il boss) ogni tanto si fermano a caricare una magia e
 ## scagliano da lontano un ventaglio di dardi grandi.
 ##
+## I non morti delle orde (tipi con "horde", vedi Game) non girano attorno e
+## non attaccano: corrono dritti verso il giocatore e, quando lo toccano, si
+## disfano facendogli un danno (vedi _rush e _burst). Muoiono con un colpo.
+##
 ## Si muovono sul terreno a gradini come il giocatore: scendono dai gradini
 ## cadendo e, quando un gradino alto un livello li blocca, ci saltano sopra;
 ## nei burroni non entrano mai. Il boss resta sempre dentro la sua arena
@@ -155,6 +159,12 @@ const VIEW_MARGIN := Vector2(160, 220)
 ## VERY_FAR_RANGE un passo ogni quattro (con il tempo di tutti).
 const FAR_RANGE := 1000.0
 const VERY_FAR_RANGE := 1500.0
+## Non morti delle orde (anche 200 insieme): a passi alterni oltre
+## HORDE_NEAR_RANGE, uno ogni quattro oltre HORDE_FAR_RANGE; la spinta di
+## separazione guarda al più SEPARATION_MAX vicini.
+const HORDE_NEAR_RANGE := 450.0
+const HORDE_FAR_RANGE := 900.0
+const SEPARATION_MAX := 10
 
 ## Scia rossa: mentre carica l'attacco il nemico si accende di un bagliore
 ## rosso; quando scatta per colpire (e nel salto con colpo a terra) lascia
@@ -178,6 +188,15 @@ const COLOR_LOCKED := Color(1.7, 0.5, 0.45)
 const SIZE_RANGE := Vector2(0.8, 1.25)
 const HEADWEARS := ["", "", "helmet", "hood", "horns", "headband"]
 const GEAR_COLORS := [Color(0.55, 0.57, 0.62), Color(0.45, 0.3, 0.18), Color(0.25, 0.22, 0.35), Color(0.6, 0.15, 0.12), Color(0.85, 0.82, 0.7), Color(0.2, 0.35, 0.2)]
+## Non morti delle orde: carne grigioverde o livida, occhi rossi, velocità
+## variabile di questa parte; si disfano toccando il giocatore entro
+## CONTACT_MARGIN oltre i due raggi.
+const ZOMBIE_TONES := [Color(0.55, 0.62, 0.48), Color(0.48, 0.54, 0.44), Color(0.6, 0.6, 0.55), Color(0.45, 0.5, 0.5)]
+const COLOR_ZOMBIE_EYES := Color(1.0, 0.2, 0.1)
+const COLOR_RAGS := Color(0.32, 0.27, 0.22)
+const ZOMBIE_SPEED_SPREAD := 0.15
+const CONTACT_MARGIN := 6.0
+const BURST_SPLATS := 5
 
 var player: Player
 var type_id := "warrior"
@@ -315,6 +334,8 @@ func setup(id: String, level := 1) -> void:
 	_speed = _type["speed"]
 	var color: Array = _type["color"]
 	_color = Color(color[0], color[1], color[2])
+	if is_horde():
+		_speed *= randf_range(1.0 - ZOMBIE_SPEED_SPREAD, 1.0 + ZOMBIE_SPEED_SPREAD)
 	if _type.has("summon"):
 		_summon_cooldown = randf_range(1.0, 2.5)
 	if _type.has("magic"):
@@ -362,12 +383,16 @@ func _apply_look(look_seed: int) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = look_seed
 	var size := 1.0 if is_boss() else rng.randf_range(SIZE_RANGE.x, SIZE_RANGE.y)
-	radius = float(_type["radius"]) * size
+	# Raggi a passi di mezzo pixel: le mesh del corpo (una per raggio, vedi
+	# Shapes) restano poche anche con le orde di centinaia di non morti.
+	radius = snappedf(float(_type["radius"]) * size, 0.5)
 	var color: Array = _type["color"]
 	var base := Color(color[0], color[1], color[2])
+	if is_horde():
+		base = ZOMBIE_TONES[rng.randi() % ZOMBIE_TONES.size()]
 	_color = base if is_boss() else Color.from_hsv(wrapf(base.h + rng.randf_range(-0.03, 0.03), 0.0, 1.0),
 			clampf(base.s * rng.randf_range(0.85, 1.15), 0.0, 1.0), clampf(base.v * rng.randf_range(0.88, 1.1), 0.0, 1.0))
-	_headwear = "" if is_boss() else HEADWEARS[rng.randi() % HEADWEARS.size()]
+	_headwear = "" if is_boss() or is_horde() else HEADWEARS[rng.randi() % HEADWEARS.size()]
 	_headwear_color = GEAR_COLORS[rng.randi() % GEAR_COLORS.size()]
 	_shape_radius = -1.0
 
@@ -432,6 +457,9 @@ func _physics_process(delta: float) -> void:
 	if player and _state != State.DEAD:
 		var far := global_position.distance_squared_to(player.global_position)
 		var interval := 4 if far > VERY_FAR_RANGE * VERY_FAR_RANGE else (2 if far > FAR_RANGE * FAR_RANGE else 1)
+		if is_horde():
+			# I non morti corrono dritti: anche più vicini basta aggiornarli meno spesso.
+			interval = 4 if far > HORDE_FAR_RANGE * HORDE_FAR_RANGE else (2 if far > HORDE_NEAR_RANGE * HORDE_NEAR_RANGE else 1)
 		if (Engine.get_physics_frames() + _update_slot) % interval != 0:
 			_skipped_time += delta
 			return
@@ -466,7 +494,9 @@ func _physics_process(delta: float) -> void:
 				_change_state(State.CHASE)
 
 		State.CHASE:
-			if not player_active or distance > LEASH_RANGE:
+			if is_horde():
+				target_velocity = _rush(to_player, distance, player_active)
+			elif not player_active or distance > LEASH_RANGE:
 				_change_state(State.WANDER)
 			elif _punishing(to_player, distance):
 				_attack_cooldown = 0.0
@@ -747,7 +777,6 @@ func is_boss() -> bool:
 	return _type.get("boss", false)
 
 
-## Corona d'oro sopra la testa del boss.
 ## Copricapo scelto a caso (vedi _apply_look), sempre in cima alla testa.
 func _draw_headwear() -> void:
 	var top := Vector2(0, -radius)
@@ -771,6 +800,39 @@ func _draw_headwear() -> void:
 			draw_line(Vector2(-radius * 0.92, -radius * 0.45), Vector2(radius * 0.92, -radius * 0.45), _headwear_color, radius * 0.2)
 
 
+## Non morto di un'orda (vedi Game): corre dritto verso il giocatore.
+func is_horde() -> bool:
+	return _type.get("horde", false)
+
+
+## Non morto: velocità verso il giocatore; toccandolo (non se ci salta sopra)
+## si disfa e gli fa un danno. Se lo schiva si riprova.
+func _rush(to_player: Vector2, distance: float, player_active: bool) -> Vector2:
+	if not player_active:
+		_change_state(State.WANDER)
+		return Vector2.ZERO
+	var above := player.altitude() - ground_elevation
+	if distance <= radius + Player.RADIUS + CONTACT_MARGIN and above <= Player.JUMP_EVADE_HEIGHT:
+		if player.receive_hit(global_position, EnemyTypes.player_damage(false)) != "dodged":
+			_burst(to_player)
+			return Vector2.ZERO
+	return to_player.normalized() * _speed
+
+
+## Il non morto si disfa addosso al giocatore: sangue tutto attorno, niente
+## esperienza né bottino, e sparisce subito (niente corpo a terra).
+func _burst(to_player: Vector2) -> void:
+	xp_reward = 0
+	drops_loot = false
+	for k in BURST_SPLATS:
+		GroundFx.bleed(global_position, ground_elevation + radius * 0.8, Vector2.from_angle(randf() * TAU), BLEED_DROPS_HEAVY)
+	HitSpark.spawn(get_parent(), global_position + to_player.normalized() * radius, ground_elevation + radius * 0.5, 40.0, COLOR_DANGER)
+	Sfx.play("splat", global_position)
+	take_damage(health + 1000, to_player.normalized(), true)
+	queue_free()
+
+
+## Corona d'oro sopra la testa del boss.
 func _draw_crown() -> void:
 	var top := Vector2(0, -radius * 1.05)
 	var width := radius * 0.7
@@ -1205,11 +1267,15 @@ func _separation() -> Vector2:
 	var grid := _enemy_grid()
 	var push := Vector2.ZERO
 	var home := Vector2i((global_position / GRID_CELL).floor())
+	var checked := 0
 	for i in range(-1, 2):
 		for j in range(-1, 2):
 			for node in grid.get(home + Vector2i(i, j), []):
 				if node == self or not is_instance_valid(node):
 					continue
+				checked += 1
+				if checked > SEPARATION_MAX:
+					return push
 				var other := node as Enemy
 				var offset := global_position - other.global_position
 				var distance := offset.length()
@@ -1331,6 +1397,9 @@ func _draw() -> void:
 
 ## "Occhio" che indica la direzione, magia e arma.
 func _draw_gear() -> void:
+	if is_horde():
+		_draw_undead()
+		return
 	Shapes.disc(self, _facing * radius * 0.5, maxf(radius * 0.2, 4.0), Color(0.1, 0.05, 0.1))
 	if is_casting():
 		_draw_magic()
@@ -1341,6 +1410,22 @@ func _draw_gear() -> void:
 			_draw_staff()
 	else:
 		_draw_sword()
+
+
+## Non morto delle orde: niente armi, due occhi rossi, braccia tese in
+## avanti con le mani ossute e stracci che pendono dal corpo.
+func _draw_undead() -> void:
+	var across := _facing.orthogonal()
+	var eyes := _facing * radius * 0.45 + Vector2(0, -radius * 0.15)
+	for side: float in [-1.0, 1.0]:
+		Shapes.disc(self, eyes + across * radius * 0.25 * side, maxf(radius * 0.1, 2.0), COLOR_ZOMBIE_EYES)
+	var reach := _facing * radius * 1.3
+	for side: float in [-1.0, 1.0]:
+		var hand := reach + across * radius * 0.4 * side
+		draw_line(across * radius * 0.6 * side, hand, _color.darkened(0.3), maxf(2.5, radius * 0.16))
+		Shapes.disc(self, hand, maxf(radius * 0.12, 2.0), _color.lightened(0.2))
+	draw_colored_polygon(PackedVector2Array([Vector2(-radius * 0.75, radius * 0.15), Vector2(radius * 0.75, radius * 0.15),
+			Vector2(radius * 0.45, radius * 0.8), Vector2(radius * 0.1, radius * 0.55), Vector2(-radius * 0.4, radius * 0.85)]), COLOR_RAGS)
 
 
 ## Posizione del corpo sopra le gambe: salto, ondeggiare del passo e

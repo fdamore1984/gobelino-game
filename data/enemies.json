@@ -77,5 +77,13 @@
 		"spawn_weight": [5, 3],
 		"ranged": {"range": 460, "bolt_speed": 400, "arrow": true, "color": [0.85, 0.85, 0.8]}
 	},
+	"zombie": {
+		"health": 8, "xp": 2, "damage": 1,
+		"guard_chance": 0, "guard_time": [0.5, 0.9], "max_strikes": 1,
+		"radius": 17, "speed": 300, "mass": 0.5, "aggro_range": 2400, "orbit_distance": 0,
+		"windup": [1.0, 1.0], "lunge_speed": 0, "strike_reach": 0, "strike_arc": 0,
+		"color": [0.55, 0.62, 0.48], "shape": "octagon",
+		"spawn_weight": [0, 0], "horde": true
+	},
 	"guardian": {"health": 1474, "armor": 0.15, "guard_chance": 0.5, "guard_time": [0.5, 0.9], "max_strikes": 3, "xp": 600, "damage": 3, "radius": 50, "speed": 63, "mass": 6.0, "aggro_range": 520, "orbit_distance": 150, "windup": [0.59, 0.98], "lunge_speed": 260, "strike_reach": 110, "strike_arc": 240, "color": [0.6, 0.2, 0.25], "shape": "octagon", "slam": {"chance": 0.35, "range": 300, "radius": 140, "windup": 0.7, "air_time": 0.55, "height": 80, "damage_bonus": 1}, "spawn_weight": [0, 0], "boss": true, "magic": {"chance": 0.45, "min_range": 170, "range": 560, "windup": [0.85, 1.15], "cooldown": [3.0, 5.0], "retry": [1.0, 2.0], "bolts": 3, "spread": 20, "bolt_speed": 270, "bolt_radius": 13, "damage_bonus": 0, "color": [1.0, 0.5, 0.35]}, "summon": {"type": "scout", "count": 2, "max_minions": 3, "cooldown": [7.0, 11.0], "channel_time": 1.4, "minion_xp": 5}}
 }

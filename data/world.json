@@ -50,8 +50,18 @@
 		"armor_max": 0.5
 	},
 	"population": {
-		"count": [3, 0.4],
-		"max": 8
+		"count": [8, 0.7],
+		"max": 20
+	},
+	"hordes": {
+		"first_delay": [60, 120],
+		"interval": [90, 180],
+		"count": [50, 200],
+		"count_mobile": [30, 80],
+		"distance": [900, 1150],
+		"spread": 220,
+		"spread_count": 50,
+		"spawn_per_frame": 25
 	},
 	"enemy_attacks": {
 		"max_simultaneous": 2,
@@ -96,7 +106,7 @@
 		"room_radius": [3, 5],
 		"arena_radius": 7,
 		"wall_level": 4,
-		"enemies_per_room": [0, 2],
+		"enemies_per_room": [2, 4],
 		"chests": [1, 2],
 		"stalagmite_chance": 0.05,
 		"floor_colors": [[0.24, 0.22, 0.21], [0.27, 0.25, 0.23], [0.22, 0.21, 0.2]],

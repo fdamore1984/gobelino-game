@@ -213,6 +213,17 @@ func _build_sounds() -> void:
 		return sin(TAU * frequency * t) * 0.22 * sin(PI * t / d))
 	_streams["summon_pop"] = _render(0.18, func(t: float, d: float) -> float:
 		return (_noise() * 0.4 + sin(TAU * 600.0 * t) * 0.3) * _env(t, d, 0.003))
+	# Orda di non morti in arrivo: un coro di rantoli bassi e tremolanti.
+	_streams["horde"] = _render_filtered(1.8, Vector2(0.35, 0.35), func(t: float, d: float) -> float:
+		var groan := 0.0
+		for k in 4:
+			var frequency := 70.0 + 18.0 * k + 12.0 * sin(TAU * (1.3 + 0.4 * k) * t + k)
+			groan += _saw(frequency * t) * 0.16
+		return (groan + _noise() * 0.12) * absf(sin(TAU * 1.6 * t)) * _env(t, d, 0.2))
+	# Non morto che si disfa: uno schiocco umido.
+	_streams["splat"] = _render_filtered(0.25, Vector2(0.5, 0.1), func(t: float, d: float) -> float:
+		var squelch := sin(TAU * lerpf(180.0, 60.0, t / d) * t) * 0.5 * exp(-t * 20.0)
+		return clampf(_noise() * exp(-t * 28.0) + squelch, -1.0, 1.0) * _env(t, d, 0.002))
 	# Interfaccia
 	_streams["ui_move"] = _render(0.04, func(t: float, d: float) -> float:
 		return sin(TAU * 900.0 * t) * 0.2 * _env(t, d, 0.002))
@@ -286,3 +297,7 @@ func _noise() -> float:
 ## Onda triangolare; phase è in cicli (frequenza * tempo).
 func _triangle(phase: float) -> float:
 	return 4.0 * absf(fmod(phase, 1.0) - 0.5) - 1.0
+
+
+func _saw(phase: float) -> float:
+	return 2.0 * fmod(phase, 1.0) - 1.0

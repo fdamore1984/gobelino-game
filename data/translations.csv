@@ -40,6 +40,7 @@ POWERUP_UPGRADE,×%d
 POWERUP_EMPOWERED,%d s
 CHALLENGE_HINT,Interact with the totem to start a survival challenge
 CHALLENGE_STATUS,Survive! %d s · Enemies: %d
+HORDE_INCOMING,An undead horde is coming!
 CHALLENGE_WON,Challenge complete! +%d XP and a potion
 HUD_MANA,Mana %d/%d · Mana potions %d/%d
 HUD_GOLD,Gold %d
@@ -121,7 +122,7 @@ MENU_CONTROLS,Controls
 CONTROLS_TITLE,Controls
 CONTROLS_MOVE,"Move (mouse: walk to the cursor, hold to follow it)"
 CONTROLS_ATTACK,"Attack (combo, hold to keep attacking)"
-CONTROLS_HEAVY,"Power strike (hold to charge, uses mana while held; keep holding to chain)"
+CONTROLS_HEAVY,"Power strike (uses a little mana; hold to charge, uses more mana while held; keep holding to chain)"
 CONTROLS_PARRY,"Parry (instant, cancels any action)"
 CONTROLS_DODGE,"Dodge (cancels any action, air dash while jumping)"
 CONTROLS_JUMP,"Jump (cancels any action) · Interact (chests, merchants, caves)"
@@ -138,7 +139,7 @@ CONTROLS_SPECIAL_TITLE,Special attacks
 CONTROLS_SPECIAL_MIXED,Power strike right after a combo: a wide power strike with bonus damage
 CONTROLS_SPECIAL_CHARGED,Charge the first power strike: every power strike chained after it deals extra damage
 CONTROLS_SPECIAL_AIR,Attack in mid-air: wide aerial slashes that also reach the enemies below you
-CONTROLS_SPECIAL_PLUNGE,"Power strike in mid-air, with a Cataclysm rune: smash it, the blast kills the enemies around (hold to float and widen it)"
+CONTROLS_SPECIAL_PLUNGE,"Power strike in mid-air: tap it for a slam that hits the enemies around (costs mana and stamina); hold it, with a Cataclysm rune, to smash the rune: the blast kills the enemies around (keep holding to widen it)"
 CONTROLS_SPECIAL_DASH,Power strike during an air dash: dash strike that smashes a wide area
 CONTROLS_TOUCH,On touch screens use the on-screen buttons
 CONTROLS_BACK,Back
@@ -290,7 +291,7 @@ HUD_FRENZY_READY,FRENZY! %s + %s
 UPGRADE_FRENZY,Frenzy strikes +2
 UPGRADE_H_BOMB,Cataclysm runes carried +1
 ITEM_H_BOMB,Cataclysm rune
-ITEM_H_BOMB_DESC,for the power strike in mid-air: smash it on the ground and the blast kills the enemies around
+ITEM_H_BOMB_DESC,for the power strike held in mid-air: smash it on the ground and the blast kills the enemies around
 MENU_TUTORIAL,Tutorial
 PAUSE_TUTORIAL,Tutorial
 TUTORIAL_TITLE,Tutorial
@@ -302,7 +303,7 @@ TUTORIAL_HINT,%s / %s: previous / next page · %s: close
 TUTORIAL_MOVE_TITLE,Moving
 TUTORIAL_MOVE_TEXT,"Move with the left stick or the keyboard, or walk to the cursor holding the middle mouse button. Tap {run} to start or stop running (it stops by itself when you stand still); hold {run} to light or put out the torch, you need it at night and in the caves: it lights the way you face. {jump} jumps: you climb onto higher ground and enemy strikes pass under you. Dodge while running to slide."
 TUTORIAL_COMBO_TITLE,Sword and combos
-TUTORIAL_COMBO_TEXT,"Press {attack} to strike with the sword: the strike lands right away. Quick strikes form a combo (3 at first), each one stronger than the last; hold {attack} to keep attacking. {heavy_attack} is the power strike, wide and very strong: it ends the combo with a bonus. Hold it to charge it up to double damage (it uses mana) and to chain more power strikes."
+TUTORIAL_COMBO_TEXT,"Press {attack} to strike with the sword: the strike lands right away. Quick strikes form a combo (3 at first), each one stronger than the last; hold {attack} to keep attacking. {heavy_attack} is the power strike, wide and very strong (it uses a little mana): it ends the combo with a bonus. Hold it to charge it up to double damage (it uses mana) and to chain more power strikes."
 TUTORIAL_PARRY_TITLE,Parry
 TUTORIAL_PARRY_TEXT,"Hold {parry} to parry with the sword across your body: you block the strikes coming from the front, arrows and bolts included, but it drains stamina. A perfect parry, started right before the hit, stuns the enemy and for 4 seconds doubles your damage and speeds up your attacks. The parry is instant: it cancels whatever you are doing."
 TUTORIAL_DODGE_TITLE,Dodge and jump
@@ -314,9 +315,9 @@ TUTORIAL_SPECIAL_TEXT,"With a full Frenzy bar press {parry} and {attack} togethe
 TUTORIAL_SUPPLIES_TITLE,Stamina and potions
 TUTORIAL_SUPPLIES_TEXT,"The green bar is your stamina: attacking, dodging, jumping, parrying and running drain it, and it recovers by itself as soon as you stop. When it's empty you can't attack or dodge, and a parry can break your guard. Your potions are in the bar at the bottom: health {potion}, mana {mana_potion}, stamina {stamina_potion}. Drinking takes a moment: enemies rush in to punish you."
 TUTORIAL_ARSENAL_TITLE,"Fireball, shield and runes"
-TUTORIAL_ARSENAL_TEXT,"{spell} casts a fireball that chases the nearest enemy in sight: it costs mana (the blue bar), which does not come back by itself: drink mana potions. {shield} raises a magic bubble that absorbs one hit from any direction (30-second recharge). In mid-air, with a Cataclysm rune in your belt, {heavy_attack} smashes it on the ground: the blast kills the enemies around and takes a big chunk out of the boss."
+TUTORIAL_ARSENAL_TEXT,"{spell} casts a fireball that chases the nearest enemy in sight: it costs mana (the blue bar), which does not come back by itself: drink mana potions. {shield} raises a magic bubble that absorbs one hit from any direction (30-second recharge). In mid-air, tap {heavy_attack} for a slam that hits the enemies around (it costs mana and stamina); hold it, with a Cataclysm rune in your belt, to smash the rune on the ground: the blast kills the enemies around and takes a big chunk out of the boss."
 TUTORIAL_ENEMIES_TITLE,The enemies
-TUTORIAL_ENEMIES_TEXT,"Every enemy blow costs you one heart (two from the boss): a few mistakes and you're down. Before striking enemies glow red and pull back their weapon: that's the moment to parry or dodge. No more than two attack at once, the others circle around. Sometimes they raise their guard: hit them from the side or from behind. Their blows and arrows hurt the other monsters too. You lock on to the nearest enemy in sight by yourself ({lock_on} keeps the lock); it gets a red ring and your strikes and fireballs go its way."
+TUTORIAL_ENEMIES_TEXT,"Every enemy blow costs you one heart (two from the boss): a few mistakes and you're down. Before striking enemies glow red and pull back their weapon: that's the moment to parry or dodge. No more than two attack at once, the others circle around. Sometimes they raise their guard: hit them from the side or from behind. Their blows and arrows hurt the other monsters too. You lock on to the nearest enemy in sight by yourself ({lock_on} keeps the lock); it gets a red ring and your strikes and fireballs go its way. Every now and then an undead horde shows up: from 50 to 200 of them, very weak, all running at you; they fall apart on contact and hurt you. Cut them down before they reach you, or jump over them."
 TUTORIAL_LOOT_TITLE,"Chests, inventory and merchants"
 TUTORIAL_LOOT_TEXT,"Walk up to chests, merchants, totems and caves and press {interact} when the prompt appears. Chests drop gold and items: swords, armor, boots, amulets, rings and spell books. {inventory} opens the inventory (the game pauses): equip your gear, read the books, sort with {inventory_sort}. Merchants buy what you don't use and sell potions, Cataclysm runes and rare gear."
 TUTORIAL_WORLD_TITLE,Exploring the lands
