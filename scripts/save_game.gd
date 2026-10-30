@@ -79,7 +79,7 @@ static func delete(index: int) -> void:
 ## momento del salvataggio (ora locale, "AAAA-MM-GG HH:MM"), tempo di gioco
 ## in secondi (-1 se il salvataggio è di una versione che non lo contava),
 ## vita e danno massimi, monete, pozioni, nemici sconfitti e piano del
-## sotterraneo (0 in superficie). Nei salvataggi vecchi i campi mancanti si
+## sotterraneo (0 in superficie; metro: è nelle catacombe). Nei salvataggi vecchi i campi mancanti si
 ## ricavano da quelli che ci sono.
 static func summary(index: int) -> Dictionary:
 	var data := read(index)
@@ -99,6 +99,7 @@ static func summary(index: int) -> Dictionary:
 		"potions": int(stats.get("potions", player.get("potions", 0))),
 		"kills": int(data.get("kills", 0)),
 		"depth": int(dungeon.get("depth", 0)),
+		"metro": str(dungeon.get("kind", "cave")) == "metro",
 	}
 
 

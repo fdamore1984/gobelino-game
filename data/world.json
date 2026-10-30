@@ -29,7 +29,8 @@
 		"ravine_depth": 6,
 		"ravine_color": [0.07, 0.06, 0.06],
 		"ravine_damage": 2,
-		"cave_chance": 0.3
+		"cave_chance": 0.3,
+		"crypt_chance": 0.012
 	},
 	"day_night": {
 		"cycle": 600,
@@ -130,6 +131,59 @@
 		"boss_reward_items": 2,
 		"boss_reward_h_bombs": 1
 	},
+	"metro": {
+		"size": [46, 4],
+		"levels": [2, 4],
+		"wall_level": 3,
+		"track_level": -1,
+		"train_level": 2,
+		"side_platform": 3,
+		"track_width": 2,
+		"island_platform": [4, 6],
+		"platform_end": [5, 9],
+		"platform_segment": 9,
+		"pillar_step": 4,
+		"train_chance": 0.75,
+		"train_cars": [1, 3],
+		"car_length": [3, 5],
+		"service_doors": 3,
+		"room_size": [3, 9],
+		"stop_chance": 0.35,
+		"corridor_chance": 0.3,
+		"merge_chance": 0.15,
+		"merge_max": 6,
+		"extra_doors": 0.3,
+		"pillar_room": 7,
+		"pillar_chance": 0.5,
+		"arena_radius": 7,
+		"enemies_per_room": [1, 2],
+		"zombies_per_room": [2, 5],
+		"chests": [1, 3],
+		"stalagmite_chance": 0.035,
+		"bench_chance": 0.12,
+		"corpse_chance": 0.025,
+		"floor_colors": [[0.33, 0.31, 0.29], [0.36, 0.34, 0.31], [0.3, 0.29, 0.27]],
+		"track_color": [0.13, 0.11, 0.1],
+		"rail_color": [0.86, 0.82, 0.7],
+		"sleeper_color": [0.2, 0.22, 0.2],
+		"edge_color": [0.52, 0.5, 0.46],
+		"wall_color": [0.07, 0.06, 0.07],
+		"face_colors": [[0.4, 0.37, 0.34], [0.3, 0.28, 0.26]],
+		"tile_band": [0.35, 0.12, 0.12],
+		"train_top": [0.52, 0.5, 0.47],
+		"train_faces": [[0.6, 0.58, 0.54], [0.46, 0.44, 0.41]],
+		"train_window": [0.2, 0.19, 0.18],
+		"blood_color": [0.4, 0.03, 0.03],
+		"blood_chance": 0.12,
+		"glowstick_chance": 0.03,
+		"glowstick_colors": [[0.35, 1.0, 0.45], [0.55, 1.0, 0.6]],
+		"darkness": [0.02, 0.02, 0.03],
+		"boss": "abomination",
+		"boss_arena_margin": 1.5,
+		"boss_reward_gold": [70, 18],
+		"boss_reward_items": 2,
+		"boss_reward_h_bombs": 1
+	},
 	"obstacles": {
 		"tree": {
 			"chance": 0.02, "forest_bonus": 0.25,
@@ -150,6 +204,18 @@
 			"chance": 0.006, "level_bonus": 0.002,
 			"radius": [18, 18], "collision": 1.0, "solid": true,
 			"colors": [[0.55, 0.35, 0.18]], "metal": [0.75, 0.7, 0.55]
+		},
+		"metro": {
+			"chance": 0, "radius": [44, 44], "collision": 0.8, "solid": true,
+			"colors": [[0.05, 0.04, 0.06], [0.5, 0.48, 0.45]], "sign": [0.35, 1.0, 0.45], "cleared": [0.42, 0.4, 0.38]
+		},
+		"bench": {
+			"chance": 0, "radius": [24, 24], "collision": 0.75, "solid": true,
+			"colors": [[0.48, 0.46, 0.43], [0.36, 0.34, 0.32]]
+		},
+		"corpse": {
+			"chance": 0, "radius": [20, 20], "collision": 0.6, "solid": false, "slow": 0.8,
+			"colors": [[0.55, 0.5, 0.42], [0.45, 0.42, 0.38], [0.5, 0.46, 0.4]], "blood": [0.38, 0.03, 0.03]
 		},
 		"cave": {
 			"chance": 0, "radius": [40, 40], "collision": 0.8, "solid": false,

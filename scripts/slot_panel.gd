@@ -186,7 +186,7 @@ func _refresh() -> void:
 			else:
 				var depth: int = info["depth"]
 				texts.append_array([
-					tr("SLOT_PLACE_DEPTH") % depth if depth > 0 else tr("SLOT_PLACE_SURFACE"),
+					tr("SLOT_PLACE_METRO" if info.get("metro", false) else "SLOT_PLACE_DEPTH") % depth if depth > 0 else tr("SLOT_PLACE_SURFACE"),
 					tr("SLOT_HEALTH_DAMAGE") % [info["max_health"], info["damage"]],
 					tr("SLOT_GOLD_POTIONS") % [info["gold"], info["potions"]],
 					tr("SLOT_KILLS") % info["kills"],

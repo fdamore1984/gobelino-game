@@ -2,7 +2,9 @@ class_name Obstacle
 extends Node2D
 ## Ostacolo naturale del mondo, disegnato con forme geometriche: albero,
 ## sasso, cespuglio, cassa, il totem al centro di un'arena, il banco di un mercante,
-## l'ingresso di una caverna o le scale del sotterraneo. La posizione è la base a terra, così
+## l'ingresso di una caverna, il mausoleo in rovina che porta alle
+## catacombe ("metro"), le scale del sotterraneo e, nelle catacombe, i
+## sarcofagi bassi ("bench") e gli scheletri a terra ("corpse"). La posizione è la base a terra, così
 ## l'ordinamento per y lo mette davanti o dietro ai personaggi; viene
 ## disegnato più in alto quanto il blocco di terreno su cui si trova. Gli effetti (blocco,
 ## rallentamento) sono gestiti da World.
@@ -11,7 +13,7 @@ extends Node2D
 const CANOPY_FADE_ALPHA := 0.4
 ## Elementi con cui si interagisce: in modalità focus restano a colori con
 ## un'aura bianca attorno (vedi LowHealthVignette).
-const INTERACTIVE := ["chest", "cave", "stairs", "exit", "merchant", "totem"]
+const INTERACTIVE := ["chest", "cave", "metro", "stairs", "exit", "merchant", "totem"]
 const COLOR_AURA := Color(1, 1, 1, 0.55)
 ## Urto del giocatore (vedi flash): luminosità in più e durata.
 const FLASH_BOOST := 0.7
@@ -27,6 +29,9 @@ var _opened := false
 var _lift := 0.0
 ## Ingresso della caverna: direzione della parete in cui si apre.
 var _edge := Vector2.RIGHT
+## Fiamme e bagliori che si vedono anche al buio (bracieri delle
+## catacombe, alito del mausoleo): un nodo figlio senza luci.
+var _glow: Node2D
 ## Aura della modalità focus disegnata adesso.
 var _aura_shown := false
 var _flash_tween: Tween
@@ -46,6 +51,11 @@ func setup(data: Dictionary, type: Dictionary) -> void:
 	# La torcia lo illumina come il punto del terreno su cui sta, in pianta.
 	material = LightShaders.feet()
 	set_process(type_id == "tree" or type_id in INTERACTIVE)
+	if type_id == "metro" or (type_id == "stairs" and _in_crypt()):
+		_glow = Node2D.new()
+		_glow.material = Enemy._unshaded_material()
+		_glow.draw.connect(_draw_glow)
+		add_child(_glow)
 	if type_id in INTERACTIVE:
 		add_to_group(LowHealthVignette.FOCUS_GROUP)
 
@@ -66,7 +76,7 @@ func _is_active() -> bool:
 	match type_id:
 		"chest":
 			return not _opened
-		"cave":
+		"cave", "metro":
 			return world == null or not world.is_cave_cleared(position)
 		"totem":
 			return world == null or world.totem_state(position) == "ready"
@@ -90,6 +100,8 @@ func _aura_height() -> float:
 			return radius * 1.4
 		"totem":
 			return radius * 1.4
+		"metro":
+			return radius * 0.8
 	# Archi nella parete.
 	return radius
 
@@ -102,8 +114,10 @@ func _process(_delta: float) -> void:
 			queue_redraw()
 	if type_id == "cave":
 		return
-	if type_id in ["totem", "merchant", "stairs", "exit"]:
+	if type_id in ["totem", "merchant", "stairs", "exit", "metro"]:
 		queue_redraw()
+		if _glow:
+			_glow.queue_redraw()
 		return
 	if type_id == "chest":
 		# Brilla finché è chiusa; poi si ridisegna aperta.
@@ -160,6 +174,12 @@ func _draw() -> void:
 			_draw_stairs()
 		"exit":
 			_draw_exit()
+		"metro":
+			_draw_mausoleum()
+		"bench":
+			_draw_sarcophagus(rng)
+		"corpse":
+			_draw_skeleton(rng)
 
 
 func _draw_shadow(width: float) -> void:
@@ -408,3 +428,134 @@ func _draw_exit() -> void:
 	_draw_arch(Color(light, 0.85))
 	var height := radius * 2.0
 	draw_circle(Vector2(0, -height * 0.45), radius * 0.6, Color(1, 1, 1, 0.25 + 0.2 * pulse))
+
+
+func _in_crypt() -> bool:
+	return World.current != null and World.current.dungeon != null and World.current.dungeon.is_metro()
+
+
+## Bagliori che si vedono anche al buio, sul nodo senza luci (_glow).
+func _draw_glow() -> void:
+	_glow.draw_set_transform(Vector2(0, -_lift))
+	if type_id == "metro":
+		if World.current and World.current.is_cave_cleared(position):
+			return
+		# Dal buio della porta sale un alito verde e la runa sopra brilla.
+		var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 600.0)
+		var sign_color := _type_color("sign")
+		var door_h := radius * 1.25 * 0.82
+		_glow.draw_circle(Vector2(0, -6 - door_h * 0.45), radius * 0.45, Color(sign_color, 0.06 + 0.06 * pulse))
+		_glow.draw_circle(Vector2(0, -6 - radius * 1.25 - radius * 0.28), 4.0, Color(sign_color, 0.5 + 0.4 * pulse))
+		return
+	# Nelle catacombe ai lati della scala che scende ardono due bracieri di
+	# fiamma verde che tremola in modo irregolare.
+	var width := radius * 1.1
+	var height := radius * 2.0
+	var t := Time.get_ticks_msec() / 1000.0
+	for side: float in [-1.0, 1.0]:
+		var base := _edge * side * (width + 16.0) + Vector2(0, -height * 0.55)
+		var flicker := 0.75 + 0.25 * sin(t * (11.0 + side * 2.3)) * sin(t * 7.1 + side)
+		_glow.draw_line(base, base + Vector2(0, 14), Color(0.25, 0.22, 0.2), 3.0)
+		_glow.draw_colored_polygon(PackedVector2Array([base + Vector2(-6, 0), base + Vector2(6, 0), base + Vector2(3, 5), base + Vector2(-3, 5)]), Color(0.3, 0.27, 0.24))
+		_glow.draw_circle(base + Vector2(0, -6), 18.0, Color(0.35, 1.0, 0.45, 0.16 * flicker))
+		_glow.draw_colored_polygon(PackedVector2Array([base + Vector2(-4, 0), base + Vector2(0, -14.0 * flicker), base + Vector2(4, 0)]), Color(0.45, 1.0, 0.5, 0.9))
+
+
+## Mausoleo in rovina: basamento e cella di pietra con due colonne, il
+## frontone crepato e la porta buia con i gradini che scendono nelle
+## catacombe; dal buio sale un alito verde (_draw_glow). Ripulite le
+## catacombe, la porta è chiusa da una lastra.
+func _draw_mausoleum() -> void:
+	_draw_shadow(radius * 1.2)
+	var dark := _color(0)
+	var stone := _color(1)
+	var w := radius * 0.95
+	var depth := radius * 0.5
+	var wall_h := radius * 1.25
+	# Basamento a gradino.
+	draw_colored_polygon(PackedVector2Array([Vector2(-w - 8, 4), Vector2(w + 8, 4), Vector2(w + 8, -6), Vector2(-w - 8, -6)]), stone.darkened(0.25))
+	# Cella: fianco in ombra e facciata.
+	draw_colored_polygon(PackedVector2Array([Vector2(w, -6), Vector2(w + depth * 0.6, -6 - depth * 0.5), Vector2(w + depth * 0.6, -6 - depth * 0.5 - wall_h), Vector2(w, -6 - wall_h)]), stone.darkened(0.3))
+	draw_colored_polygon(PackedVector2Array([Vector2(-w, -6), Vector2(w, -6), Vector2(w, -6 - wall_h), Vector2(-w, -6 - wall_h)]), stone)
+	# Frontone triangolare con una crepa.
+	var roof := -6 - wall_h
+	draw_colored_polygon(PackedVector2Array([Vector2(-w - 6, roof), Vector2(w + 6, roof), Vector2(0, roof - radius * 0.6)]), stone.lightened(0.1))
+	draw_colored_polygon(PackedVector2Array([Vector2(w + 6, roof), Vector2(w + 6 + depth * 0.6, roof - depth * 0.5), Vector2(depth * 0.6, roof - radius * 0.6 - depth * 0.5), Vector2(0, roof - radius * 0.6)]), stone.darkened(0.15))
+	draw_polyline(PackedVector2Array([Vector2(-w * 0.3, roof - 4), Vector2(-w * 0.15, roof - 12), Vector2(-w * 0.25, roof - 20)]), stone.darkened(0.45), 1.5)
+	# Colonne ai lati della porta.
+	for side: float in [-1.0, 1.0]:
+		draw_rect(Rect2(side * w * 0.72 - 5, roof, 10, wall_h), stone.lightened(0.15))
+		draw_rect(Rect2(side * w * 0.72 - 7, roof, 14, 5), stone.lightened(0.25))
+	# Porta ad arco.
+	var door := PackedVector2Array()
+	var door_w := w * 0.42
+	var door_h := wall_h * 0.82
+	for k in 9:
+		var angle := PI * k / 8.0
+		door.append(Vector2(cos(angle) * door_w, -6 - door_h + door_w - sin(angle) * door_w))
+	door.append(Vector2(-door_w, -6))
+	door.append(Vector2(door_w, -6))
+	var cleared := World.current != null and World.current.is_cave_cleared(position)
+	if cleared:
+		draw_colored_polygon(door, _type_color("cleared"))
+		draw_polyline(PackedVector2Array([Vector2(-door_w * 0.6, -door_h * 0.4), Vector2(door_w * 0.5, -door_h * 0.7)]), stone.darkened(0.4), 2.0)
+		return
+	draw_colored_polygon(door, dark)
+	for k in 3:
+		var y := -9.0 - k * 6.0
+		draw_line(Vector2(-door_w * (0.8 - k * 0.18), y), Vector2(door_w * (0.8 - k * 0.18), y), stone.darkened(0.5 + k * 0.12), 3.0)
+	# L'alito verde e la runa sono su _glow (vedi _draw_glow).
+
+
+## Sarcofago basso di pietra sulla navata, in diagonale come le navate:
+## cassa con il coperchio più chiaro, a volte spostato di traverso.
+func _draw_sarcophagus(rng: RandomNumberGenerator) -> void:
+	_draw_shadow(radius * 0.95)
+	var stone := _color(0)
+	var along := Vector2(1.0, 0.5).normalized() * radius
+	var across := Vector2(-1.0, 0.5).normalized() * radius * 0.4
+	var lift := Vector2(0, -14)
+	var base := PackedVector2Array([-along - across, along - across, along + across, -along + across])
+	# Fianchi visibili (verso il basso dello schermo).
+	draw_colored_polygon(PackedVector2Array([base[1], base[2], base[2] + lift, base[1] + lift]), stone.darkened(0.3))
+	draw_colored_polygon(PackedVector2Array([base[2], base[3], base[3] + lift, base[2] + lift]), stone.darkened(0.15))
+	var shift := Vector2.ZERO
+	if rng.randf() < 0.3:
+		# Coperchio spostato: si vede il buio dentro.
+		shift = along * 0.25
+		draw_colored_polygon(PackedVector2Array([base[0] + lift, base[1] + lift, base[2] + lift, base[3] + lift]), Color(0.05, 0.04, 0.05))
+	var lid := PackedVector2Array()
+	for point in base:
+		lid.append(point * 1.05 + lift + Vector2(0, -3) + shift)
+	draw_colored_polygon(lid, _color(1).lightened(0.2))
+	lid.append(lid[0])
+	draw_polyline(lid, stone.darkened(0.45), 1.5)
+
+
+## Scheletro a terra in una pozza di sangue, avvolto in un sudario
+## strappato: rallenta un poco.
+func _draw_skeleton(rng: RandomNumberGenerator) -> void:
+	var blood := _type_color("blood")
+	draw_set_transform(Vector2(0, -_lift), 0.0, Vector2(1.0, 0.5))
+	draw_circle(Vector2(rng.randf_range(-6, 6), 4), radius * 1.3, Color(blood, 0.7))
+	draw_set_transform(Vector2(0, -_lift))
+	var cloth := _color(rng.randi())
+	var angle := rng.randf_range(-0.4, 0.4)
+	var axis := Vector2.from_angle(angle) * radius
+	var shroud := PackedVector2Array()
+	for k in 10:
+		var a := TAU * k / 10.0
+		shroud.append(Vector2(cos(a), sin(a) * 0.38).rotated(angle) * radius * rng.randf_range(0.85, 1.05))
+	draw_colored_polygon(shroud, cloth.darkened(0.25))
+	var bone := Color(0.88, 0.85, 0.75)
+	# Costole lungo il corpo.
+	for k in 4:
+		var at := axis * (0.45 - k * 0.22)
+		var rib := axis.orthogonal().normalized() * radius * 0.28
+		draw_line(at - rib, at + rib, bone, 2.0)
+	draw_line(axis * 0.55, -axis * 0.4, bone, 2.0)
+	draw_circle(axis * 1.1 + Vector2(0, -2), radius * 0.3, bone)
+	for side: float in [-1.0, 1.0]:
+		draw_circle(axis * 1.15 + axis.orthogonal().normalized() * radius * 0.1 * side + Vector2(0, -2), 1.6, Color(0.08, 0.06, 0.06))
+	draw_line(-axis * 0.4, -axis * 0.9 + Vector2(-radius * 0.2, radius * 0.25), bone, 2.0)
+	draw_line(-axis * 0.4, -axis * 0.95 + Vector2(radius * 0.15, -radius * 0.1), bone, 2.0)

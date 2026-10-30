@@ -23,7 +23,7 @@ const TUTORIAL_IMAGES := {
 	"dodge.png": "dodge.png", "frenzy_bar.png": "frenzy_bar.png", "16_frenzy.png": "frenzy_special.png",
 	"supplies.png": "supplies.png", "15_h_bomb.png": "arsenal.png", "enemies.png": "enemies.png",
 	"6_inventory.png": "loot.png", "13_map.png": "world.png", "12_dungeon.png": "buildings.png",
-	"3_level_up.png": "progress.png",
+	"18_metro.png": "metro.png", "3_level_up.png": "progress.png",
 }
 ## Seme del mondo usato per le immagini, così il terreno è sempre lo stesso.
 const WORLD_SEED := 1234
@@ -50,7 +50,7 @@ func _ready() -> void:
 			DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(TUTORIAL_OUTPUT))
 			for capture: Callable in [_capture_move, _capture_combat, _capture_parry, _capture_dodge, _capture_frenzy_bar,
 					_capture_frenzy, _capture_supplies, _capture_h_bomb, _capture_enemies, _capture_inventory, _capture_cave,
-					_capture_dungeon, _capture_level_up]:
+					_capture_dungeon, _capture_metro, _capture_level_up]:
 				await capture.call(language)
 		else:
 			await _capture_menu(language)
@@ -66,6 +66,8 @@ func _ready() -> void:
 			await _capture_frenzy(language)
 			await _capture_cave(language)
 			await _capture_dungeon(language)
+			await _capture_metro(language)
+			await _capture_horde(language)
 	get_tree().quit()
 
 
@@ -185,7 +187,7 @@ func _capture_challenge(language: String) -> void:
 	(_game.get_node("DayNight") as DayNight).time = 0.7
 	_player.torch_on = true
 	_player._torch.enabled = true
-	_player._torch.position = Vector2(0, -_player.ground_elevation + Player.RADIUS * 0.6)
+	_player._torch.position = Vector2(0, Player.RADIUS * 0.6)
 	_player._torch.aim(_player.facing)
 	var fireball := Fireball.new()
 	fireball.position = _player.position + Vector2(120, -70)
@@ -418,7 +420,7 @@ func _capture_move(_language: String) -> void:
 	_player._walk_phase = 1.3
 	_player.torch_on = true
 	_player._torch.enabled = true
-	_player._torch.position = Vector2(0, -_player.ground_elevation + Player.RADIUS * 0.6)
+	_player._torch.position = Vector2(0, Player.RADIUS * 0.6)
 	_player._torch.aim(_player.facing)
 	_player.queue_redraw()
 	_enemy("scout", _player.position + Vector2(330, 60), Enemy.State.CHASE, 0.0)
@@ -530,6 +532,8 @@ func _capture_dungeon(language: String) -> void:
 	_hud_stats()
 	var cave := _nearest("cave")
 	_game._cave = cave["position"]
+	_game._cave_kind = "cave"
+	_game._dungeon_data = Dungeon.data_for("cave")
 	_game._cave_levels = 3
 	await _game._go_to_depth(3, Vector2.INF)
 	var world: World = _game.get_node("World")
@@ -538,7 +542,7 @@ func _capture_dungeon(language: String) -> void:
 	_player.facing = (arena - _player.position).normalized()
 	_player.torch_on = true
 	_player._torch.enabled = true
-	_player._torch.position = Vector2(0, -_player.ground_elevation + Player.RADIUS * 0.6)
+	_player._torch.position = Vector2(0, Player.RADIUS * 0.6)
 	_player._torch.aim(_player.facing)
 	var boss: Enemy = _game._boss
 	boss.position = arena
@@ -552,6 +556,68 @@ func _capture_dungeon(language: String) -> void:
 		enemy.queue_redraw()
 	await _frames(20)
 	await _save("%s_12_dungeon.png" % language)
+	_end_game()
+
+
+## Catacombe al buio: la torcia illumina la navata, le fosse ossarie e una
+## fila di tombe; arrivano non morti e ghoul (artigli, bile velenosa).
+func _capture_metro(language: String) -> void:
+	await _start_game(Vector2(0, -40), 1.0)
+	_player.level = 6
+	_hud_stats()
+	var crypt := _nearest("metro")
+	_game._cave = crypt["position"] if not crypt.is_empty() else Vector2(5000, 5000)
+	_game._cave_kind = "metro"
+	_game._dungeon_data = Dungeon.data_for("metro")
+	_game._cave_levels = 3
+	await _game._go_to_depth(1, Vector2.INF)
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		enemy.queue_free()
+	var world: World = _game.get_node("World")
+	var dungeon := world.dungeon
+	# Sulla prima navata, guardando lungo le fosse: davanti ghoul e non morti.
+	var row := dungeon.station_rows.x + 1
+	var cell := Vector2i(dungeon.width / 2 - 4, row)
+	while not dungeon.is_floor(cell + Vector2i(1, 0)):
+		cell.x += 1
+	await _place_player(World.cell_center(cell))
+	_player.facing = Vector2(1, 0.5).normalized()
+	_player.torch_on = true
+	_player._torch.enabled = true
+	_player._torch.position = Vector2(0, Player.RADIUS * 0.6)
+	_player._torch.aim(_player.facing)
+	var spot := func(du: int, dv: int) -> Vector2:
+		return World.cell_center(cell + Vector2i(du, dv))
+	_player._set_lock_target(_enemy("mutant_stalker", spot.call(2, 0), Enemy.State.WINDUP, 0.7))
+	_enemy("mutant_spitter", spot.call(5, -1), Enemy.State.WINDUP, 0.6)
+	_enemy("mutant_crawler", spot.call(3, 1), Enemy.State.CHASE, 0.0)
+	_enemy("mutant_bloater", spot.call(7, 0), Enemy.State.CHASE, 0.0)
+	for k in 7:
+		_enemy("walker", spot.call(4 + k % 4, 2 + k / 4) + Vector2(randf_range(-15, 15), randf_range(-8, 8)), Enemy.State.CHASE, 0.0)
+	await _frames(20)
+	await _save("%s_18_metro.png" % language)
+	_end_game()
+
+
+## Un'orda di non morti di notte: buio pesto, la torcia accesa e il goblin ben visibile.
+func _capture_horde(language: String) -> void:
+	await _start_game(Vector2(0, -40), 0.9)
+	_player.level = 4
+	_hud_stats()
+	(_game.get_node("DayNight") as DayNight).time = 0.7
+	_player.facing = Vector2(1, 0.2).normalized()
+	_player.torch_on = true
+	_player._torch.enabled = true
+	_player._torch.position = Vector2(0, Player.RADIUS * 0.6)
+	_player._torch.aim(_player.facing)
+	var origin := _player.position
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	for k in 120:
+		var at := origin + Vector2(rng.randf_range(160, 760), rng.randf_range(-260, 320))
+		_enemy("zombie", at, Enemy.State.CHASE, 0.0)._walk_phase = rng.randf() * TAU
+	await _frames(20)
+	await _save("%s_19_horde.png" % language)
 	_end_game()
 
 
@@ -691,6 +757,9 @@ func _label(text: String, size: int, color: Color, width: float, y: float) -> La
 
 
 func _save(file: String) -> void:
+	# La fisica del giocatore è ferma: la luce della torcia su di lui si aggiorna qui.
+	if is_instance_valid(_player):
+		_player.update_torch_light()
 	await _frames(6)
 	var image := get_viewport().get_texture().get_image()
 	if not _tutorial:

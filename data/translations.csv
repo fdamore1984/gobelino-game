@@ -155,6 +155,7 @@ SLOT_GOLD_POTIONS,Gold %d · Potions %d
 SLOT_KILLS,Enemies defeated: %d
 SLOT_PLACE_SURFACE,On the surface
 SLOT_PLACE_DEPTH,Underground · level %d
+SLOT_PLACE_METRO,In the catacombs · level %d
 SLOT_PLAYTIME,Play time: %s
 SLOT_PLAYTIME_MIN,%d min
 SLOT_PLAYTIME_HOURS,%d h %02d min
@@ -179,16 +180,24 @@ SAVE_BLOCKED_CHALLENGE,Can't save during a challenge
 SAVE_BLOCKED_DEAD,Can't save now
 LOADING_LANDS,Exploring new lands…
 LOADING_DEPTHS,Descending into the cave: level %d of %d
+LOADING_METRO,Down into the catacombs: level %d of %d
 LOADING_SURFACE,Back to the surface
 LOADING_GAME,Loading your game
 CAVE_HINT,A cave: interact to explore the depths
 INTERACT,Interact
 CAVE_CLEARED,This cave has been cleared
+METRO_HINT,A ruined mausoleum: interact to go down into the catacombs
+METRO_CLEARED,These catacombs have been cleansed
+METRO_STAIRS_HINT,Stone steps to the crypt below
+METRO_EXIT_HINT,The way back up to the open air
 STAIRS_HINT,Stairs going down
 EXIT_HINT,The way back to the surface
 DUNGEON_LEVEL,Underground · level %d of %d
+METRO_LEVEL,Catacombs · level %d of %d
 BOSS_NAME,Cave Guardian
 BOSS_DEFEATED,Guardian defeated! The way out is open
+BOSS_NAME_METRO,The Crypt Abomination
+METRO_BOSS_DEFEATED,The Abomination is slain! The way out is open
 MENU_CREDITS,Created by fdamore1984 with Claude Code
 CONTROLS_LOCK,Manual lock on the nearest enemy in sight (again: switch target)
 TOUCH_LOCK,Lock
@@ -324,5 +333,7 @@ TUTORIAL_WORLD_TITLE,Exploring the lands
 TUTORIAL_WORLD_TEXT,"The lands have no borders. The minimap in the top-right corner shows enemies, chests, totems, merchants and caves; {map} opens the full map. At night you need the torch. Hold {focus} for focus mode: the world dims and only the goblin and the things to pick up keep their colors. Jump to climb the hills and ramps."
 TUTORIAL_BUILDINGS_TITLE,Caves and the boss
 TUTORIAL_BUILDINGS_TEXT,"Cave entrances open in the mountain walls: go in with {interact}. Down there it's dark and the enemies get tougher level after level: on every level look for the stairs. On the last one the Cave Guardian waits in his arena: he summons help and strikes from afar. Beat him for gold, a Cataclysm rune and gear you won't find anywhere else."
+TUTORIAL_METRO_TITLE,The catacombs
+TUTORIAL_METRO_TEXT,"Ruined mausoleums (a purple square with a skull on the map) lead down into the catacombs: go down with {interact}. It's pitch black and nothing living is left down there: only packs of undead and the ghouls of the crypts, with claws and many red eyes; some spit venomous bile from afar, the bloated ones crush the ground around them. In the middle of every level the stone naves run between two sunken ossuary pits (jump down and climb back up with a jump), with rows of great tombs; around them are chapels and burial chambers. Find the steps going down; on the last level the Crypt Abomination waits, summoning the undead."
 TUTORIAL_PROGRESS_TITLE,"Challenges, levels and saves"
 TUTORIAL_PROGRESS_TEXT,"Interact with a totem for a 30-second challenge in waves: survive it for experience and a potion. Every defeated enemy gives experience; at every level your damage grows and you pick an upgrade among the cards on offer (""Frenzy strikes +2"" too; extra health only shows up now and then). The game saves by itself every 5 minutes and when you enter a cave, with no enemies nearby; from the pause menu ({menu}) you save by hand."

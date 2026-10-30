@@ -34,6 +34,11 @@ extends Node2D
 ## parata perfetta, oggetti e livelli contano ancora. Colpito resta invulnerabile per
 ## HURT_INVULNERABLE_TIME secondi e lampeggia, come il giocatore.
 ##
+## I ghoul delle catacombe (tipi con "mutant") combattono come gli altri
+## ma senza armi: tanti occhi rossi in disordine, bocca spalancata,
+## escrescenze sul corpo e artigli al posto delle mani; quelli che sputano
+## ("spit") lanciano bile velenosa dalla bocca invece di tirare frecce.
+##
 ## I non morti delle orde (tipi con "horde", vedi Game) non girano attorno e
 ## non attaccano: corrono dritti verso il giocatore e, quando lo toccano, si
 ## disfano facendogli un danno (vedi _rush e _burst). Muoiono con un colpo.
@@ -212,6 +217,10 @@ const GEAR_COLORS := [Color(0.55, 0.57, 0.62), Color(0.45, 0.3, 0.18), Color(0.2
 const ZOMBIE_TONES := [Color(0.55, 0.62, 0.48), Color(0.48, 0.54, 0.44), Color(0.6, 0.6, 0.55), Color(0.45, 0.5, 0.5)]
 const COLOR_ZOMBIE_EYES := Color(1.0, 0.2, 0.1)
 const COLOR_RAGS := Color(0.32, 0.27, 0.22)
+## Ghoul: escrescenze, artigli e bile.
+const COLOR_GROWTH := Color(0.78, 0.55, 0.5)
+const COLOR_CLAWS := Color(0.88, 0.85, 0.75)
+const COLOR_ACID := Color(0.55, 1.0, 0.25)
 const ZOMBIE_SPEED_SPREAD := 0.15
 const CONTACT_MARGIN := 6.0
 const BURST_SPLATS := 5
@@ -418,7 +427,7 @@ func _apply_look(look_seed: int) -> void:
 		base = ZOMBIE_TONES[rng.randi() % ZOMBIE_TONES.size()]
 	_color = base if is_boss() else Color.from_hsv(wrapf(base.h + rng.randf_range(-0.03, 0.03), 0.0, 1.0),
 			clampf(base.s * rng.randf_range(0.85, 1.15), 0.0, 1.0), clampf(base.v * rng.randf_range(0.88, 1.1), 0.0, 1.0))
-	_headwear = "" if is_boss() or is_horde() else HEADWEARS[rng.randi() % HEADWEARS.size()]
+	_headwear = "" if is_boss() or is_horde() or is_mutant() else HEADWEARS[rng.randi() % HEADWEARS.size()]
 	_headwear_color = GEAR_COLORS[rng.randi() % GEAR_COLORS.size()]
 	_shape_radius = -1.0
 
@@ -857,6 +866,11 @@ func is_horde() -> bool:
 	return _type.get("horde", false)
 
 
+## Ghoul delle catacombe (vedi in cima).
+func is_mutant() -> bool:
+	return _type.get("mutant", false)
+
+
 ## Non morto: velocità verso il giocatore; toccandolo (non se ci salta sopra)
 ## si disfa e gli fa un danno. Se lo schiva si riprova.
 func _rush(to_player: Vector2, distance: float, player_active: bool) -> Vector2:
@@ -1012,6 +1026,8 @@ func _shoot_bolt(direction: Vector2, ranged: Dictionary) -> void:
 	get_parent().add_child(bolt)
 	if bolt.arrow:
 		Sfx.play("bow", global_position)
+	elif is_mutant():
+		Sfx.play("splat", global_position, 1.3 if _casting else 1.6)
 
 
 ## Magia da lontano (voce "magic" del tipo): il giocatore è tra "min_range" e
@@ -1045,7 +1061,8 @@ func _cast_magic() -> void:
 	var spread := deg_to_rad(float(magic["spread"]))
 	for i in count:
 		_shoot_bolt(_attack_direction.rotated((i - (count - 1) / 2.0) * spread), magic)
-	Sfx.play("fireball", global_position, 0.7)
+	if not is_mutant():
+		Sfx.play("fireball", global_position, 0.7)
 
 
 func _finish_cast() -> void:
@@ -1377,9 +1394,11 @@ func _draw_telegraph() -> void:
 		GroundFx.danger_glow(_telegraph, _slam_target - global_position, float(slam["radius"]), _state_time / total)
 	if _state == State.SUMMON:
 		var progress: float = _state_time / _type["summon"]["channel_time"]
+		# I ghoul richiamano i non morti con un urlo: dove arriveranno sale un vapore verde.
+		var smoke := COLOR_ACID if is_mutant() else COLOR_SUMMON
 		for offset in _summon_positions:
-			Shapes.disc(_telegraph, offset, 24.0, Color(COLOR_SUMMON, 0.12))
-			Shapes.disc(_telegraph, offset, 24.0 * progress, Color(COLOR_SUMMON, 0.3))
+			Shapes.disc(_telegraph, offset, 24.0, Color(smoke, 0.12))
+			Shapes.disc(_telegraph, offset, 24.0 * progress, Color(smoke, 0.3))
 
 
 func _draw() -> void:
@@ -1430,7 +1449,9 @@ func _draw() -> void:
 	if not behind:
 		_draw_gear()
 	_draw_headwear()
-	if is_boss():
+	if is_mutant():
+		_draw_growths(body)
+	elif is_boss():
 		_draw_crown()
 
 	if _state == State.STUNNED:
@@ -1454,6 +1475,9 @@ func _draw_gear() -> void:
 	if is_horde():
 		_draw_undead()
 		return
+	if is_mutant():
+		_draw_ghoul()
+		return
 	Shapes.disc(self, _facing * radius * 0.5, maxf(radius * 0.2, 4.0), Color(0.1, 0.05, 0.1))
 	if is_casting():
 		_draw_magic()
@@ -1464,6 +1488,74 @@ func _draw_gear() -> void:
 			_draw_staff()
 	else:
 		_draw_sword()
+
+
+## Ghoul: tanti occhi rossi in disordine e la bocca spalancata (la bile
+## gocciola a chi sputa, di più mentre carica), poi gli artigli.
+func _draw_ghoul() -> void:
+	var across := _facing.orthogonal()
+	var eyes := _facing * radius * 0.45 + Vector2(0, -radius * 0.2)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = _look_seed
+	for k in 3 + rng.randi() % 3:
+		var at := eyes + across * radius * rng.randf_range(-0.45, 0.45) + Vector2(0, radius * rng.randf_range(-0.35, 0.1))
+		Shapes.disc(self, at, radius * rng.randf_range(0.06, 0.12), COLOR_ZOMBIE_EYES)
+	var mouth := eyes + Vector2(0, radius * 0.35)
+	var open := 0.12 + (0.12 if _state in [State.WINDUP, State.STRIKE, State.SUMMON] else 0.0)
+	draw_colored_polygon(PackedVector2Array([mouth - across * radius * 0.25, mouth + across * radius * 0.25, mouth + Vector2(0, radius * open)]), Color(0.12, 0.02, 0.03))
+	if _type.get("spit", false) or is_casting():
+		var charge := clampf(_state_time / _windup_time, 0.0, 1.0) if _state == State.WINDUP else 0.0
+		Shapes.disc(self, mouth + Vector2(0, radius * open), radius * (0.08 + 0.12 * charge), Color(COLOR_ACID, 0.7 + 0.3 * charge))
+	_draw_claws()
+
+
+## Artigli del ghoul: braccia lunghe con tre unghie ricurve. Come le spade,
+## durante la carica si portano indietro e poi spazzano l'arco
+## dell'attacco; chi sputa le tiene basse e punta la bocca.
+func _draw_claws() -> void:
+	var angles := _sword_angles()
+	var angle := _facing.angle() + 0.5
+	match _state:
+		State.WINDUP:
+			if not _is_ranged() and not is_casting():
+				angle = angles.x - _swing_sign * 0.4 * minf(_state_time / _windup_time, 1.0)
+		State.STRIKE:
+			if not _is_ranged() and not is_casting():
+				angle = angles.z
+		State.RECOVER:
+			angle = angles.y
+	if _state == State.WINDUP and (_is_ranged() or is_casting()):
+		# Mira dello sputo: una scia verde che si allunga dalla bocca (il momento di schivare).
+		var progress := clampf(_state_time / _windup_time, 0.0, 1.0)
+		var mouth := _facing * radius * 0.5 + Vector2(0, radius * 0.2)
+		draw_line(mouth, mouth + _attack_direction * radius * 6.0 * progress, Color(COLOR_ACID, 0.2 + 0.4 * progress), 1.5)
+	var reach := radius * (1.25 if _state in [State.WINDUP, State.STRIKE] else 1.05)
+	var hand := Vector2.from_angle(angle) * reach
+	var other := _facing * radius * 1.1 - _facing.orthogonal() * radius * 0.55 * _swing_sign
+	var shoulder := _facing.orthogonal() * radius * 0.7
+	var limb := _color.darkened(0.45)
+	for pair: Array in [[shoulder if hand.dot(shoulder) >= 0.0 else -shoulder, hand], [-shoulder if hand.dot(shoulder) >= 0.0 else shoulder, other]]:
+		var from: Vector2 = pair[0]
+		var to: Vector2 = pair[1]
+		draw_line(from, to, limb, maxf(2.5, radius * 0.12))
+		var out := (to - from).normalized()
+		for k in 3:
+			var nail := out.rotated((k - 1) * 0.45)
+			var tip := to + nail * radius * 0.4 + nail.orthogonal() * radius * 0.08
+			draw_polyline(PackedVector2Array([to, to + nail * radius * 0.25, tip]), COLOR_CLAWS, maxf(1.5, radius * 0.06))
+
+
+## Escrescenze del ghoul: bolle di carne gonfia sul corpo, sempre uguali
+## per lo stesso nemico (dal seme dell'aspetto); il boss ne ha di più.
+func _draw_growths(body: Color) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = _look_seed + 7
+	var growth := body.lerp(COLOR_GROWTH, 0.5)
+	for k in 2 + rng.randi() % 3 + (3 if is_boss() else 0):
+		var at := Vector2.from_angle(rng.randf_range(-PI, 0.2)) * radius * rng.randf_range(0.55, 0.85)
+		var size := radius * rng.randf_range(0.14, 0.26)
+		Shapes.disc(self, at, size, growth)
+		Shapes.disc(self, at + Vector2(-size * 0.3, -size * 0.3), size * 0.35, growth.lightened(0.25))
 
 
 ## Non morto delle orde: niente armi, due occhi rossi, braccia tese in

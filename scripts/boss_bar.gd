@@ -29,7 +29,8 @@ func _draw() -> void:
 		return
 	var font := ThemeDB.fallback_font
 	var bar := Rect2(Vector2((size.x - SIZE.x) / 2.0, 70.0), SIZE)
-	var title := tr("BOSS_NAME")
+	# Ogni boss ha il suo nome ("name" del tipo in data/enemies.json).
+	var title := tr(str(EnemyTypes.get_type(boss.type_id).get("name", "BOSS_NAME")))
 	var width := font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x
 	draw_string_outline(font, Vector2(size.x / 2.0 - width / 2.0, bar.position.y - 8.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 5, Color(0, 0, 0, 0.7))
 	draw_string(font, Vector2(size.x / 2.0 - width / 2.0, bar.position.y - 8.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(1.0, 0.85, 0.4))

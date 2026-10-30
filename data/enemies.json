@@ -85,5 +85,52 @@
 		"color": [0.55, 0.62, 0.48], "shape": "octagon",
 		"spawn_weight": [0, 0], "horde": true
 	},
+	"walker": {
+		"points": 1, "xp": 3, "damage": 1,
+		"guard_chance": 0, "guard_time": [0.5, 0.9], "max_strikes": 1,
+		"radius": 17, "speed": 210, "mass": 0.5, "aggro_range": 460, "orbit_distance": 0,
+		"windup": [1.0, 1.0], "lunge_speed": 0, "strike_reach": 0, "strike_arc": 0,
+		"color": [0.55, 0.62, 0.48], "shape": "octagon",
+		"spawn_weight": [0, 0], "horde": true
+	},
+	"mutant_crawler": {
+		"mutant": true,
+		"points": 3, "xp": 20, "damage": 2,
+		"guard_chance": 0, "guard_time": [0.5, 0.9], "max_strikes": 3,
+		"radius": 16, "speed": 150, "mass": 0.6, "aggro_range": 480, "orbit_distance": 120,
+		"windup": [0.38, 0.6], "lunge_speed": 460, "strike_reach": 45, "strike_arc": 120,
+		"color": [0.62, 0.6, 0.55], "shape": "triangle",
+		"spawn_weight": [0, 0], "metro_weight": [30, 0]
+	},
+	"mutant_stalker": {
+		"mutant": true,
+		"points": 4, "xp": 35, "damage": 2, "armor": 0.05,
+		"guard_chance": 0.2, "guard_time": [0.5, 0.9], "max_strikes": 2,
+		"radius": 22, "speed": 100, "mass": 1.0, "aggro_range": 440, "orbit_distance": 210,
+		"windup": [0.55, 0.85], "lunge_speed": 560, "strike_reach": 75, "strike_arc": 70,
+		"color": [0.5, 0.52, 0.58], "shape": "diamond",
+		"spawn_weight": [0, 0], "metro_weight": [16, 2]
+	},
+	"mutant_spitter": {
+		"mutant": true, "spit": true,
+		"points": 4, "xp": 40, "damage": 2,
+		"guard_chance": 0, "guard_time": [0.5, 0.9], "max_strikes": 2,
+		"radius": 20, "speed": 80, "mass": 0.8, "aggro_range": 520, "orbit_distance": 320,
+		"windup": [0.7, 1.05], "lunge_speed": 0, "strike_reach": 40, "strike_arc": 60,
+		"color": [0.55, 0.6, 0.45], "shape": "pentagon",
+		"spawn_weight": [0, 0], "metro_weight": [8, 2],
+		"ranged": {"range": 420, "bolt_speed": 260, "color": [0.55, 1.0, 0.25]}
+	},
+	"mutant_bloater": {
+		"mutant": true,
+		"points": 7, "xp": 90, "damage": 3, "armor": 0.2,
+		"guard_chance": 0, "guard_time": [0.5, 0.9], "max_strikes": 2,
+		"radius": 38, "speed": 50, "mass": 3.5, "aggro_range": 360, "orbit_distance": 180,
+		"windup": [1.05, 1.5], "lunge_speed": 230, "strike_reach": 90, "strike_arc": 200,
+		"slam": {"chance": 0.4, "range": 250, "radius": 130, "windup": 0.8, "air_time": 0.55, "height": 60, "damage_bonus": 1},
+		"color": [0.66, 0.55, 0.52], "shape": "octagon",
+		"spawn_weight": [0, 0], "metro_weight": [3, 2]
+	},
+	"abomination": {"mutant": true, "name": "BOSS_NAME_METRO", "points": 20, "armor": 0.15, "guard_chance": 0.3, "guard_time": [0.5, 0.9], "max_strikes": 3, "xp": 650, "damage": 3, "radius": 54, "speed": 66, "mass": 6.5, "aggro_range": 520, "orbit_distance": 150, "windup": [0.6, 0.95], "lunge_speed": 300, "strike_reach": 115, "strike_arc": 240, "slam": {"chance": 0.4, "range": 300, "radius": 150, "windup": 0.7, "air_time": 0.55, "height": 80, "damage_bonus": 1}, "color": [0.6, 0.5, 0.55], "shape": "octagon", "spawn_weight": [0, 0], "boss": true, "magic": {"chance": 0.4, "min_range": 170, "range": 560, "windup": [0.85, 1.15], "cooldown": [3.0, 5.0], "retry": [1.0, 2.0], "bolts": 5, "spread": 30, "bolt_speed": 240, "bolt_radius": 14, "damage_bonus": 0, "color": [0.55, 1.0, 0.25]}, "summon": {"type": "walker", "count": 4, "max_minions": 8, "cooldown": [7.0, 11.0], "channel_time": 1.4, "minion_xp": 2}},
 	"guardian": {"points": 20, "armor": 0.15, "guard_chance": 0.5, "guard_time": [0.5, 0.9], "max_strikes": 3, "xp": 600, "damage": 3, "radius": 50, "speed": 63, "mass": 6.0, "aggro_range": 520, "orbit_distance": 150, "windup": [0.59, 0.98], "lunge_speed": 260, "strike_reach": 110, "strike_arc": 240, "color": [0.6, 0.2, 0.25], "shape": "octagon", "slam": {"chance": 0.35, "range": 300, "radius": 140, "windup": 0.7, "air_time": 0.55, "height": 80, "damage_bonus": 1}, "spawn_weight": [0, 0], "boss": true, "magic": {"chance": 0.45, "min_range": 170, "range": 560, "windup": [0.85, 1.15], "cooldown": [3.0, 5.0], "retry": [1.0, 2.0], "bolts": 3, "spread": 20, "bolt_speed": 270, "bolt_radius": 13, "damage_bonus": 0, "color": [1.0, 0.5, 0.35]}, "summon": {"type": "scout", "count": 2, "max_minions": 3, "cooldown": [7.0, 11.0], "channel_time": 1.4, "minion_xp": 5}}
 }
