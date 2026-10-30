@@ -359,6 +359,9 @@ const CLICK_STUCK_TIME := 0.4
 ## Flashlight), accesa e spenta tenendo premuto L3 (o Maiusc) per
 ## TORCH_HOLD_TIME secondi; un tocco più breve è la corsa.
 const TORCH_HOLD_TIME := 0.45
+## Con la torcia accesa e il fascio almeno così forte (vedi
+## Flashlight.strength) il personaggio è disegnato con i colori del giorno.
+const TORCH_SELF_LIGHT := 0.5
 
 ## Ogni pozione cura questi punti vita.
 const POTION_HEAL := 3
@@ -921,9 +924,10 @@ func _physics_process(delta: float) -> void:
 	_blood.update(delta)
 	_wounds.update(delta)
 	if torch_on:
-		# Il fascio parte da terra, sotto il personaggio, verso lo sguardo.
-		_torch.position = Vector2(0, -ground_elevation + RADIUS * 0.6)
+		# Il fascio parte dal terreno in pianta, sotto il personaggio, verso lo sguardo.
+		_torch.position = Vector2(0, RADIUS * 0.6)
 		_torch.aim(facing)
+	update_torch_light()
 	_squash = move_toward(_squash, 0.0, SQUASH_RECOVERY * delta)
 	if _camera:
 		# Mentre si precipita nel burrone la telecamera resta al bordo.
@@ -2514,6 +2518,16 @@ func _update_run_button(delta: float) -> void:
 	else:
 		_run_hold = -1.0
 		_run_on = not _run_on
+
+
+## Al buio con la torcia accesa il goblin si vede come di giorno: il buio
+## della notte e dei sotterranei non lo scurisce (niente luci su di lui).
+## Altrimenti la luce lo prende come il punto del terreno ai suoi piedi.
+func update_torch_light() -> void:
+	var lit := _torch.strength() >= TORCH_SELF_LIGHT
+	var wanted: Material = Enemy._unshaded_material() if lit else LightShaders.feet()
+	if material != wanted:
+		material = wanted
 
 
 func set_torch(on: bool) -> void:

@@ -43,6 +43,8 @@ func setup(data: Dictionary, type: Dictionary) -> void:
 	# Disegnato una volta sola; solo gli alberi controllano il giocatore e
 	# il totem si anima.
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+	# La torcia lo illumina come il punto del terreno su cui sta, in pianta.
+	material = LightShaders.feet()
 	set_process(type_id == "tree" or type_id in INTERACTIVE)
 	if type_id in INTERACTIVE:
 		add_to_group(LowHealthVignette.FOCUS_GROUP)

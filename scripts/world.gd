@@ -24,6 +24,18 @@ extends Node2D
 ## dietro; quelli che coprono il giocatore, e tutti quelli attorno,
 ## diventano trasparenti finché resta lì dietro.
 ##
+## Luce della torcia (vedi Flashlight): si calcola in pianta, cioè nel punto
+## del terreno a quota zero sotto quello che si disegna, dove stanno anche
+## la torcia e i piedi di personaggi e oggetti (vedi LightShaders). Così
+## altopiani, rampe e pareti prendono la luce del punto su cui stanno. Non
+## passa attraverso montagne e pareti del sotterraneo: ogni blocco
+## invalicabile (non i burroni) che confina con un posto in cui si cammina
+## ha un ostacolo per la luce (LightOccluder2D) sulla sua base in pianta.
+## Gli altopiani su cui si sale la lasciano passare. Pareti, cime e
+## decorazioni dicono nella coordinata UV.y di ogni vertice di quanti pixel
+## scendere per arrivare in pianta (vedi _light_uvs); una parete si accende
+## solo se il fascio arriva davanti a lei.
+##
 ## Prestazioni: i dati del terreno (livelli, rampe, ostacoli) di una regione
 ## grande attorno al giocatore sono generati in anticipo (begin_region,
 ## generate_region); avvicinandosi al bordo Game mette in pausa e genera la
@@ -85,6 +97,17 @@ const LIP_WIDTH := 5.0
 ## Tipi di blocco: terreno normale, montagna o burrone (invalicabili) e
 ## roccia del sotterraneo.
 enum Kind { GROUND, MOUNTAIN, RAVINE, ROCK }
+
+## Maschera degli ostacoli per la luce (vedi in cima e Flashlight) e di
+## quanto, davanti alla base di una parete, si guarda se arriva la luce
+## (così il punto è davanti al suo stesso ostacolo).
+const OCCLUDER_BASE := 1
+const LIGHT_BASE_NUDGE := 4.0
+
+## Come si calcola la luce dei punti che si disegnano (vedi _light_uvs):
+## NONE dove sono, FACE alla base in pianta della parete (_light_base_a,
+## _light_base_b), TOP scendendo di _light_top (cime e decorazioni).
+enum LightMode { NONE, FACE, TOP }
 
 ## Mondo attivo: giocatore e nemici lo usano per muoversi.
 static var current: World
@@ -172,6 +195,11 @@ var _faded_blocks := {}
 ## ricontrollarli.
 var _wanted_blocks := {}
 var _occlusion_timer := 0.0
+## Punto in pianta in cui si calcola la luce di quello che si disegna (vedi LightMode).
+var _light_mode := LightMode.NONE
+var _light_base_a := Vector2.ZERO
+var _light_base_b := Vector2.ZERO
+var _light_top := 0.0
 
 
 func _ready() -> void:
@@ -1213,6 +1241,8 @@ func _show_chunk(chunk: Vector2i) -> void:
 	view.world = self
 	view.chunk = chunk
 	view.position = _from_uv(chunk.x * CHUNK_CELLS * CELL, chunk.y * CHUNK_CELLS * CELL)
+	view.material = LightShaders.ground()
+	_add_occluders(view, chunk)
 	add_child(view)
 	var nodes: Array[Node] = []
 	if entities:
@@ -1226,6 +1256,7 @@ func _show_chunk(chunk: Vector2i) -> void:
 					block.world = self
 					block.cell = cell
 					block.position = cell_corners(cell)[0]
+					block.material = LightShaders.ground()
 					entities.add_child(block)
 					nodes.append(block)
 	_chunk_views[chunk] = {"view": view, "nodes": nodes}
@@ -1265,6 +1296,33 @@ func draw_chunk(canvas: CanvasItem, chunk: Vector2i, offset: Vector2) -> void:
 				draw_floor(canvas, cell, offset)
 
 
+## Ostacoli per la luce dei blocchi invalicabili del pezzo che confinano
+## con un posto in cui si cammina (vedi in cima), figli di view.
+func _add_occluders(view: Node2D, chunk: Vector2i) -> void:
+	for i in CHUNK_CELLS:
+		for j in CHUNK_CELLS:
+			var cell := chunk * CHUNK_CELLS + Vector2i(i, j)
+			if not is_barrier(cell) or kind_of(cell) == Kind.RAVINE:
+				continue
+			var open := false
+			for step: Vector2i in RAMP_DIRECTIONS:
+				var other := cell + step
+				if not is_barrier(other) or kind_of(other) == Kind.RAVINE:
+					open = true
+					break
+			if not open:
+				continue
+			var polygon := PackedVector2Array()
+			for corner in cell_corners(cell):
+				polygon.append(corner - view.position)
+			var shape := OccluderPolygon2D.new()
+			shape.polygon = polygon
+			var occluder := LightOccluder2D.new()
+			occluder.occluder = shape
+			occluder.occluder_light_mask = OCCLUDER_BASE
+			view.add_child(occluder)
+
+
 ## Pavimento sotto un blocco che copre chi sta dietro: il rombo piano
 ## all'altezza del vicino dietro più basso (dove sta chi viene coperto), con
 ## le sue pareti verso i vicini davanti. Di solito è nascosto dal blocco.
@@ -1282,7 +1340,10 @@ func draw_floor(canvas: CanvasItem, cell: Vector2i, offset: Vector2) -> void:
 	var faces := _face_colors_of(kind)
 	_draw_face(canvas, corners, heights, cell + Vector2i(1, 0), 1, 2, 0, 3, faces[0], false)
 	_draw_face(canvas, corners, heights, cell + Vector2i(0, 1), 2, 3, 1, 0, faces[1], false)
-	canvas.draw_colored_polygon(top, _top_color(cell, kind, is_path(cell)).darkened(0.15))
+	_light_mode = LightMode.TOP
+	_light_top = base
+	_fill(canvas, top, _top_color(cell, kind, is_path(cell)).darkened(0.15))
+	_light_mode = LightMode.NONE
 
 
 ## Un blocco: pareti davanti (dove il vicino è più basso) e faccia
@@ -1309,10 +1370,18 @@ func draw_cell(canvas: CanvasItem, cell: Vector2i, offset: Vector2) -> void:
 	if ramp != Vector2i.ZERO:
 		# Le rampe che salgono verso il fondo sono in ombra, le altre in luce.
 		color = color.darkened(0.12) if ramp.x + ramp.y < 0 else color.lightened(0.08)
-	canvas.draw_colored_polygon(top, color)
+	# La cima prende la luce del terreno in pianta sotto ogni suo vertice.
+	_light_mode = LightMode.NONE
+	var uvs := PackedVector2Array()
+	for k in 4:
+		uvs.append(Vector2(0.0, heights[k]))
+	canvas.draw_colored_polygon(top, color, uvs)
 	if ramp != Vector2i.ZERO:
+		_light_mode = LightMode.TOP
+		_light_top = (heights[0] + heights[1] + heights[2] + heights[3]) / 4.0
 		_draw_ramp_lines(canvas, top, ramp, color)
 	_draw_decor(canvas, cell, offset, kind, path)
+	_light_mode = LightMode.NONE
 
 
 func _top_color(cell: Vector2i, kind: int, path: bool) -> Color:
@@ -1346,12 +1415,16 @@ func _draw_face(canvas: CanvasItem, corners: PackedVector2Array, heights: Array[
 		return
 	var a := corners[first]
 	var b := corners[second]
+	# Ogni punto della parete prende la luce che arriva in pianta alla sua base.
+	_light_mode = LightMode.FACE
+	_light_base_a = a
+	_light_base_b = b
 	var points := PackedVector2Array([a - Vector2(0, top_a), b - Vector2(0, top_b)])
 	if top_b - bottom_b >= 0.5:
 		points.append(b - Vector2(0, bottom_b))
 	if top_a - bottom_a >= 0.5:
 		points.append(a - Vector2(0, bottom_a))
-	canvas.draw_colored_polygon(points, color)
+	_fill(canvas, points, color)
 	# Strati della roccia o della terra, tutti in una sola chiamata.
 	var strata := PackedVector2Array()
 	var depth := STRATA_STEP
@@ -1360,7 +1433,7 @@ func _draw_face(canvas: CanvasItem, corners: PackedVector2Array, heights: Array[
 		strata.append(b - Vector2(0, top_b - minf(depth, top_b - bottom_b)))
 		depth += STRATA_STEP
 	if not strata.is_empty():
-		canvas.draw_multiline(strata, color.darkened(0.18), 1.5)
+		_lines(canvas, strata, color.darkened(0.18), 1.5)
 	if lip:
 		# Bordo d'erba che sporge in cima.
 		var lip_a := minf(LIP_WIDTH, top_a - bottom_a)
@@ -1371,8 +1444,60 @@ func _draw_face(canvas: CanvasItem, corners: PackedVector2Array, heights: Array[
 		if lip_a > 0.5:
 			lip_points.append(a - Vector2(0, top_a - lip_a))
 		if lip_points.size() >= 3:
-			canvas.draw_colored_polygon(lip_points, _lip_color)
-	canvas.draw_line(a - Vector2(0, bottom_a), b - Vector2(0, bottom_b), Color(0, 0, 0, 0.3), 2.0)
+			_fill(canvas, lip_points, _lip_color)
+	_line(canvas, a - Vector2(0, bottom_a), b - Vector2(0, bottom_b), Color(0, 0, 0, 0.3), 2.0)
+	_light_mode = LightMode.NONE
+
+
+## Per ogni punto, di quanti pixel scendere per arrivare al punto in pianta
+## da cui prende la luce (in UV.y, vedi LightShaders.ground): fin sotto la
+## base in pianta della parete (un poco davanti, LIGHT_BASE_NUDGE) o di
+## _light_top. Vuoto se la luce si calcola dove si disegna.
+func _light_uvs(points: PackedVector2Array) -> PackedVector2Array:
+	var uvs := PackedVector2Array()
+	if _light_mode == LightMode.NONE:
+		return uvs
+	uvs.resize(points.size())
+	var a := _light_base_a
+	var b := _light_base_b
+	for k in points.size():
+		var drop := _light_top
+		if _light_mode == LightMode.FACE:
+			var t := clampf((points[k].x - a.x) / (b.x - a.x), 0.0, 1.0) if absf(b.x - a.x) > 0.01 else 0.0
+			drop = maxf(lerpf(a.y, b.y, t) - points[k].y, 0.0) + LIGHT_BASE_NUDGE
+		uvs[k] = Vector2(0.0, drop)
+	return uvs
+
+
+func _fill(canvas: CanvasItem, points: PackedVector2Array, color: Color) -> void:
+	canvas.draw_colored_polygon(points, color, _light_uvs(points))
+
+
+func _line(canvas: CanvasItem, from: Vector2, to: Vector2, color: Color, width: float) -> void:
+	_lines(canvas, PackedVector2Array([from, to]), color, width)
+
+
+## Segmenti (a coppie di punti) come quadrilateri, così ogni vertice ha la sua luce.
+func _lines(canvas: CanvasItem, pairs: PackedVector2Array, color: Color, width: float) -> void:
+	if _light_mode == LightMode.NONE:
+		canvas.draw_multiline(pairs, color, width)
+		return
+	var colors := PackedColorArray([color, color, color, color])
+	for k in range(0, pairs.size() - 1, 2):
+		var across := (pairs[k + 1] - pairs[k]).orthogonal().normalized() * width / 2.0
+		var quad := PackedVector2Array([pairs[k] + across, pairs[k + 1] + across, pairs[k + 1] - across, pairs[k] - across])
+		canvas.draw_primitive(quad, colors, _light_uvs(quad))
+
+
+## Cerchio pieno che prende la luce come gli altri punti (un poligono, se serve).
+func _circle(canvas: CanvasItem, center: Vector2, radius: float, color: Color) -> void:
+	if _light_mode == LightMode.NONE:
+		canvas.draw_circle(center, radius, color)
+		return
+	var points := PackedVector2Array()
+	for k in 10:
+		points.append(center + Vector2.from_angle(k * TAU / 10.0) * radius)
+	_fill(canvas, points, color)
 
 
 ## Linee lungo la pendenza di una rampa, parallele al lato più alto.
@@ -1397,7 +1522,7 @@ func _draw_ramp_lines(canvas: CanvasItem, top: PackedVector2Array, ramp: Vector2
 		var t := k / 4.0
 		lines.append((low[0] as Vector2).lerp(high[0], t))
 		lines.append((low[1] as Vector2).lerp(high[1], t))
-	canvas.draw_multiline(lines, color.darkened(0.15), 1.5)
+	_lines(canvas, lines, color.darkened(0.15), 1.5)
 
 
 ## Ciuffi d'erba e fiori sui blocchi d'erba, sassolini sui sentieri e nel
@@ -1407,16 +1532,19 @@ func _draw_decor(canvas: CanvasItem, cell: Vector2i, offset: Vector2, kind: int,
 		return
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash([_decor_seed(), cell.x, cell.y, "decor"])
+	# Le decorazioni prendono la luce in pianta come la cima su cui stanno.
+	_light_mode = LightMode.TOP
+	_light_top = _top_height(cell) if ramp_of(cell) == Vector2i.ZERO else level_of(cell) * level_height + level_height / 2.0
 	if path or dungeon:
 		for k in rng.randi_range(2, 4):
 			var at := _decor_point(cell, rng, offset)
-			canvas.draw_circle(at, rng.randf_range(1.5, 3.0), _pebble_colors[k % _pebble_colors.size()])
+			_circle(canvas, at, rng.randf_range(1.5, 3.0), _pebble_colors[k % _pebble_colors.size()])
 		if dungeon and rng.randf() < float(_dungeon_data["mushroom_chance"]):
 			var at := _decor_point(cell, rng, offset)
 			var glow := _mushroom_colors[rng.randi() % _mushroom_colors.size()]
-			canvas.draw_circle(at, 7.0, Color(glow, 0.25))
-			canvas.draw_line(at, at + Vector2(0, -5), Color(0.8, 0.8, 0.75), 2.0)
-			canvas.draw_circle(at + Vector2(0, -6), 3.5, glow)
+			_circle(canvas, at, 7.0, Color(glow, 0.25))
+			_line(canvas, at, at + Vector2(0, -5), Color(0.8, 0.8, 0.75), 2.0)
+			_circle(canvas, at + Vector2(0, -6), 3.5, glow)
 		return
 	var grass := _grass_colors[clampi(level_of(cell), 0, _levels - 1)].darkened(0.3)
 	var tufts := PackedVector2Array()
@@ -1424,13 +1552,13 @@ func _draw_decor(canvas: CanvasItem, cell: Vector2i, offset: Vector2, kind: int,
 		var at := _decor_point(cell, rng, offset)
 		tufts.append_array([at, at + Vector2(-4, -7), at, at + Vector2(0, -9), at, at + Vector2(4, -7)])
 	if not tufts.is_empty():
-		canvas.draw_multiline(tufts, grass, 1.5)
+		_lines(canvas, tufts, grass, 1.5)
 	if rng.randf() < float(_decor["flower_chance"]):
 		var color := _flower_colors[rng.randi() % _flower_colors.size()]
 		var at := _decor_point(cell, rng, offset)
 		for k in 3:
-			canvas.draw_circle(at + Vector2.from_angle(k * TAU / 3.0) * 3.0, 2.5, color)
-		canvas.draw_circle(at, 1.5, Color(0.95, 0.8, 0.3))
+			_circle(canvas, at + Vector2.from_angle(k * TAU / 3.0) * 3.0, 2.5, color)
+		_circle(canvas, at, 1.5, Color(0.95, 0.8, 0.3))
 
 
 ## Punto a caso sulla faccia superiore del blocco, lontano dai bordi.
