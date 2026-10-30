@@ -125,7 +125,7 @@ CONTROLS_ATTACK,"Attack (combo, hold to keep attacking)"
 CONTROLS_HEAVY,"Power strike (uses a little mana; hold to charge, uses more mana while held; keep holding to chain)"
 CONTROLS_PARRY,"Parry (instant, cancels any action)"
 CONTROLS_DODGE,"Dodge (cancels any action, air dash while jumping)"
-CONTROLS_JUMP,"Jump (cancels any action) · Interact (chests, merchants, caves)"
+CONTROLS_JUMP,"Jump (cancels any action) · Interact (chests, merchants, caves, mausoleums)"
 CONTROLS_RUN,Tap: run on/off (dodge while running to slide) · Hold: torch on/off
 CONTROLS_FOCUS,"Focus (hold: dims the world, highlights you, items, chests and passages)"
 CONTROLS_SPELL,Fireball
@@ -328,9 +328,9 @@ TUTORIAL_ARSENAL_TEXT,"{spell} casts a fireball that chases the nearest enemy in
 TUTORIAL_ENEMIES_TITLE,The enemies
 TUTORIAL_ENEMIES_TEXT,"Every enemy blow costs you one heart (two from the boss): a few mistakes and you're down. Enemies have only a few health points too, shown as segments over their heads: every hit takes one away, the strongest hits two or three. Before striking enemies glow red and pull back their weapon: that's the moment to parry or dodge. No more than two attack at once, the others circle around. Sometimes they raise their guard: hit them from the side or from behind. Their blows and arrows hurt the other monsters too. You lock on to the nearest enemy in sight by yourself ({lock_on} keeps the lock); it gets a red ring and your strikes and fireballs go its way. Every now and then an undead horde shows up: from 50 to 200 of them, very weak, all running at you; they fall apart on contact and hurt you. Cut them down before they reach you, or jump over them."
 TUTORIAL_LOOT_TITLE,"Chests, inventory and merchants"
-TUTORIAL_LOOT_TEXT,"Walk up to chests, merchants, totems and caves and press {interact} when the prompt appears. Chests drop gold and items: swords, armor, boots, amulets, rings and spell books. {inventory} opens the inventory (the game pauses): equip your gear, read the books, sort with {inventory_sort}. Merchants buy what you don't use and sell potions, Cataclysm runes and rare gear."
+TUTORIAL_LOOT_TEXT,"Walk up to chests, merchants, totems, caves and mausoleums and press {interact} when the prompt appears. Chests drop gold and items: swords, armor, boots, amulets, rings and spell books. {inventory} opens the inventory (the game pauses): equip your gear, read the books, sort with {inventory_sort}. Merchants buy what you don't use and sell potions, Cataclysm runes and rare gear."
 TUTORIAL_WORLD_TITLE,Exploring the lands
-TUTORIAL_WORLD_TEXT,"The lands have no borders. The minimap in the top-right corner shows enemies, chests, totems, merchants and caves; {map} opens the full map. At night you need the torch. Hold {focus} for focus mode: the world dims and only the goblin and the things to pick up keep their colors. Jump to climb the hills and ramps."
+TUTORIAL_WORLD_TEXT,"The lands have no borders. The minimap in the top-right corner shows enemies, chests, totems, merchants, caves and mausoleums, but only in the places you have already explored; {map} opens the full map. At night and underground it's pitch black: you need the torch, whose light stops at mountains and walls. Behind a wall you see the goblin's outline. Hold {focus} for focus mode: the world dims and only the goblin and the things to pick up keep their colors. Jump to climb the hills and ramps."
 TUTORIAL_BUILDINGS_TITLE,Caves and the boss
 TUTORIAL_BUILDINGS_TEXT,"Cave entrances open in the mountain walls: go in with {interact}. Down there it's dark and the enemies get tougher level after level: on every level look for the stairs. On the last one the Cave Guardian waits in his arena: he summons help and strikes from afar. Beat him for gold, a Cataclysm rune and gear you won't find anywhere else."
 TUTORIAL_METRO_TITLE,The catacombs
