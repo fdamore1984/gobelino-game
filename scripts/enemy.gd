@@ -24,6 +24,25 @@ extends Node2D
 ## I tipi con "magic" (il boss) ogni tanto si fermano a caricare una magia e
 ## scagliano da lontano un ventaglio di dardi grandi.
 ##
+## Vita a punti, come quella del giocatore: ogni tipo ha pochi punti vita
+## ("points" in data/enemies.json, che crescono un poco col livello di
+## minaccia) mostrati a segmenti sopra la testa. Un colpo toglie 1 punto,
+## 2 o 3 i colpi molto forti: il danno del colpo, meno l'armatura, diviso
+## per POINT_DAMAGE volte il primo colpo del giocatore al livello 1,
+## cresciuto col livello di minaccia del nemico ("hit_damage", più piano
+## dei danni del giocatore; vedi points_for), così combo, colpi potenti,
+## parata perfetta, oggetti e livelli contano ancora. Colpito resta invulnerabile per
+## HURT_INVULNERABLE_TIME secondi e lampeggia, come il giocatore.
+##
+## I ghoul delle catacombe (tipi con "mutant") combattono come gli altri
+## ma senza armi: tanti occhi rossi in disordine, bocca spalancata,
+## escrescenze sul corpo e artigli al posto delle mani; quelli che sputano
+## ("spit") lanciano bile velenosa dalla bocca invece di tirare frecce.
+##
+## I non morti delle orde (tipi con "horde", vedi Game) non girano attorno e
+## non attaccano: corrono dritti verso il giocatore e, quando lo toccano, si
+## disfano facendogli un danno (vedi _rush e _burst). Muoiono con un colpo.
+##
 ## Si muovono sul terreno a gradini come il giocatore: scendono dai gradini
 ## cadendo e, quando un gradino alto un livello li blocca, ci saltano sopra;
 ## nei burroni non entrano mai. Il boss resta sempre dentro la sua arena
@@ -47,6 +66,14 @@ const LEASH_RANGE := 700.0
 const SEPARATION_RANGE := 60.0
 const KNOCKBACK := 320.0
 const HEAVY_KNOCKBACK_FACTOR := 1.6
+## Vita a punti (vedi in cima): danno che vale un punto, rispetto al primo
+## colpo del giocatore al livello 1, e punti al più per colpo.
+const POINT_DAMAGE := 1.25
+const MAX_POINTS_PER_HIT := 3
+## Dopo un colpo si resta invulnerabili per questo tempo, lampeggiando
+## (molto meno del giocatore: le combo devono restare veloci).
+const HURT_INVULNERABLE_TIME := 0.12
+const HURT_BLINK_RATE := 30.0
 
 ## Ogni tanto cambia verso di rotazione o fa uno scatto laterale.
 const DECISION_INTERVAL := Vector2(0.5, 1.6)
@@ -155,6 +182,12 @@ const VIEW_MARGIN := Vector2(160, 220)
 ## VERY_FAR_RANGE un passo ogni quattro (con il tempo di tutti).
 const FAR_RANGE := 1000.0
 const VERY_FAR_RANGE := 1500.0
+## Non morti delle orde (anche 200 insieme): a passi alterni oltre
+## HORDE_NEAR_RANGE, uno ogni quattro oltre HORDE_FAR_RANGE; la spinta di
+## separazione guarda al più SEPARATION_MAX vicini.
+const HORDE_NEAR_RANGE := 450.0
+const HORDE_FAR_RANGE := 900.0
+const SEPARATION_MAX := 10
 
 ## Scia rossa: mentre carica l'attacco il nemico si accende di un bagliore
 ## rosso; quando scatta per colpire (e nel salto con colpo a terra) lascia
@@ -170,6 +203,9 @@ const COLOR_STUNNED := Color(0.55, 0.55, 0.8)
 const COLOR_DANGER := Color(1.0, 0.25, 0.15)
 const COLOR_SUMMON := Color(0.4, 1.0, 0.9)
 const COLOR_DAMAGE := Color(1.0, 1.0, 1.0)
+## Contorno del nemico dietro a un muro (vedi Silhouette).
+const COLOR_SILHOUETTE := Color(1.0, 0.3, 0.25, 0.75)
+const SILHOUETTE_INTERVAL := 3
 ## Tinta del nemico agganciato dal giocatore (vedi set_locked): i valori
 ## sopra 1 lo illuminano di rosso invece di scurirlo.
 const COLOR_LOCKED := Color(1.7, 0.5, 0.45)
@@ -178,14 +214,28 @@ const COLOR_LOCKED := Color(1.7, 0.5, 0.45)
 const SIZE_RANGE := Vector2(0.8, 1.25)
 const HEADWEARS := ["", "", "helmet", "hood", "horns", "headband"]
 const GEAR_COLORS := [Color(0.55, 0.57, 0.62), Color(0.45, 0.3, 0.18), Color(0.25, 0.22, 0.35), Color(0.6, 0.15, 0.12), Color(0.85, 0.82, 0.7), Color(0.2, 0.35, 0.2)]
+## Non morti delle orde: carne grigioverde o livida, occhi rossi, velocità
+## variabile di questa parte; si disfano toccando il giocatore entro
+## CONTACT_MARGIN oltre i due raggi.
+const ZOMBIE_TONES := [Color(0.55, 0.62, 0.48), Color(0.48, 0.54, 0.44), Color(0.6, 0.6, 0.55), Color(0.45, 0.5, 0.5)]
+const COLOR_ZOMBIE_EYES := Color(1.0, 0.2, 0.1)
+const COLOR_RAGS := Color(0.32, 0.27, 0.22)
+## Ghoul: escrescenze, artigli e bile.
+const COLOR_GROWTH := Color(0.78, 0.55, 0.5)
+const COLOR_CLAWS := Color(0.88, 0.85, 0.75)
+const COLOR_ACID := Color(0.55, 1.0, 0.25)
+const ZOMBIE_SPEED_SPREAD := 0.15
+const CONTACT_MARGIN := 6.0
+const BURST_SPLATS := 5
 
 var player: Player
 var type_id := "warrior"
 var radius := 24.0
 ## Altezza del terreno sotto il nemico: viene disegnato più in alto.
 var ground_elevation := 0.0
-var health := 40
-var max_health := 40
+## Punti vita (vedi in cima).
+var health := 4
+var max_health := 4
 ## Esperienza data al giocatore quando viene sconfitto.
 var xp_reward := 30
 ## Danno di un colpo: quello del tipo, cresciuto con il livello di minaccia.
@@ -240,6 +290,8 @@ var _slam_landed := false
 var _air := 0.0
 var _knockback := Vector2.ZERO
 var _hit_flash := 0.0
+## Invulnerabilità rimasta dopo un colpo (vedi take_points).
+var _invulnerable := 0.0
 ## Altezza sopra il terreno (salendo su un gradino con un salto o cadendo
 ## da uno), velocità verticale e attesa prima del prossimo salto.
 var _height := 0.0
@@ -287,6 +339,10 @@ var _body_mesh: ArrayMesh
 var _outline_mesh: ArrayMesh
 var _shape_radius := -1.0
 
+## Sagoma che si vede quando il nemico è dietro a un muro (vedi Silhouette):
+## si controlla un passo di fisica ogni SILHOUETTE_INTERVAL.
+var _silhouette := Silhouette.new(COLOR_SILHOUETTE, false)
+
 ## Aggiornamento a passi alterni da lontano: in quali passi (da 0 a 3) e tempo saltato.
 var _update_slot := randi() % 4
 var _skipped_time := 0.0
@@ -307,7 +363,7 @@ func setup(id: String, level := 1) -> void:
 	_type = EnemyTypes.get_type(id)
 	threat_level = maxi(level, 1)
 	radius = _type["radius"]
-	max_health = roundi(EnemyTypes.scaled("health", _type["health"], threat_level))
+	max_health = maxi(roundi(EnemyTypes.scaled("points", _type["points"], threat_level)), 1)
 	health = max_health
 	xp_reward = roundi(EnemyTypes.scaled("xp", _type["xp"], threat_level))
 	damage = floori(EnemyTypes.scaled("damage", _type["damage"], threat_level))
@@ -315,6 +371,8 @@ func setup(id: String, level := 1) -> void:
 	_speed = _type["speed"]
 	var color: Array = _type["color"]
 	_color = Color(color[0], color[1], color[2])
+	if is_horde():
+		_speed *= randf_range(1.0 - ZOMBIE_SPEED_SPREAD, 1.0 + ZOMBIE_SPEED_SPREAD)
 	if _type.has("summon"):
 		_summon_cooldown = randf_range(1.0, 2.5)
 	if _type.has("magic"):
@@ -326,7 +384,7 @@ func setup(id: String, level := 1) -> void:
 ## scena di gioco (boss più forte, nemici evocati).
 func save_state() -> Dictionary:
 	return {
-		"type": type_id, "position": SaveGame.array(position), "health": health, "max_health": max_health,
+		"type": type_id, "position": SaveGame.array(position), "health": health, "max_health": max_health, "points": true,
 		"xp": xp_reward, "damage": damage, "loot": drops_loot, "minion": is_minion,
 		"level": threat_level, "armor": armor,
 		"facing": SaveGame.array(_facing), "look": _look_seed,
@@ -337,8 +395,13 @@ func save_state() -> Dictionary:
 ## alla scena); i campi mancanti restano quelli del tipo.
 func load_state(data: Dictionary) -> void:
 	position = SaveGame.vector(data["position"])
-	max_health = maxi(int(data.get("max_health", max_health)), 1)
-	health = clampi(int(data.get("health", max_health)), 1, max_health)
+	if data.get("points", false):
+		max_health = maxi(int(data.get("max_health", max_health)), 1)
+		health = clampi(int(data.get("health", max_health)), 1, max_health)
+	else:
+		# Salvataggio di prima della vita a punti: si tiene la stessa parte di vita.
+		var share := float(data.get("health", 1)) / maxf(float(data.get("max_health", 1)), 1.0)
+		health = clampi(ceili(share * max_health), 1, max_health)
 	xp_reward = int(data.get("xp", xp_reward))
 	damage = int(data.get("damage", damage))
 	threat_level = int(data.get("level", threat_level))
@@ -362,12 +425,16 @@ func _apply_look(look_seed: int) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = look_seed
 	var size := 1.0 if is_boss() else rng.randf_range(SIZE_RANGE.x, SIZE_RANGE.y)
-	radius = float(_type["radius"]) * size
+	# Raggi a passi di mezzo pixel: le mesh del corpo (una per raggio, vedi
+	# Shapes) restano poche anche con le orde di centinaia di non morti.
+	radius = snappedf(float(_type["radius"]) * size, 0.5)
 	var color: Array = _type["color"]
 	var base := Color(color[0], color[1], color[2])
+	if is_horde():
+		base = ZOMBIE_TONES[rng.randi() % ZOMBIE_TONES.size()]
 	_color = base if is_boss() else Color.from_hsv(wrapf(base.h + rng.randf_range(-0.03, 0.03), 0.0, 1.0),
 			clampf(base.s * rng.randf_range(0.85, 1.15), 0.0, 1.0), clampf(base.v * rng.randf_range(0.88, 1.1), 0.0, 1.0))
-	_headwear = "" if is_boss() else HEADWEARS[rng.randi() % HEADWEARS.size()]
+	_headwear = "" if is_boss() or is_horde() or is_mutant() else HEADWEARS[rng.randi() % HEADWEARS.size()]
 	_headwear_color = GEAR_COLORS[rng.randi() % GEAR_COLORS.size()]
 	_shape_radius = -1.0
 
@@ -396,6 +463,8 @@ func _punishing(to_player: Vector2, distance: float) -> bool:
 func _ready() -> void:
 	if _type.is_empty():
 		setup(type_id)
+	# La torcia lo illumina come il punto del terreno su cui sta, in pianta.
+	material = LightShaders.feet()
 	add_to_group("enemies")
 	if _facing == Vector2.RIGHT:
 		_facing = Vector2.from_angle(randf() * TAU)
@@ -410,6 +479,7 @@ func _ready() -> void:
 	add_child(_danger_front)
 	for fx: CanvasItem in [_telegraph, _danger_back, _danger_front]:
 		fx.material = _unshaded_material()
+	add_child(_silhouette)
 	_voice.tone = (BOSS_VOICE if is_boss() else randf_range(VOICE_SPREAD.x, VOICE_SPREAD.y)) / pow(float(_type["mass"]), 0.25)
 	add_child(_voice)
 	if World.current:
@@ -432,6 +502,9 @@ func _physics_process(delta: float) -> void:
 	if player and _state != State.DEAD:
 		var far := global_position.distance_squared_to(player.global_position)
 		var interval := 4 if far > VERY_FAR_RANGE * VERY_FAR_RANGE else (2 if far > FAR_RANGE * FAR_RANGE else 1)
+		if is_horde():
+			# I non morti corrono dritti: anche più vicini basta aggiornarli meno spesso.
+			interval = 4 if far > HORDE_FAR_RANGE * HORDE_FAR_RANGE else (2 if far > HORDE_NEAR_RANGE * HORDE_NEAR_RANGE else 1)
 		if (Engine.get_physics_frames() + _update_slot) % interval != 0:
 			_skipped_time += delta
 			return
@@ -441,6 +514,7 @@ func _physics_process(delta: float) -> void:
 	_attack_cooldown = maxf(_attack_cooldown - delta, 0.0)
 	_summon_cooldown = maxf(_summon_cooldown - delta, 0.0)
 	_hit_flash = maxf(_hit_flash - delta, 0.0)
+	_update_invulnerability(delta)
 	_guard_cooldown = maxf(_guard_cooldown - delta, 0.0)
 	_guard_flash = maxf(_guard_flash - delta, 0.0)
 	_slam_cooldown = maxf(_slam_cooldown - delta, 0.0)
@@ -466,7 +540,9 @@ func _physics_process(delta: float) -> void:
 				_change_state(State.CHASE)
 
 		State.CHASE:
-			if not player_active or distance > LEASH_RANGE:
+			if is_horde():
+				target_velocity = _rush(to_player, distance, player_active)
+			elif not player_active or distance > LEASH_RANGE:
 				_change_state(State.WANDER)
 			elif _punishing(to_player, distance):
 				_attack_cooldown = 0.0
@@ -598,6 +674,7 @@ func _physics_process(delta: float) -> void:
 				ground_elevation = World.current.elevation_at(position)
 			queue_redraw()
 			if _state_time >= DEATH_FALL_TIME:
+				_silhouette.visible = false
 				GroundFx.corpse(global_position, ground_elevation, _corpse_points(1.0), _corpse_color())
 				queue_free()
 			_redraw_danger()
@@ -652,10 +729,25 @@ func _physics_process(delta: float) -> void:
 	_update_trail(delta)
 	if _on_screen():
 		queue_redraw()
+		if (Engine.get_physics_frames() + _update_slot) % SILHOUETTE_INTERVAL == 0:
+			_update_silhouette()
+	elif _silhouette.visible:
+		_silhouette.visible = false
 	_redraw_danger()
 	if _state in [State.SUMMON, State.SLAM] or _telegraph_shown:
 		_telegraph_shown = _state in [State.SUMMON, State.SLAM]
 		_telegraph.queue_redraw()
+
+
+## Dietro a un muro si vede la sagoma del nemico (vedi Silhouette).
+func _update_silhouette() -> void:
+	var lift := _air + _height
+	_silhouette.body_center = _body_offset()
+	_silhouette.radius = radius
+	_silhouette.facing = _facing
+	_silhouette.leg_spacing = radius * LEG_SPACING
+	_silhouette.feet_y = -ground_elevation - lift + radius * 0.85
+	_silhouette.update(position, ground_elevation + lift)
 
 
 ## Ridisegna gli effetti rossi mentre ci sono, e una volta in più per
@@ -703,12 +795,27 @@ func shove(velocity: Vector2) -> void:
 		_knockback = velocity
 
 
-## heavy: colpo finale della combo, spinge più lontano.
+## Punti vita tolti da un colpo con quel danno (vedi in cima): l'armatura
+## ne assorbe una parte, ma almeno un punto passa sempre.
+func points_for(amount: int) -> int:
+	var unit := EnemyTypes.scaled("hit_damage", POINT_DAMAGE * Player.BASE_DAMAGE, threat_level)
+	return clampi(roundi(amount * (1.0 - armor) / unit), 1, MAX_POINTS_PER_HIT)
+
+
+## Colpo del giocatore con quel danno (vedi points_for); heavy: colpo
+## finale della combo, spinge più lontano.
 func take_damage(amount: int, direction: Vector2, heavy := false) -> void:
-	if _state == State.DEAD:
+	take_points(points_for(amount), direction, heavy)
+
+
+## Toglie punti vita. Durante l'invulnerabilità dopo un colpo non succede
+## nulla, salvo con force (runa del cataclisma, non morto che si disfa) e durante
+## l'attacco speciale della Frenesia (i nemici sono fermi e i colpi vanno a raffica).
+func take_points(points: int, direction: Vector2, heavy := false, force := false) -> void:
+	if _state == State.DEAD or (_invulnerable > 0.0 and not force and not frozen):
 		return
-	# L'armatura assorbe una parte del danno, ma almeno un punto passa sempre.
-	health -= maxi(roundi(amount * (1.0 - armor)), 1)
+	health -= maxi(points, 1)
+	_invulnerable = HURT_INVULNERABLE_TIME
 	_hit_flash = 0.12
 	_knockback = direction * KNOCKBACK * (HEAVY_KNOCKBACK_FACTOR if heavy else 1.0) / float(_type["mass"])
 	GroundFx.bleed(global_position, ground_elevation + radius * 0.8, direction, BLEED_DROPS_HEAVY if heavy else BLEED_DROPS)
@@ -717,6 +824,7 @@ func take_damage(amount: int, direction: Vector2, heavy := false) -> void:
 	if health <= 0:
 		_fall_side = 1.0 if direction.x >= 0.0 else -1.0
 		_trail.clear()
+		_silhouette.visible = false
 		GroundFx.pool(global_position, radius * DEATH_POOL)
 		_change_state(State.DEAD)
 		remove_from_group("enemies")
@@ -730,6 +838,14 @@ func take_damage(amount: int, direction: Vector2, heavy := false) -> void:
 		_finish_summon()
 	elif _state == State.WANDER:
 		_change_state(State.CHASE)
+
+
+## Conto alla rovescia dell'invulnerabilità, lampeggiando come il giocatore.
+func _update_invulnerability(delta: float) -> void:
+	if _invulnerable <= 0.0 and modulate.a >= 1.0:
+		return
+	_invulnerable = maxf(_invulnerable - delta, 0.0)
+	modulate.a = 0.35 if _invulnerable > 0.0 and int(_invulnerable * HURT_BLINK_RATE) % 2 == 0 else 1.0
 
 
 ## Fa partire subito l'inseguimento del giocatore (per esempio nelle sfide).
@@ -747,7 +863,6 @@ func is_boss() -> bool:
 	return _type.get("boss", false)
 
 
-## Corona d'oro sopra la testa del boss.
 ## Copricapo scelto a caso (vedi _apply_look), sempre in cima alla testa.
 func _draw_headwear() -> void:
 	var top := Vector2(0, -radius)
@@ -771,6 +886,44 @@ func _draw_headwear() -> void:
 			draw_line(Vector2(-radius * 0.92, -radius * 0.45), Vector2(radius * 0.92, -radius * 0.45), _headwear_color, radius * 0.2)
 
 
+## Non morto di un'orda (vedi Game): corre dritto verso il giocatore.
+func is_horde() -> bool:
+	return _type.get("horde", false)
+
+
+## Ghoul delle catacombe (vedi in cima).
+func is_mutant() -> bool:
+	return _type.get("mutant", false)
+
+
+## Non morto: velocità verso il giocatore; toccandolo (non se ci salta sopra)
+## si disfa e gli fa un danno. Se lo schiva si riprova.
+func _rush(to_player: Vector2, distance: float, player_active: bool) -> Vector2:
+	if not player_active:
+		_change_state(State.WANDER)
+		return Vector2.ZERO
+	var above := player.altitude() - ground_elevation
+	if distance <= radius + Player.RADIUS + CONTACT_MARGIN and above <= Player.JUMP_EVADE_HEIGHT:
+		if player.receive_hit(global_position, EnemyTypes.player_damage(false)) != "dodged":
+			_burst(to_player)
+			return Vector2.ZERO
+	return to_player.normalized() * _speed
+
+
+## Il non morto si disfa addosso al giocatore: sangue tutto attorno, niente
+## esperienza né bottino, e sparisce subito (niente corpo a terra).
+func _burst(to_player: Vector2) -> void:
+	xp_reward = 0
+	drops_loot = false
+	for k in BURST_SPLATS:
+		GroundFx.bleed(global_position, ground_elevation + radius * 0.8, Vector2.from_angle(randf() * TAU), BLEED_DROPS_HEAVY)
+	HitSpark.spawn(get_parent(), global_position + to_player.normalized() * radius, ground_elevation + radius * 0.5, 40.0, COLOR_DANGER)
+	Sfx.play("splat", global_position)
+	take_points(health, to_player.normalized(), true, true)
+	queue_free()
+
+
+## Corona d'oro sopra la testa del boss.
 func _draw_crown() -> void:
 	var top := Vector2(0, -radius * 1.05)
 	var width := radius * 0.7
@@ -898,6 +1051,8 @@ func _shoot_bolt(direction: Vector2, ranged: Dictionary) -> void:
 	get_parent().add_child(bolt)
 	if bolt.arrow:
 		Sfx.play("bow", global_position)
+	elif is_mutant():
+		Sfx.play("splat", global_position, 1.3 if _casting else 1.6)
 
 
 ## Magia da lontano (voce "magic" del tipo): il giocatore è tra "min_range" e
@@ -931,7 +1086,8 @@ func _cast_magic() -> void:
 	var spread := deg_to_rad(float(magic["spread"]))
 	for i in count:
 		_shoot_bolt(_attack_direction.rotated((i - (count - 1) / 2.0) * spread), magic)
-	Sfx.play("fireball", global_position, 0.7)
+	if not is_mutant():
+		Sfx.play("fireball", global_position, 0.7)
 
 
 func _finish_cast() -> void:
@@ -1088,7 +1244,7 @@ func _land_slam(player_active: bool, slam: Dictionary) -> void:
 	GroundFx.shockwave(global_position, ground_elevation, impact_radius)
 	Sfx.play("fireball_hit", global_position, 0.5 / sqrt(_type["mass"]))
 	for other in _enemies_near(impact_radius):
-		hurt_enemy(other, damage + int(slam["damage_bonus"]), threat_level, other.global_position - global_position, true)
+		hurt_enemy(other, EnemyTypes.player_damage(is_boss()), other.global_position - global_position, true)
 	if player_active and player.global_position.distance_to(global_position) <= impact_radius + Player.RADIUS:
 		# Anche il colpo a terra si può parare: con una parata perfetta
 		# (istantanea, appena prima dell'impatto) si resta storditi.
@@ -1184,14 +1340,13 @@ func _strike_enemies() -> void:
 		if offset.length() > radius + other.radius and absf(_attack_direction.angle_to(offset)) > _strike_arc() / 2.0:
 			continue
 		_friendly_struck.append(other)
-		hurt_enemy(other, damage, threat_level, offset, false)
+		hurt_enemy(other, EnemyTypes.player_damage(is_boss()), offset, false)
 
 
-## Danno di un colpo nemico a un altro nemico (fuoco amico): points sono i
-## punti di danno del colpo, level il livello di minaccia di chi colpisce.
-static func hurt_enemy(other: Enemy, points: int, level: int, direction: Vector2, heavy: bool) -> void:
-	var amount := roundi(points * EnemyTypes.friendly_fire(level))
-	other.take_damage(amount, direction.normalized() if direction != Vector2.ZERO else Vector2.DOWN, heavy)
+## Colpo di un nemico a un altro nemico (fuoco amico): toglie gli stessi
+## punti vita che toglierebbe al giocatore (points).
+static func hurt_enemy(other: Enemy, points: int, direction: Vector2, heavy: bool) -> void:
+	other.take_points(points, direction.normalized() if direction != Vector2.ZERO else Vector2.DOWN, heavy)
 	Sfx.play("hit", other.global_position, 0.8, -6.0)
 
 
@@ -1205,11 +1360,15 @@ func _separation() -> Vector2:
 	var grid := _enemy_grid()
 	var push := Vector2.ZERO
 	var home := Vector2i((global_position / GRID_CELL).floor())
+	var checked := 0
 	for i in range(-1, 2):
 		for j in range(-1, 2):
 			for node in grid.get(home + Vector2i(i, j), []):
 				if node == self or not is_instance_valid(node):
 					continue
+				checked += 1
+				if checked > SEPARATION_MAX:
+					return push
 				var other := node as Enemy
 				var offset := global_position - other.global_position
 				var distance := offset.length()
@@ -1260,9 +1419,11 @@ func _draw_telegraph() -> void:
 		GroundFx.danger_glow(_telegraph, _slam_target - global_position, float(slam["radius"]), _state_time / total)
 	if _state == State.SUMMON:
 		var progress: float = _state_time / _type["summon"]["channel_time"]
+		# I ghoul richiamano i non morti con un urlo: dove arriveranno sale un vapore verde.
+		var smoke := COLOR_ACID if is_mutant() else COLOR_SUMMON
 		for offset in _summon_positions:
-			Shapes.disc(_telegraph, offset, 24.0, Color(COLOR_SUMMON, 0.12))
-			Shapes.disc(_telegraph, offset, 24.0 * progress, Color(COLOR_SUMMON, 0.3))
+			Shapes.disc(_telegraph, offset, 24.0, Color(smoke, 0.12))
+			Shapes.disc(_telegraph, offset, 24.0 * progress, Color(smoke, 0.3))
 
 
 func _draw() -> void:
@@ -1313,7 +1474,9 @@ func _draw() -> void:
 	if not behind:
 		_draw_gear()
 	_draw_headwear()
-	if is_boss():
+	if is_mutant():
+		_draw_growths(body)
+	elif is_boss():
 		_draw_crown()
 
 	if _state == State.STUNNED:
@@ -1321,16 +1484,25 @@ func _draw() -> void:
 			var angle := _state_time * 4.0 + TAU * i / 3.0
 			Shapes.disc(self, Vector2(cos(angle) * 18.0, -radius * 1.6 + sin(angle) * 5.0), 4.0, Color(1, 1, 0.5))
 
-	# Vita residua sopra la testa.
+	# Punti vita rimasti sopra la testa, a segmenti come quelli del giocatore.
 	if health < max_health and _state != State.DEAD:
 		var width := maxf(40.0, radius * 1.8)
 		var origin := Vector2(-width / 2.0, -radius * 1.2 - 14.0)
-		draw_rect(Rect2(origin, Vector2(width, 6)), Color(0, 0, 0, 0.5))
-		draw_rect(Rect2(origin, Vector2(width * health / max_health, 6)), COLOR_DANGER)
+		draw_rect(Rect2(origin - Vector2(1, 1), Vector2(width + 2, 8)), Color(0, 0, 0, 0.5))
+		var gap := 1.5 if max_health <= 10 else 0.0
+		var segment := (width - gap * (max_health - 1)) / max_health
+		for k in health:
+			draw_rect(Rect2(origin + Vector2(k * (segment + gap), 0), Vector2(segment, 6)), COLOR_DANGER)
 
 
 ## "Occhio" che indica la direzione, magia e arma.
 func _draw_gear() -> void:
+	if is_horde():
+		_draw_undead()
+		return
+	if is_mutant():
+		_draw_ghoul()
+		return
 	Shapes.disc(self, _facing * radius * 0.5, maxf(radius * 0.2, 4.0), Color(0.1, 0.05, 0.1))
 	if is_casting():
 		_draw_magic()
@@ -1341,6 +1513,90 @@ func _draw_gear() -> void:
 			_draw_staff()
 	else:
 		_draw_sword()
+
+
+## Ghoul: tanti occhi rossi in disordine e la bocca spalancata (la bile
+## gocciola a chi sputa, di più mentre carica), poi gli artigli.
+func _draw_ghoul() -> void:
+	var across := _facing.orthogonal()
+	var eyes := _facing * radius * 0.45 + Vector2(0, -radius * 0.2)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = _look_seed
+	for k in 3 + rng.randi() % 3:
+		var at := eyes + across * radius * rng.randf_range(-0.45, 0.45) + Vector2(0, radius * rng.randf_range(-0.35, 0.1))
+		Shapes.disc(self, at, radius * rng.randf_range(0.06, 0.12), COLOR_ZOMBIE_EYES)
+	var mouth := eyes + Vector2(0, radius * 0.35)
+	var open := 0.12 + (0.12 if _state in [State.WINDUP, State.STRIKE, State.SUMMON] else 0.0)
+	draw_colored_polygon(PackedVector2Array([mouth - across * radius * 0.25, mouth + across * radius * 0.25, mouth + Vector2(0, radius * open)]), Color(0.12, 0.02, 0.03))
+	if _type.get("spit", false) or is_casting():
+		var charge := clampf(_state_time / _windup_time, 0.0, 1.0) if _state == State.WINDUP else 0.0
+		Shapes.disc(self, mouth + Vector2(0, radius * open), radius * (0.08 + 0.12 * charge), Color(COLOR_ACID, 0.7 + 0.3 * charge))
+	_draw_claws()
+
+
+## Artigli del ghoul: braccia lunghe con tre unghie ricurve. Come le spade,
+## durante la carica si portano indietro e poi spazzano l'arco
+## dell'attacco; chi sputa le tiene basse e punta la bocca.
+func _draw_claws() -> void:
+	var angles := _sword_angles()
+	var angle := _facing.angle() + 0.5
+	match _state:
+		State.WINDUP:
+			if not _is_ranged() and not is_casting():
+				angle = angles.x - _swing_sign * 0.4 * minf(_state_time / _windup_time, 1.0)
+		State.STRIKE:
+			if not _is_ranged() and not is_casting():
+				angle = angles.z
+		State.RECOVER:
+			angle = angles.y
+	if _state == State.WINDUP and (_is_ranged() or is_casting()):
+		# Mira dello sputo: una scia verde che si allunga dalla bocca (il momento di schivare).
+		var progress := clampf(_state_time / _windup_time, 0.0, 1.0)
+		var mouth := _facing * radius * 0.5 + Vector2(0, radius * 0.2)
+		draw_line(mouth, mouth + _attack_direction * radius * 6.0 * progress, Color(COLOR_ACID, 0.2 + 0.4 * progress), 1.5)
+	var reach := radius * (1.25 if _state in [State.WINDUP, State.STRIKE] else 1.05)
+	var hand := Vector2.from_angle(angle) * reach
+	var other := _facing * radius * 1.1 - _facing.orthogonal() * radius * 0.55 * _swing_sign
+	var shoulder := _facing.orthogonal() * radius * 0.7
+	var limb := _color.darkened(0.45)
+	for pair: Array in [[shoulder if hand.dot(shoulder) >= 0.0 else -shoulder, hand], [-shoulder if hand.dot(shoulder) >= 0.0 else shoulder, other]]:
+		var from: Vector2 = pair[0]
+		var to: Vector2 = pair[1]
+		draw_line(from, to, limb, maxf(2.5, radius * 0.12))
+		var out := (to - from).normalized()
+		for k in 3:
+			var nail := out.rotated((k - 1) * 0.45)
+			var tip := to + nail * radius * 0.4 + nail.orthogonal() * radius * 0.08
+			draw_polyline(PackedVector2Array([to, to + nail * radius * 0.25, tip]), COLOR_CLAWS, maxf(1.5, radius * 0.06))
+
+
+## Escrescenze del ghoul: bolle di carne gonfia sul corpo, sempre uguali
+## per lo stesso nemico (dal seme dell'aspetto); il boss ne ha di più.
+func _draw_growths(body: Color) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = _look_seed + 7
+	var growth := body.lerp(COLOR_GROWTH, 0.5)
+	for k in 2 + rng.randi() % 3 + (3 if is_boss() else 0):
+		var at := Vector2.from_angle(rng.randf_range(-PI, 0.2)) * radius * rng.randf_range(0.55, 0.85)
+		var size := radius * rng.randf_range(0.14, 0.26)
+		Shapes.disc(self, at, size, growth)
+		Shapes.disc(self, at + Vector2(-size * 0.3, -size * 0.3), size * 0.35, growth.lightened(0.25))
+
+
+## Non morto delle orde: niente armi, due occhi rossi, braccia tese in
+## avanti con le mani ossute e stracci che pendono dal corpo.
+func _draw_undead() -> void:
+	var across := _facing.orthogonal()
+	var eyes := _facing * radius * 0.45 + Vector2(0, -radius * 0.15)
+	for side: float in [-1.0, 1.0]:
+		Shapes.disc(self, eyes + across * radius * 0.25 * side, maxf(radius * 0.1, 2.0), COLOR_ZOMBIE_EYES)
+	var reach := _facing * radius * 1.3
+	for side: float in [-1.0, 1.0]:
+		var hand := reach + across * radius * 0.4 * side
+		draw_line(across * radius * 0.6 * side, hand, _color.darkened(0.3), maxf(2.5, radius * 0.16))
+		Shapes.disc(self, hand, maxf(radius * 0.12, 2.0), _color.lightened(0.2))
+	draw_colored_polygon(PackedVector2Array([Vector2(-radius * 0.75, radius * 0.15), Vector2(radius * 0.75, radius * 0.15),
+			Vector2(radius * 0.45, radius * 0.8), Vector2(radius * 0.1, radius * 0.55), Vector2(-radius * 0.4, radius * 0.85)]), COLOR_RAGS)
 
 
 ## Posizione del corpo sopra le gambe: salto, ondeggiare del passo e

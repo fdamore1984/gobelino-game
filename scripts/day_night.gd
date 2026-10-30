@@ -5,6 +5,9 @@ extends CanvasModulate
 
 const DATA := preload("res://data/world.json")
 
+## Ciclo attivo (per la torcia, vedi Flashlight).
+static var current: DayNight
+
 ## Momento della giornata, da 0 a 1: il sole sorge e tramonta agli
 ## istanti sunrise e sunset di data/world.json; il ciclo dura cycle secondi.
 var time := 0.0
@@ -16,8 +19,14 @@ var _override := Color(0, 0, 0, 0)
 
 
 func _ready() -> void:
+	current = self
 	time = _settings["start"]
 	_apply()
+
+
+func _exit_tree() -> void:
+	if current == self:
+		current = null
 
 
 func _process(delta: float) -> void:

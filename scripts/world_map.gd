@@ -2,7 +2,8 @@ class_name WorldMap
 extends Control
 ## Mappa completa (Select / M, o il pulsante a schermo): un'area grande
 ## attorno al giocatore con il terreno, casse, totem, mercanti, ingressi delle
-## caverne, scale e uscite (vedi Minimap.draw_point). Il terreno si disegna a
+## caverne, scale e uscite (vedi Minimap.draw_point), solo nelle zone già
+## scoperte (vedi World.is_explored). Il terreno si disegna a
 ## righe su qualche frame, così l'apertura non blocca il gioco. Mentre è
 ## aperta il gioco è in pausa; Select, M, B o Esc la chiudono.
 
@@ -14,7 +15,7 @@ const MAP_SIZE := 560.0
 const COLOR_DIM := Color(0, 0, 0, 0.75)
 const COLOR_TITLE := Color(1.0, 0.85, 0.4)
 const COLOR_HINT := Color(1, 1, 1, 0.65)
-const COLOR_UNKNOWN := Color(0.08, 0.1, 0.08)
+const COLOR_UNKNOWN := Minimap.COLOR_UNKNOWN
 
 var player: Player
 
@@ -72,7 +73,8 @@ func _process(_delta: float) -> void:
 	var step := 2.0 * RANGE / SAMPLES
 	for j in range(_next_row, mini(_next_row + ROWS_PER_FRAME, SAMPLES)):
 		for i in SAMPLES:
-			_image.set_pixel(i, j, world.map_color(_center + Vector2(-RANGE + (i + 0.5) * step, -RANGE + (j + 0.5) * step)))
+			var point := _center + Vector2(-RANGE + (i + 0.5) * step, -RANGE + (j + 0.5) * step)
+			_image.set_pixel(i, j, world.map_color(point) if world.is_explored(point) else COLOR_UNKNOWN)
 	_next_row += ROWS_PER_FRAME
 	_texture.update(_image)
 	queue_redraw()
@@ -89,7 +91,7 @@ func _draw() -> void:
 	if world and player:
 		for point: Dictionary in world.points_of_interest(_center, RANGE):
 			var at := _to_map(point["position"], origin)
-			if Rect2(origin, Vector2(MAP_SIZE, MAP_SIZE)).has_point(at):
+			if Rect2(origin, Vector2(MAP_SIZE, MAP_SIZE)).has_point(at) and world.is_explored(point["position"]):
 				Minimap.draw_point(self, world, point, at)
 		var center := _to_map(player.position, origin)
 		var facing := player.facing

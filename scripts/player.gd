@@ -33,13 +33,16 @@ extends Node2D
 ## concatenati dopo fanno danni in più. Un colpo potente subito dopo una
 ## combo di colpi normali (combo mista) è un colpo potente con un bonus ai
 ## danni. Attacchi a terra, che colpiscono tutti i nemici attorno: il colpo
-## potente in aria fa piombare a terra, durante uno scatto in aria con un
-## colpo più ampio. Durante gli attacchi a terra si passa
+## potente in aria, premuto e lasciato, fa piombare a terra con uno slam
+## (costa mana e vigore); tenuto premuto, con una runa del cataclisma nella
+## cintura, è la runa. Durante uno scatto in aria è un colpo più ampio.
+## Durante gli attacchi a terra si passa
 ## attraverso i nemici; all'impatto quelli attorno (non i boss) vengono
 ## respinti lontano.
-## Ogni colpo potente consuma mana finché si tiene premuto (HEAVY_CHARGE_MANA):
-## senza mana la carica si interrompe. Lo slam aereo caricato fa fluttuare a
-## mezz'aria, consuma anche vigore ed espone a dardi e frecce.
+## Ogni colpo potente a terra consuma un po' di mana (HEAVY_MANA) e altro
+## finché si tiene premuto (HEAVY_CHARGE_MANA): senza mana la carica si
+## interrompe. La runa del cataclisma in carica fa fluttuare a mezz'aria ed
+## espone a dardi e frecce.
 ## Col mouse: clic sinistro per attaccare e destro per il colpo potente
 ## verso il cursore, centrale (move_click) per camminarci (vedi _unhandled_input).
 ## Sconfiggere nemici dà esperienza; a ogni livello aumentano i danni
@@ -145,8 +148,8 @@ const SLAM_DIVE_SPEED := 650.0
 const SLAM_RECOVERY := 0.32
 ## Se per qualche motivo non si tocca terra, l'impatto arriva comunque.
 const SLAM_MAX_TIME := 2.0
-const SLAM_RADIUS := {"dash": 165.0}
-## Runa del cataclisma: il colpo potente in aria si fa solo con una runa nella
+const SLAM_RADIUS := {"dash": 165.0, "air": 135.0}
+## Runa del cataclisma: il colpo potente in aria tenuto premuto, con una runa nella
 ## cintura (se ne portano START_H_BOMB_CAPACITY, una in più per ogni
 ## potenziamento "h_bomb"); senza, in aria il colpo potente non parte. La
 ## spada sparisce e il goblin alza sopra la testa una grossa runa del
@@ -164,7 +167,7 @@ const SLAM_RADIUS := {"dash": 165.0}
 const START_H_BOMB_CAPACITY := 3
 const H_BOMB_MIN_RADIUS := 190.0
 const H_BOMB_MAX_RADIUS := 280.0
-const H_BOMB_BOSS_DAMAGE := 0.35
+const H_BOMB_BOSS_DAMAGE := 0.5
 const AIR_SLAM_RISE_SPEED := 45.0
 const AIR_SLAM_BOB := 3.0
 ## Fuliggine dell'esplosione: il corpo si annerisce (fino a SOOT_STRENGTH
@@ -176,6 +179,14 @@ const COLOR_SOOT := Color(0.13, 0.12, 0.11)
 const H_BOMB_HELD := Vector2(0, -RADIUS - 20.0)
 const H_BOMB_LENGTH := 74.0
 const DASH_SLAM_DAMAGE_FACTOR := 2.4
+## Colpo potente in aria: se lo si lascia entro AIR_HEAVY_HOLD_TIME è lo
+## slam ("air"), che costa AIR_SLAM_MANA di mana e STAMINA_HEAVY di
+## vigore (senza, non parte) e fa AIR_SLAM_DAMAGE_FACTOR volte il danno
+## base; tenuto premuto più a lungo, con una runa, è la runa. Intanto
+## si resta sospesi ("pending", vedi _update_slam).
+const AIR_HEAVY_HOLD_TIME := 0.15
+const AIR_SLAM_MANA := 10.0
+const AIR_SLAM_DAMAGE_FACTOR := 2.0
 ## Aggancio del bersaglio (vedi _update_lock). Automatico: il nemico vivo
 ## più vicino entro LOCK_RANGE che si vede, mai uno oltre un muro, un
 ## palazzo o un ostacolo solido (World.clear_line, ricontrollato ogni
@@ -331,6 +342,9 @@ const HEAVY_CHARGE_TIME := 0.9
 ## il tasto (carica compresa, a terra e in aria): senza mana la carica si
 ## interrompe e il colpo parte con quella raggiunta (senza mana non si carica).
 const HEAVY_CHARGE_MANA := 20.0
+## Mana consumato da ogni colpo potente a terra, anche senza caricarlo
+## (senza mana il colpo parte lo stesso).
+const HEAVY_MANA := 4.0
 const COLOR_CHARGE_GLOW := Color(0.55, 0.8, 1.0)
 
 ## Mouse: il tasto di "move_click" (centrale) fa camminare verso il punto
@@ -345,6 +359,11 @@ const CLICK_STUCK_TIME := 0.4
 ## Flashlight), accesa e spenta tenendo premuto L3 (o Maiusc) per
 ## TORCH_HOLD_TIME secondi; un tocco più breve è la corsa.
 const TORCH_HOLD_TIME := 0.45
+## Con la torcia accesa e il fascio almeno così forte (vedi
+## Flashlight.strength) il personaggio è disegnato con i colori del giorno.
+const TORCH_SELF_LIGHT := 0.5
+## Contorno del goblin quando è dietro a un muro (vedi Silhouette).
+const COLOR_SILHOUETTE := Color(0.8, 1.0, 0.75, 0.75)
 
 ## Ogni pozione cura questi punti vita.
 const POTION_HEAL := 3
@@ -628,6 +647,8 @@ var _click_stuck := 0.0
 var _aim_cursor := false
 var _aim := Vector2.ZERO
 var _torch := Flashlight.new()
+## Sagoma che si vede quando il goblin è dietro a un muro (vedi Silhouette).
+var _silhouette := Silhouette.new(COLOR_SILHOUETTE, true)
 ## Potenziamento -> quante volte è stato scelto, nell'ordine di scelta.
 var upgrades_taken := {}
 ## Frenesia (0-FRENZY_MAX, non si salva) e da quanto non si attacca.
@@ -659,6 +680,8 @@ func _ready() -> void:
 		_torch.enabled = torch_on
 		_torch.aim(facing)
 		add_child(_torch)
+	if not _silhouette.is_inside_tree():
+		add_child(_silhouette)
 	if not _voice.is_inside_tree():
 		_voice.tone = VOICE_TONE
 		add_child(_voice)
@@ -907,9 +930,11 @@ func _physics_process(delta: float) -> void:
 	_blood.update(delta)
 	_wounds.update(delta)
 	if torch_on:
-		# Il fascio parte da terra, sotto il personaggio, verso lo sguardo.
-		_torch.position = Vector2(0, -ground_elevation + RADIUS * 0.6)
+		# Il fascio parte dal terreno in pianta, sotto il personaggio, verso lo sguardo.
+		_torch.position = Vector2(0, RADIUS * 0.6)
 		_torch.aim(facing)
+	update_torch_light()
+	_update_silhouette()
 	_squash = move_toward(_squash, 0.0, SQUASH_RECOVERY * delta)
 	if _camera:
 		# Mentre si precipita nel burrone la telecamera resta al bordo.
@@ -1017,7 +1042,7 @@ func _update_height(delta: float) -> void:
 		gravity *= AIR_ATTACK_GRAVITY_FACTOR
 	if _state == State.SLAM and not _slam_landed:
 		# Mentre si carica lo slam aereo si fluttua (vedi _update_slam).
-		gravity = 0.0 if _charging or _state_time < SLAM_HANG else SLAM_GRAVITY
+		gravity = 0.0 if _charging or _slam_kind == "pending" or _state_time < SLAM_HANG else SLAM_GRAVITY
 	_height_velocity -= gravity * delta
 	_height += _height_velocity * delta
 	if _height <= 0.0:
@@ -1701,13 +1726,14 @@ func _start_attack(step: int, input: Vector2) -> void:
 
 ## held: concatenato tenendo premuto il tasto (non si carica).
 func _start_heavy(input: Vector2, held := false) -> void:
-	# In aria il colpo potente è la runa del cataclisma: senza rune non parte.
+	# In aria il colpo potente è lo slam o la runa del cataclisma: si decide
+	# da quanto si tiene premuto (vedi _resolve_air_heavy).
 	if is_airborne():
-		if h_bombs > 0:
-			_start_slam("plunge", input)
+		_start_slam("pending", input)
 		return
 	if not _use_stamina(STAMINA_HEAVY):
 		return
+	mana = maxf(mana - HEAVY_MANA, 0.0)
 	# Fuori dalla combo il colpo potente parte da solo, senza bonus.
 	if _combo_timer == 0.0 and _state not in [State.ATTACK, State.SLAM]:
 		_combo_step = 0
@@ -1764,9 +1790,11 @@ func _next_combo_step() -> int:
 	return _combo_step + 1 if continues else 1
 
 
-## Inizia un attacco a terra: sosta in aria prima di piombare giù (plunge, dash).
+## Inizia un attacco a terra: sosta in aria prima di piombare giù (pending,
+## che diventa air o plunge, e dash).
 func _start_slam(kind: String, input: Vector2) -> void:
-	# Il colpo dallo scatto in aria paga qui; gli altri lo pagano come colpo potente.
+	# Il colpo dallo scatto in aria paga qui, lo slam in _resolve_air_heavy
+	# (la runa costa la runa).
 	if kind == "dash" and not _use_stamina(STAMINA_HEAVY):
 		return
 	_slam_kind = kind
@@ -1776,8 +1804,7 @@ func _start_slam(kind: String, input: Vector2) -> void:
 	_attack_speed = EMPOWER_ATTACK_SPEED if is_empowered() else 1.0
 	_charge = 0.0
 	_charge_time = 0.0
-	# Tenendo premuto il colpo potente la runa si carica a mezz'aria.
-	_charging = kind == "plunge" and UiNav.game_held("heavy_attack")
+	_charging = false
 	_queued_attack = ""
 	_combo_timer = 0.0
 	_carry_velocity = Vector2.ZERO
@@ -1789,11 +1816,29 @@ func _start_slam(kind: String, input: Vector2) -> void:
 		_face_lock()
 	facing = _target_facing
 	_height_velocity = 0.0
-	if kind == "plunge":
-		Sfx.play("h_bomb_lift", global_position)
-	else:
+	if kind == "dash":
 		Sfx.play("heavy_swing", global_position, 0.85)
 	_change_state(State.SLAM)
+
+
+## Colpo potente in aria deciso: lasciato subito (o senza rune) è lo slam,
+## che costa mana e vigore; tenuto premuto, con una runa del cataclisma, la
+## runa, che continua a caricarsi a mezz'aria finché la si tiene.
+func _resolve_air_heavy(held: bool) -> void:
+	if held and h_bombs > 0:
+		_slam_kind = "plunge"
+		_charging = true
+		_state_time = 0.0
+		Sfx.play("h_bomb_lift", global_position)
+		return
+	if mana < AIR_SLAM_MANA or not _use_stamina(STAMINA_HEAVY):
+		# Senza mana o vigore non parte: si ricade e basta.
+		_change_state(State.NORMAL)
+		return
+	mana -= AIR_SLAM_MANA
+	_slam_kind = "air"
+	_state_time = SLAM_HANG
+	Sfx.play("heavy_swing", global_position, 0.85)
 
 
 ## Attacco a terra: sosta in aria, discesa e, toccato terra, l'impatto
@@ -1801,6 +1846,14 @@ func _start_slam(kind: String, input: Vector2) -> void:
 ## aim: direzione verso cui girarsi in carica (il cursore se lo slam è
 ## partito col mouse).
 func _update_slam(input: Vector2, aim: Vector2, delta: float) -> void:
+	if _slam_kind == "pending":
+		# Sospesi un attimo, finché non si capisce se il tasto è tenuto premuto.
+		_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * delta)
+		if not UiNav.game_held("heavy_attack"):
+			_resolve_air_heavy(false)
+		elif _state_time >= AIR_HEAVY_HOLD_TIME:
+			_resolve_air_heavy(true)
+		return
 	if _charging:
 		# A mezz'aria si fluttua salendo piano (sempre più piano con la carica):
 		# ci si gira con la levetta (o verso il bersaglio, o il cursore) finché
@@ -1894,9 +1947,9 @@ func _h_bomb_impact() -> void:
 		var direction := offset.normalized() if offset != Vector2.ZERO else facing
 		if enemy.is_boss():
 			# L'armatura non attenua la runa.
-			enemy.take_damage(roundi(enemy.max_health * H_BOMB_BOSS_DAMAGE / (1.0 - enemy.armor)), direction, true)
+			enemy.take_points(ceili(enemy.max_health * H_BOMB_BOSS_DAMAGE), direction, true, true)
 		else:
-			enemy.take_damage(enemy.health * 10 + 1000, direction, true)
+			enemy.take_points(enemy.health, direction, true, true)
 			enemy.shove(direction * SLAM_PUSH_SPEED)
 	var blast := HBombBlast.new()
 	blast.radius = radius
@@ -1911,16 +1964,16 @@ func _h_bomb_impact() -> void:
 	HitFeedback.hit(get_tree(), 0.16)
 
 
-## Raggio dell'esplosione della runa (secondo la carica) o del colpo dallo scatto.
+## Raggio dell'esplosione della runa (secondo la carica), dello slam o del colpo dallo scatto.
 func _slam_radius() -> float:
 	if _slam_kind == "plunge":
 		return lerpf(H_BOMB_MIN_RADIUS, H_BOMB_MAX_RADIUS, _charge)
 	return SLAM_RADIUS[_slam_kind]
 
 
-## Danno del colpo dallo scatto in aria (la runa uccide e basta).
+## Danno dello slam e del colpo dallo scatto in aria (la runa uccide e basta).
 func _slam_damage() -> int:
-	var multiplier := DASH_SLAM_DAMAGE_FACTOR
+	var multiplier := DASH_SLAM_DAMAGE_FACTOR if _slam_kind == "dash" else AIR_SLAM_DAMAGE_FACTOR
 	if _attack_speed > 1.0:
 		multiplier *= EMPOWER_DAMAGE_FACTOR
 	return roundi(base_damage() * multiplier * (1.0 + inventory.bonus("damage")))
@@ -2472,6 +2525,26 @@ func _update_run_button(delta: float) -> void:
 	else:
 		_run_hold = -1.0
 		_run_on = not _run_on
+
+
+## Dietro a un muro si vede la sagoma del goblin (vedi Silhouette).
+func _update_silhouette() -> void:
+	_silhouette.body_center = Vector2(0, -altitude() - LEG_LENGTH)
+	_silhouette.radius = RADIUS
+	_silhouette.facing = facing
+	_silhouette.leg_spacing = LEG_SPACING
+	_silhouette.feet_y = -altitude() + RADIUS * 0.85
+	_silhouette.update(position, altitude())
+
+
+## Al buio con la torcia accesa il goblin si vede come di giorno: il buio
+## della notte e dei sotterranei non lo scurisce (niente luci su di lui).
+## Altrimenti la luce lo prende come il punto del terreno ai suoi piedi.
+func update_torch_light() -> void:
+	var lit := _torch.strength() >= TORCH_SELF_LIGHT
+	var wanted: Material = Enemy._unshaded_material() if lit else LightShaders.feet()
+	if material != wanted:
+		material = wanted
 
 
 func set_torch(on: bool) -> void:

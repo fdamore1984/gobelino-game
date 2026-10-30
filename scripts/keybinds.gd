@@ -2,10 +2,12 @@ class_name Keybinds
 ## Comandi personalizzati: per ogni azione dell'Input Map (ACTIONS) si può
 ## cambiare il tasto della tastiera, il tasto del mouse e quello del
 ## controller (vedi OptionsPanel). Cambiare un dispositivo sostituisce tutti
-## i tasti di quel dispositivo per l'azione e lascia stare gli altri.
+## i tasti di quel dispositivo per l'azione e lascia stare gli altri; un
+## dispositivo si può anche lasciare senza tasti (clear).
 ##
 ## Si salvano solo le azioni cambiate, in user://keybinds.json
-## (azione -> dispositivo -> elenco di tasti): così se una versione nuova
+## (azione -> dispositivo -> elenco di tasti, vuoto se lasciato senza
+## tasti): così se una versione nuova
 ## cambia i tasti predefiniti di un'azione mai toccata, valgono quelli
 ## nuovi. Senza il file (versioni precedenti) restano i tasti predefiniti
 ## di project.godot. Si caricano all'avvio (vedi Settings).
@@ -23,6 +25,9 @@ const ACTIONS := [
 	"dodge", "jump", "interact", "run", "focus", "spell", "shield", "potion", "mana_potion",
 	"stamina_potion", "inventory", "inventory_sort", "map", "lock_on", "menu",
 ]
+## Azioni che devono avere almeno un tasto: senza, non si potrebbe più
+## aprire il menù di pausa.
+const REQUIRED := ["menu"]
 ## Tasti del mouse che si possono usare (non la rotella).
 const MOUSE_BUTTONS := [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE, MOUSE_BUTTON_XBUTTON1, MOUSE_BUTTON_XBUTTON2]
 ## Una levetta o un grilletto conta come tasto oltre questa inclinazione.
@@ -56,6 +61,30 @@ static func rebind(action: String, event: InputEvent) -> void:
 	_overrides[action][device] = [_serialize(event)]
 	_apply()
 	_save()
+
+
+## Lascia l'azione senza tasti per quel dispositivo e salva.
+static func clear(action: String, device: String) -> void:
+	if device not in DEVICES or not can_clear(action, device):
+		return
+	if not _overrides.has(action):
+		_overrides[action] = {}
+	_overrides[action][device] = []
+	_apply()
+	_save()
+
+
+## L'azione si può lasciare senza tasti per quel dispositivo: non è tra
+## quelle che ne devono avere almeno uno (REQUIRED), o ne ha su un altro.
+static func can_clear(action: String, device: String) -> bool:
+	if action not in ACTIONS:
+		return false
+	if action not in REQUIRED:
+		return true
+	for other: String in DEVICES:
+		if other != device and not events(action, other).is_empty():
+			return true
+	return false
 
 
 ## Torna ai comandi predefiniti di tutte le azioni.
@@ -118,11 +147,14 @@ static func is_bindable(event: InputEvent) -> bool:
 	return false
 
 
-## Tasti dell'azione per un dispositivo.
+## Tasti dell'azione per un dispositivo. Comprende quelli di tastiera e
+## mouse che sullo Steam Deck Platform tiene da parte mentre c'è il
+## controller: sono comunque i comandi scelti e il pannello delle opzioni
+## li deve mostrare.
 static func events(action: String, device: String) -> Array[InputEvent]:
 	var found: Array[InputEvent] = []
 	if InputMap.has_action(action):
-		for event in InputMap.action_get_events(action):
+		for event in InputMap.action_get_events(action) + Platform.hidden_events(action):
 			if device_of(event) == device:
 				found.append(event)
 	return found

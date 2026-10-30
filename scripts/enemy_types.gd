@@ -28,11 +28,11 @@ static func exists(id: String) -> bool:
 
 
 ## Crescita dei nemici con il livello di minaccia (livello del giocatore,
-## più la profondità nelle caverne o il bonus delle sfide): vita, danno ed
-## esperienza crescono in modo lineare di una parte del valore base per
-## livello (voce "enemy_scaling" di data/world.json), più piano dei danni
-## del giocatore (+30% a livello) così salire di livello si sente ma i
-## nemici restano una minaccia.
+## più la profondità nelle caverne o il bonus delle sfide): punti vita,
+## danno ed esperienza crescono in modo lineare di una parte del valore
+## base per livello (voce "enemy_scaling" di data/world.json). I punti vita
+## crescono piano: un colpo vale già in proporzione al livello (vedi
+## Enemy.points_for).
 static func scaled(stat: String, base: float, threat_level: int) -> float:
 	var scaling: Dictionary = WORLD_DATA.data["enemy_scaling"]
 	return base * (1.0 + float(scaling[stat]) * maxi(threat_level - 1, 0))
@@ -68,22 +68,15 @@ static func player_damage(boss: bool) -> int:
 	return int(data["boss_player_damage"] if boss else data["player_damage"])
 
 
-## Fuoco amico: danni a un altro nemico per ogni punto di danno del colpo
-## (i punti contano per la vita del giocatore, molto più bassa), cresce con
-## il livello di minaccia come la vita dei nemici, così pesa sempre allo
-## stesso modo.
-static func friendly_fire(threat_level: int) -> float:
-	var data: Dictionary = WORLD_DATA.data["enemy_attacks"]
-	return float(data["friendly_fire"]) * scaled("health", 1.0, threat_level)
-
-
 ## Sceglie un tipo a caso, pesato: salendo di livello compaiono più
-## spesso i nemici forti.
-static func pick_random(player_level: int) -> String:
+## spesso i nemici forti. weight_key: il peso da usare ("spawn_weight" in
+## superficie e nelle caverne, "metro_weight" nelle catacombe, dove ci sono
+## solo i mostri delle cripte).
+static func pick_random(player_level: int, weight_key := "spawn_weight") -> String:
 	var weights := {}
 	var total := 0.0
 	for id: String in ids():
-		var weight: Array = get_type(id)["spawn_weight"]
+		var weight: Array = get_type(id).get(weight_key, [0, 0])
 		var value := maxf(weight[0] + weight[1] * (player_level - 1), 0.0)
 		if value <= 0.0:
 			# Il boss (peso zero) non compare mai a caso.

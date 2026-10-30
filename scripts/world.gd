@@ -14,15 +14,37 @@ extends Node2D
 ## libere con al centro un totem che avvia una sfida (vedi Game).
 ## Lunghe catene di montagne e burroni non si attraversano (hanno qualche
 ## passaggio); nelle pareti delle montagne si aprono caverne che portano a
-## un sotterraneo (vedi Dungeon), disegnato con gli stessi blocchi.
+## un sotterraneo (vedi Dungeon), disegnato con gli stessi blocchi. Dai
+## mausolei in rovina ("metro", "crypt_chance" in "terrain") si scende nelle
+## catacombe (Dungeon con kind "metro"): navate di lastre di pietra, fosse
+## ossarie incassate piene di ossa, file di grandi tombe, pareti di pietra
+## con nicchie di teschi, stendardi strappati e sangue, candele di fiamma
+## verde (parametri in "metro").
 ##
 ## Le posizioni di personaggi e oggetti sono a terra (il piano x, y);
 ## l'altezza del terreno sotto di loro (elevation_at) li disegna più in
 ## alto. Il terreno viene generato e disegnato a blocchi di rombi attorno
 ## alla telecamera; i blocchi più alti di quelli dietro vengono disegnati
 ## tra i personaggi (non col resto del terreno), così coprono chi ci passa
-## dietro; quelli che coprono il giocatore, e tutti quelli attorno,
-## diventano trasparenti finché resta lì dietro.
+## dietro. Non diventano trasparenti: di chi sta dietro si vede solo la
+## sagoma (vedi is_covered e Silhouette).
+##
+## Mappa e minimappa mostrano solo le zone scoperte: i rombi entro un raggio
+## dal giocatore ("map" in data/world.json) si segnano a mano a mano che si
+## esplora e restano scoperti (vedi reveal_around, is_explored), una mappa
+## per la superficie e una per ogni piano dei sotterranei (map_key).
+##
+## Luce della torcia (vedi Flashlight): si calcola in pianta, cioè nel punto
+## del terreno a quota zero sotto quello che si disegna, dove stanno anche
+## la torcia e i piedi di personaggi e oggetti (vedi LightShaders). Così
+## altopiani, rampe e pareti prendono la luce del punto su cui stanno. Non
+## passa attraverso montagne e pareti del sotterraneo: ogni blocco
+## invalicabile (non i burroni) che confina con un posto in cui si cammina
+## ha un ostacolo per la luce (LightOccluder2D) sulla sua base in pianta.
+## Gli altopiani su cui si sale la lasciano passare. Pareti, cime e
+## decorazioni dicono nella coordinata UV.y di ogni vertice di quanti pixel
+## scendere per arrivare in pianta (vedi _light_uvs); una parete si accende
+## solo se il fascio arriva davanti a lei.
 ##
 ## Prestazioni: i dati del terreno (livelli, rampe, ostacoli) di una regione
 ## grande attorno al giocatore sono generati in anticipo (begin_region,
@@ -43,19 +65,14 @@ const PREFETCH_MARGIN := 380.0
 const KEEP_MARGIN := 320.0
 ## I dati fuori dalla regione si dimenticano solo oltre questi rombi in memoria.
 const FORGET_THRESHOLD := 110000
-## Blocchi davanti al giocatore: del tutto trasparenti entro OCCLUSION_INNER
-## pixel dal suo corpo sullo schermo, di nuovo pieni oltre OCCLUSION_OUTER.
-const OCCLUSION_INNER := 150.0
-const OCCLUSION_OUTER := 240.0
-## Altezza del corpo del giocatore sopra i piedi, dove si misura la distanza.
-const OCCLUSION_BODY := 30.0
-const OCCLUSION_FADE_SPEED := 5.0
-## I blocchi da rendere trasparenti si cercano solo ogni tanto (la
-## dissolvenza continua a ogni frame): costa meno e non si nota.
-const OCCLUSION_INTERVAL := 0.05
-## Solo i blocchi più alti dei piedi di almeno tanto coprono davvero il corpo
-## (i gradini bassi restano pieni).
+## Solo i blocchi più alti dei piedi di almeno tanto coprono davvero il
+## corpo di un personaggio (i gradini bassi no, vedi is_covered).
 const OCCLUSION_MIN_HEIGHT := 40.0
+## I blocchi tra i personaggi si ordinano qualche pixel dopo il loro
+## vertice più arretrato (vedi _show_chunk).
+const BLOCK_SORT_BIAS := 8.0
+## Lato dei quadrati della griglia dei blocchi che coprono (vedi is_covered).
+const COVER_GRID := 128.0
 ## Gli ostacoli vengono messi solo in questa parte del rombo, lontano dai bordi.
 const PLACE_MIN := 14.0
 const PLACE_MAX := 44.0
@@ -85,6 +102,17 @@ const LIP_WIDTH := 5.0
 ## Tipi di blocco: terreno normale, montagna o burrone (invalicabili) e
 ## roccia del sotterraneo.
 enum Kind { GROUND, MOUNTAIN, RAVINE, ROCK }
+
+## Maschera degli ostacoli per la luce (vedi in cima e Flashlight) e di
+## quanto, davanti alla base di una parete, si guarda se arriva la luce
+## (così il punto è davanti al suo stesso ostacolo).
+const OCCLUDER_BASE := 1
+const LIGHT_BASE_NUDGE := 4.0
+
+## Come si calcola la luce dei punti che si disegnano (vedi _light_uvs):
+## NONE dove sono, FACE alla base in pianta della parete (_light_base_a,
+## _light_base_b), TOP scendendo di _light_top (cime e decorazioni).
+enum LightMode { NONE, FACE, TOP }
 
 ## Mondo attivo: giocatore e nemici lo usano per muoversi.
 static var current: World
@@ -152,6 +180,13 @@ var _path_color: Color
 var _lip_color: Color
 var _ravine_color: Color
 var _dungeon_wall_color: Color
+## Colori delle catacombe (voce "metro" di data/world.json).
+var _metro_data: Dictionary = DATA.data["metro"]
+var _metro_floor_colors: Array[Color] = []
+var _metro_face_colors: Array[Color] = []
+var _train_faces: Array[Color] = []
+var _candle_colors: Array[Color] = []
+var _metro_colors := {}
 var _tuft_range := Vector2i.ZERO
 ## Pezzo -> ostacoli (dizionari), generati quando servono.
 var _chunk_obstacles := {}
@@ -166,12 +201,23 @@ var _maintain_timer := 0.0
 var _blocking_cell := Vector2i.ZERO
 var _has_blocking_cell := false
 var _contact_glow := ContactGlow.new()
-## Blocchi resi trasparenti perché coprono il giocatore.
-var _faded_blocks := {}
-## Blocchi che adesso coprono il giocatore (blocco -> true) e attesa prima di
-## ricontrollarli.
-var _wanted_blocks := {}
-var _occlusion_timer := 0.0
+## Blocchi tra i personaggi per quadrato dello schermo (vedi is_covered).
+var _cover_grid := {}
+## Zone scoperte delle mappe (vedi reveal_around): chiave della mappa
+## (map_key) -> pezzo di mondo -> 64 bit, uno per rombo del pezzo.
+var explored := {}
+## Mappa in cui si è adesso: "surface" o il piano di un sotterraneo (la
+## imposta Game).
+var map_key := "surface"
+var _map_data: Dictionary = DATA.data["map"]
+## Ultimo punto attorno a cui si è scoperta la mappa e attesa per il prossimo.
+var _revealed_at := Vector2.INF
+var _reveal_timer := 0.0
+## Punto in pianta in cui si calcola la luce di quello che si disegna (vedi LightMode).
+var _light_mode := LightMode.NONE
+var _light_base_a := Vector2.ZERO
+var _light_base_b := Vector2.ZERO
+var _light_top := 0.0
 
 
 func _ready() -> void:
@@ -194,6 +240,12 @@ func _ready() -> void:
 	_lip_color = _color(_terrain["lip_color"])
 	_ravine_color = _color(_terrain["ravine_color"])
 	_dungeon_wall_color = _color(_dungeon_data["wall_color"])
+	_metro_floor_colors = _colors(_metro_data["floor_colors"])
+	_metro_face_colors = _colors(_metro_data["face_colors"])
+	_train_faces = _colors(_metro_data["train_faces"])
+	_candle_colors = _colors(_metro_data["glowstick_colors"])
+	for key: String in ["track_color", "rail_color", "sleeper_color", "edge_color", "wall_color", "tile_band", "train_top", "train_window", "blood_color"]:
+		_metro_colors[key] = _color(_metro_data[key])
 	var tufts: Array = _decor["grass_tufts"]
 	_tuft_range = Vector2i(tufts[0], tufts[1])
 	# I pezzi di terreno si disegnano da dietro in avanti.
@@ -242,7 +294,20 @@ func save_state() -> Dictionary:
 	return {
 		"chests": _opened_chests.keys().map(SaveGame.array), "totems": totems,
 		"stocks": stocks, "caves": cleared_caves.keys().map(SaveGame.array),
+		"explored": _explored_state(),
 	}
+
+
+## Zone scoperte da salvare: per ogni mappa, terne [x, y, bit] dei pezzi
+## (i bit come testo: i numeri del JSON non tengono 64 bit).
+func _explored_state() -> Dictionary:
+	var result := {}
+	for key: String in explored:
+		var list := []
+		for chunk: Vector2i in explored[key]:
+			list.append([chunk.x, chunk.y, str(explored[key][chunk])])
+		result[key] = list
+	return result
 
 
 func load_state(data: Dictionary) -> void:
@@ -256,6 +321,13 @@ func load_state(data: Dictionary) -> void:
 		_merchant_stocks[SaveGame.vector(entry["at"])] = stock
 	for at: Array in data.get("caves", []):
 		cleared_caves[SaveGame.vector(at)] = true
+	# I salvataggi di prima non hanno le zone scoperte: la mappa riparte vuota.
+	var saved_maps: Dictionary = data.get("explored", {})
+	for key: String in saved_maps:
+		var seen := {}
+		for entry: Array in saved_maps[key]:
+			seen[Vector2i(int(entry[0]), int(entry[1]))] = str(entry[2]).to_int()
+		explored[key] = seen
 
 
 func _setup_noise(noise: FastNoiseLite, offset: int, frequency: float, octaves: int) -> void:
@@ -275,68 +347,109 @@ func _process(delta: float) -> void:
 		var chunk: Vector2i = _view_queue.pop_back()
 		if not _chunk_views.has(chunk):
 			_show_chunk(chunk)
-	_update_occlusion(delta)
+	_update_reveal(delta)
 
 
-## I blocchi davanti al giocatore che lo coprirebbero diventano
-## trasparenti in tutta la zona attorno a lui: si vede cosa succede dietro
-## pareti, muri del sotterraneo e montagne.
-func _update_occlusion(delta: float) -> void:
-	var hero := player as Player
-	if hero == null:
-		return
-	var feet := hero.position
-	var altitude := hero.altitude()
-	var body := feet - Vector2(0, altitude + OCCLUSION_BODY)
-	_occlusion_timer -= delta
-	if _occlusion_timer <= 0.0:
-		_occlusion_timer = OCCLUSION_INTERVAL
-		_wanted_blocks.clear()
-		var center := _chunk_of(cell_at(feet))
-		for i in range(-1, 3):
-			for j in range(-1, 3):
-				var entry: Variant = _chunk_views.get(center + Vector2i(i, j))
-				if entry == null:
-					continue
-				for node: Node in entry["nodes"]:
-					var block := node as TerrainBlock
-					if block and _covers(block, feet, altitude, body):
-						_wanted_blocks[block] = true
-	var wanted := _wanted_blocks
-	for block: Variant in wanted:
-		if is_instance_valid(block):
-			_faded_blocks[block] = true
-	for key: Variant in _faded_blocks.keys():
-		# I blocchi dei pezzi tolti nel frattempo non esistono più.
-		if not is_instance_valid(key):
-			_faded_blocks.erase(key)
+## Il punto (sullo schermo, già alzato dell'altezza a cui è disegnato) è
+## coperto da un blocco del terreno disegnato davanti a chi ha i piedi in
+## feet: i muri non diventano trasparenti, dietro si vede la sagoma (vedi
+## Silhouette). Si guardano i blocchi tra i personaggi dei pezzi vicini.
+func is_covered(feet: Vector2, altitude: float, points: PackedVector2Array) -> bool:
+	for point in points:
+		var blocks: Variant = _cover_grid.get(Vector2i((point / COVER_GRID).floor()))
+		if blocks == null:
 			continue
-		var block := key as TerrainBlock
-		var target := 0.0
-		if not wanted.has(block):
-			target = 1.0
-		elif OCCLUSION_OUTER > OCCLUSION_INNER:
-			target = smoothstep(OCCLUSION_INNER, OCCLUSION_OUTER, _block_distance(block, body))
-		block.modulate.a = move_toward(block.modulate.a, target, OCCLUSION_FADE_SPEED * delta)
-		if target >= 1.0 and block.modulate.a >= 1.0:
-			_faded_blocks.erase(block)
+		for block: TerrainBlock in blocks:
+			if block.position.y > feet.y and block.top > altitude + OCCLUSION_MIN_HEIGHT \
+					and Geometry2D.is_point_in_polygon(point, block.outline()):
+				return true
+	return false
 
 
-## Il blocco è disegnato dopo il giocatore (gli sta davanti), è più alto
-## dei suoi piedi ed è vicino al suo corpo sullo schermo.
-func _covers(block: TerrainBlock, feet: Vector2, altitude: float, body: Vector2) -> bool:
-	if block.position.y <= feet.y or _top_height(block.cell) < altitude + OCCLUSION_MIN_HEIGHT:
-		return false
-	return _block_distance(block, body) < OCCLUSION_OUTER
+## Aggiunge (o toglie) il blocco nei quadrati della griglia toccati dalla
+## sua sagoma sullo schermo, così is_covered guarda solo quelli lì.
+func _index_cover(block: TerrainBlock, add: bool) -> void:
+	var bounds := Rect2(block.outline()[0], Vector2.ZERO)
+	for point in block.outline():
+		bounds = bounds.expand(point)
+	var first := Vector2i((bounds.position / COVER_GRID).floor())
+	var last := Vector2i((bounds.end / COVER_GRID).floor())
+	for x in range(first.x, last.x + 1):
+		for y in range(first.y, last.y + 1):
+			var key := Vector2i(x, y)
+			if add:
+				if not _cover_grid.has(key):
+					_cover_grid[key] = []
+				_cover_grid[key].append(block)
+			elif _cover_grid.has(key):
+				_cover_grid[key].erase(block)
+				if _cover_grid[key].is_empty():
+					_cover_grid.erase(key)
 
 
-## Distanza sullo schermo tra il punto e la parete del blocco (dalla cima
-## alla base, al centro del rombo).
-func _block_distance(block: TerrainBlock, point: Vector2) -> float:
-	var ground := cell_center(block.cell)
-	var top := ground - Vector2(0, _top_height(block.cell))
-	var y := clampf(point.y, top.y, ground.y)
-	return point.distance_to(Vector2(ground.x, y))
+## Sagoma sullo schermo del blocco disegnato (base e cima), per is_covered.
+func block_outline(cell: Vector2i) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	var corners := cell_corners(cell)
+	for k in 4:
+		points.append(corners[k])
+		points.append(corners[k] - Vector2(0, corner_height(cell, k)))
+	return Geometry2D.convex_hull(points)
+
+
+# --- Mappa scoperta ----------------------------------------------------
+
+## Raggio attorno al giocatore entro cui si scopre la mappa (e si vedono
+## i nemici sulla minimappa), in pixel sullo schermo.
+func reveal_radius() -> float:
+	return float(_map_data["reveal_radius"])
+
+
+## Scopre la mappa attorno al giocatore ogni tanto, quando si è spostato.
+func _update_reveal(delta: float) -> void:
+	_reveal_timer -= delta
+	if player == null or _reveal_timer > 0.0:
+		return
+	_reveal_timer = float(_map_data["reveal_interval"])
+	if _revealed_at.distance_to(player.position) >= float(_map_data["reveal_step"]):
+		reveal_around(player.position)
+
+
+## Segna come scoperti i rombi entro reveal_radius dal punto, nella mappa
+## attuale: restano scoperti per sempre (si salvano, vedi save_state).
+func reveal_around(point: Vector2) -> void:
+	_revealed_at = point
+	var radius := reveal_radius()
+	if not explored.has(map_key):
+		explored[map_key] = {}
+	var seen: Dictionary = explored[map_key]
+	var low := to_grid(point + Vector2(-radius, 0)).min(to_grid(point + Vector2(0, -radius)))
+	var high := to_grid(point + Vector2(radius, 0)).max(to_grid(point + Vector2(0, radius)))
+	for u in range(floori(low.x), ceili(high.x) + 1):
+		for v in range(floori(low.y), ceili(high.y) + 1):
+			var cell := Vector2i(u, v)
+			if cell_center(cell).distance_to(point) > radius:
+				continue
+			var chunk := _chunk_of(cell)
+			var bit := 1 << ((cell.x - chunk.x * CHUNK_CELLS) + (cell.y - chunk.y * CHUNK_CELLS) * CHUNK_CELLS)
+			seen[chunk] = int(seen.get(chunk, 0)) | bit
+
+
+## Il punto è in una zona già scoperta della mappa attuale.
+func is_explored(point: Vector2) -> bool:
+	var seen: Dictionary = explored.get(map_key, {})
+	var cell := cell_at(point)
+	var chunk := _chunk_of(cell)
+	var mask := int(seen.get(chunk, 0))
+	return mask & (1 << ((cell.x - chunk.x * CHUNK_CELLS) + (cell.y - chunk.y * CHUNK_CELLS) * CHUNK_CELLS)) != 0
+
+
+## Cambia mappa (superficie o piano di un sotterraneo) e scopre subito
+## attorno al giocatore.
+func set_map_key(key: String) -> void:
+	map_key = key
+	_revealed_at = Vector2.INF
+	_reveal_timer = 0.0
 
 
 # --- Coordinate --------------------------------------------------------
@@ -424,9 +537,10 @@ func level_of(cell: Vector2i) -> int:
 	var kind := Kind.GROUND
 	var level := 0
 	if dungeon:
+		# Roccia e tombe non si attraversano; le fosse ossarie sono più in basso.
+		level = dungeon.level_at(cell)
 		if not dungeon.is_floor(cell):
 			kind = Kind.ROCK
-			level = dungeon.wall_level
 	else:
 		var center := cell_center(cell)
 		var ridge := _barrier_strength(center)
@@ -691,7 +805,7 @@ func points_of_interest(center: Vector2, radius: float) -> Array[Dictionary]:
 	for i in range(min_chunk.x, max_chunk.x + 1):
 		for j in range(min_chunk.y, max_chunk.y + 1):
 			for obstacle: Dictionary in _obstacles_of(Vector2i(i, j)):
-				if obstacle["type"] in ["chest", "totem", "merchant", "cave", "stairs", "exit"]:
+				if obstacle["type"] in ["chest", "totem", "merchant", "cave", "metro", "stairs", "exit"]:
 					result.append(obstacle)
 	return result
 
@@ -1025,6 +1139,13 @@ func _generate_obstacles(chunk: Vector2i) -> Array:
 		result = result.filter(func(obstacle: Dictionary) -> bool:
 			return obstacle["position"].distance_to(cave["position"]) > 90.0)
 		result.append(cave)
+	else:
+		# Mausoleo delle catacombe: niente ostacoli attorno.
+		var crypt := _crypt_in_chunk(chunk)
+		if not crypt.is_empty():
+			result = result.filter(func(obstacle: Dictionary) -> bool:
+				return obstacle["position"].distance_to(crypt["position"]) > 130.0)
+			result.append(crypt)
 	return result
 
 
@@ -1213,6 +1334,8 @@ func _show_chunk(chunk: Vector2i) -> void:
 	view.world = self
 	view.chunk = chunk
 	view.position = _from_uv(chunk.x * CHUNK_CELLS * CELL, chunk.y * CHUNK_CELLS * CELL)
+	view.material = LightShaders.ground()
+	_add_occluders(view, chunk)
 	add_child(view)
 	var nodes: Array[Node] = []
 	if entities:
@@ -1225,9 +1348,13 @@ func _show_chunk(chunk: Vector2i) -> void:
 					var block := TerrainBlock.new()
 					block.world = self
 					block.cell = cell
-					block.position = cell_corners(cell)[0]
+					# Ordinato poco dopo il suo vertice più arretrato: a pari
+					# altezza sullo schermo il blocco copre chi gli sta dietro.
+					block.position = cell_corners(cell)[0] + Vector2(0, BLOCK_SORT_BIAS)
+					block.material = LightShaders.ground()
 					entities.add_child(block)
 					nodes.append(block)
+					_index_cover(block, true)
 	_chunk_views[chunk] = {"view": view, "nodes": nodes}
 
 
@@ -1235,17 +1362,31 @@ func _hide_chunk(chunk: Vector2i) -> void:
 	var entry: Dictionary = _chunk_views[chunk]
 	entry["view"].queue_free()
 	for node: Node in entry["nodes"]:
+		if node is TerrainBlock:
+			_index_cover(node, false)
 		node.queue_free()
 	_chunk_views.erase(chunk)
 
 
 ## Un blocco più alto di quelli dietro può coprire chi ci passa dietro:
-## va disegnato anche tra i personaggi, ordinato con loro.
+## va disegnato anche tra i personaggi, ordinato con loro. Anche i blocchi
+## in mezzo a un edificio o a un muro, se dietro di loro, abbastanza vicino
+## da finire sotto il loro tetto sullo schermo, c'è un posto in cui si
+## cammina: altrimenti chi passa dietro un edificio alto verrebbe disegnato
+## sopra il tetto.
 func _covers_behind(cell: Vector2i) -> bool:
 	var top := _top_height(cell)
 	for step: Vector2i in [Vector2i(-1, 0), Vector2i(0, -1), Vector2i(-1, -1)]:
 		if _top_height(cell + step) < top:
 			return true
+	if top <= 0.0 or not is_barrier(cell):
+		return false
+	# Ogni rombo più indietro è mezzo rombo più in alto sullo schermo.
+	var reach := ceili((top + CELL) / (CELL * 0.5))
+	for a in reach + 1:
+		for b in reach + 1 - a:
+			if (a > 0 or b > 0) and not is_barrier(cell - Vector2i(a, b)):
+				return true
 	return false
 
 
@@ -1255,7 +1396,7 @@ func draw_chunk(canvas: CanvasItem, chunk: Vector2i, offset: Vector2) -> void:
 	# Da dietro in avanti: prima i rombi con u + v più piccolo. I blocchi che
 	# coprono chi sta dietro li disegna il loro TerrainBlock, tra i personaggi;
 	# qui sotto resta il pavimento da cui salgono, che si vede quando il
-	# blocco diventa trasparente (vedi _update_occlusion).
+	# blocco non c'è (vedi refresh_now).
 	for depth in 2 * CHUNK_CELLS - 1:
 		for i in range(maxi(0, depth - CHUNK_CELLS + 1), mini(depth, CHUNK_CELLS - 1) + 1):
 			var cell := chunk * CHUNK_CELLS + Vector2i(i, depth - i)
@@ -1263,6 +1404,33 @@ func draw_chunk(canvas: CanvasItem, chunk: Vector2i, offset: Vector2) -> void:
 				draw_cell(canvas, cell, offset)
 			else:
 				draw_floor(canvas, cell, offset)
+
+
+## Ostacoli per la luce dei blocchi invalicabili del pezzo che confinano
+## con un posto in cui si cammina (vedi in cima), figli di view.
+func _add_occluders(view: Node2D, chunk: Vector2i) -> void:
+	for i in CHUNK_CELLS:
+		for j in CHUNK_CELLS:
+			var cell := chunk * CHUNK_CELLS + Vector2i(i, j)
+			if not is_barrier(cell) or kind_of(cell) == Kind.RAVINE:
+				continue
+			var open := false
+			for step: Vector2i in RAMP_DIRECTIONS:
+				var other := cell + step
+				if not is_barrier(other) or kind_of(other) == Kind.RAVINE:
+					open = true
+					break
+			if not open:
+				continue
+			var polygon := PackedVector2Array()
+			for corner in cell_corners(cell):
+				polygon.append(corner - view.position)
+			var shape := OccluderPolygon2D.new()
+			shape.polygon = polygon
+			var occluder := LightOccluder2D.new()
+			occluder.occluder = shape
+			occluder.occluder_light_mask = OCCLUDER_BASE
+			view.add_child(occluder)
 
 
 ## Pavimento sotto un blocco che copre chi sta dietro: il rombo piano
@@ -1279,10 +1447,13 @@ func draw_floor(canvas: CanvasItem, cell: Vector2i, offset: Vector2) -> void:
 		corners[k] += offset
 		top.append(corners[k] - Vector2(0, base))
 	var kind := kind_of(cell)
-	var faces := _face_colors_of(kind)
+	var faces := _face_colors_of(kind, cell)
 	_draw_face(canvas, corners, heights, cell + Vector2i(1, 0), 1, 2, 0, 3, faces[0], false)
 	_draw_face(canvas, corners, heights, cell + Vector2i(0, 1), 2, 3, 1, 0, faces[1], false)
-	canvas.draw_colored_polygon(top, _top_color(cell, kind, is_path(cell)).darkened(0.15))
+	_light_mode = LightMode.TOP
+	_light_top = base
+	_fill(canvas, top, _top_color(cell, kind, is_path(cell)).darkened(0.15))
+	_light_mode = LightMode.NONE
 
 
 ## Un blocco: pareti davanti (dove il vicino è più basso) e faccia
@@ -1298,10 +1469,14 @@ func draw_cell(canvas: CanvasItem, cell: Vector2i, offset: Vector2) -> void:
 	var kind := kind_of(cell)
 	# Parete destra (lato destra-basso, vicino (u+1, v)) e sinistra (lato
 	# basso-sinistra, vicino (u, v+1)): i vertici combaciano con quelli del vicino.
-	var faces := _face_colors_of(kind)
+	var faces := _face_colors_of(kind, cell)
 	var lip := kind == Kind.GROUND and dungeon == null
-	_draw_face(canvas, corners, heights, cell + Vector2i(1, 0), 1, 2, 0, 3, faces[0], lip)
-	_draw_face(canvas, corners, heights, cell + Vector2i(0, 1), 2, 3, 1, 0, faces[1], lip)
+	# Nelle catacombe le pareti sono di pietra con le nicchie, le tombe scolpite.
+	var pattern := ""
+	if dungeon and dungeon.is_metro() and kind == Kind.ROCK:
+		pattern = "train" if dungeon.tile_at(cell) == Dungeon.Tile.TRAIN else "tiles"
+	_draw_face(canvas, corners, heights, cell + Vector2i(1, 0), 1, 2, 0, 3, faces[0], lip, cell, pattern)
+	_draw_face(canvas, corners, heights, cell + Vector2i(0, 1), 2, 3, 1, 0, faces[1], lip, cell, pattern)
 
 	var path := is_path(cell)
 	var color := _top_color(cell, kind, path)
@@ -1309,10 +1484,18 @@ func draw_cell(canvas: CanvasItem, cell: Vector2i, offset: Vector2) -> void:
 	if ramp != Vector2i.ZERO:
 		# Le rampe che salgono verso il fondo sono in ombra, le altre in luce.
 		color = color.darkened(0.12) if ramp.x + ramp.y < 0 else color.lightened(0.08)
-	canvas.draw_colored_polygon(top, color)
+	# La cima prende la luce del terreno in pianta sotto ogni suo vertice.
+	_light_mode = LightMode.NONE
+	var uvs := PackedVector2Array()
+	for k in 4:
+		uvs.append(Vector2(0.0, heights[k]))
+	canvas.draw_colored_polygon(top, color, uvs)
 	if ramp != Vector2i.ZERO:
+		_light_mode = LightMode.TOP
+		_light_top = (heights[0] + heights[1] + heights[2] + heights[3]) / 4.0
 		_draw_ramp_lines(canvas, top, ramp, color)
 	_draw_decor(canvas, cell, offset, kind, path)
+	_light_mode = LightMode.NONE
 
 
 func _top_color(cell: Vector2i, kind: int, path: bool) -> Color:
@@ -1322,22 +1505,38 @@ func _top_color(cell: Vector2i, kind: int, path: bool) -> Color:
 		Kind.RAVINE:
 			return _ravine_color
 		Kind.ROCK:
+			if dungeon and dungeon.is_metro():
+				return _metro_colors["train_top"] if dungeon.tile_at(cell) == Dungeon.Tile.TRAIN else _metro_colors["wall_color"]
 			return _dungeon_wall_color
+	if dungeon and dungeon.is_metro():
+		if dungeon.tile_at(cell) == Dungeon.Tile.TRACK:
+			return _metro_colors["track_color"]
+		return _metro_floor_colors[posmod(hash([cell.x, cell.y]), _metro_floor_colors.size())]
 	if dungeon:
 		return _dungeon_floor_colors[posmod(hash([cell.x, cell.y]), _dungeon_floor_colors.size())]
 	return _path_color if path else _grass_colors[clampi(level_of(cell), 0, _levels - 1)]
 
 
-func _face_colors_of(kind: int) -> Array[Color]:
+func _face_colors_of(kind: int, cell: Vector2i) -> Array[Color]:
 	if kind == Kind.MOUNTAIN:
 		return _mountain_face_colors
+	if dungeon and dungeon.is_metro():
+		match dungeon.tile_at(cell):
+			Dungeon.Tile.TRAIN:
+				return _train_faces
+			Dungeon.Tile.WALL:
+				return _metro_face_colors
+		# Bordo della navata sopra la fossa: pietra più scura.
+		var stone: Array[Color] = [_metro_floor_colors[0].darkened(0.3), _metro_floor_colors[0].darkened(0.45)]
+		return stone
 	if dungeon:
 		return _dungeon_face_colors
 	return _face_colors
 
 
 func _draw_face(canvas: CanvasItem, corners: PackedVector2Array, heights: Array[float], other: Vector2i,
-		first: int, second: int, other_first: int, other_second: int, color: Color, lip: bool) -> void:
+		first: int, second: int, other_first: int, other_second: int, color: Color, lip: bool,
+		cell := Vector2i.ZERO, pattern := "") -> void:
 	var top_a := heights[first]
 	var top_b := heights[second]
 	var bottom_a := minf(corner_height(other, other_first), top_a)
@@ -1346,12 +1545,24 @@ func _draw_face(canvas: CanvasItem, corners: PackedVector2Array, heights: Array[
 		return
 	var a := corners[first]
 	var b := corners[second]
+	# Ogni punto della parete prende la luce che arriva in pianta alla sua base.
+	_light_mode = LightMode.FACE
+	_light_base_a = a
+	_light_base_b = b
 	var points := PackedVector2Array([a - Vector2(0, top_a), b - Vector2(0, top_b)])
 	if top_b - bottom_b >= 0.5:
 		points.append(b - Vector2(0, bottom_b))
 	if top_a - bottom_a >= 0.5:
 		points.append(a - Vector2(0, bottom_a))
-	canvas.draw_colored_polygon(points, color)
+	_fill(canvas, points, color)
+	if pattern != "":
+		if pattern == "train":
+			_draw_tomb_side(canvas, a, b, top_a, top_b, bottom_a, bottom_b, cell, first, color)
+		else:
+			_draw_crypt_wall(canvas, a, b, top_a, top_b, bottom_a, bottom_b, cell, first, color)
+		_line(canvas, a - Vector2(0, bottom_a), b - Vector2(0, bottom_b), Color(0, 0, 0, 0.4), 2.0)
+		_light_mode = LightMode.NONE
+		return
 	# Strati della roccia o della terra, tutti in una sola chiamata.
 	var strata := PackedVector2Array()
 	var depth := STRATA_STEP
@@ -1360,7 +1571,7 @@ func _draw_face(canvas: CanvasItem, corners: PackedVector2Array, heights: Array[
 		strata.append(b - Vector2(0, top_b - minf(depth, top_b - bottom_b)))
 		depth += STRATA_STEP
 	if not strata.is_empty():
-		canvas.draw_multiline(strata, color.darkened(0.18), 1.5)
+		_lines(canvas, strata, color.darkened(0.18), 1.5)
 	if lip:
 		# Bordo d'erba che sporge in cima.
 		var lip_a := minf(LIP_WIDTH, top_a - bottom_a)
@@ -1371,8 +1582,174 @@ func _draw_face(canvas: CanvasItem, corners: PackedVector2Array, heights: Array[
 		if lip_a > 0.5:
 			lip_points.append(a - Vector2(0, top_a - lip_a))
 		if lip_points.size() >= 3:
-			canvas.draw_colored_polygon(lip_points, _lip_color)
-	canvas.draw_line(a - Vector2(0, bottom_a), b - Vector2(0, bottom_b), Color(0, 0, 0, 0.3), 2.0)
+			_fill(canvas, lip_points, _lip_color)
+	_line(canvas, a - Vector2(0, bottom_a), b - Vector2(0, bottom_b), Color(0, 0, 0, 0.3), 2.0)
+	_light_mode = LightMode.NONE
+
+
+## Parete di pietra delle catacombe tra a e b (dall'alto top alla base
+## bottom): corsi di blocchi sfalsati, un fregio rosso scuro, il muschio che
+## sale da terra e, qua e là, una nicchia con un teschio e le ossa, uno
+## stendardo strappato o una strisciata di sangue che cola.
+func _draw_crypt_wall(canvas: CanvasItem, a: Vector2, b: Vector2, top_a: float, top_b: float,
+		bottom_a: float, bottom_b: float, cell: Vector2i, side: int, color: Color) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash([_decor_seed(), cell.x, cell.y, side, "crypt"])
+	var height := minf(top_a - bottom_a, top_b - bottom_b)
+	var joints := PackedVector2Array()
+	var depth := 12.0
+	var row := 0
+	while depth < height - 2.0:
+		joints.append(a - Vector2(0, bottom_a + depth))
+		joints.append(b - Vector2(0, bottom_b + depth))
+		# Giunti verticali sfalsati tra un corso e l'altro.
+		for t: float in ([0.25, 0.75] if row % 2 == 0 else [0.5]):
+			var at := a.lerp(b, t)
+			var base := lerpf(bottom_a, bottom_b, t)
+			joints.append(at - Vector2(0, base + depth - 12.0))
+			joints.append(at - Vector2(0, base + minf(depth, height)))
+		depth += 12.0
+		row += 1
+	_lines(canvas, joints, color.darkened(0.25), 1.0)
+	var band: Color = _metro_colors["tile_band"]
+	_fill(canvas, PackedVector2Array([a - Vector2(0, bottom_a + 52.0), b - Vector2(0, bottom_b + 52.0),
+			b - Vector2(0, bottom_b + 58.0), a - Vector2(0, bottom_a + 58.0)]), band)
+	# Muschio e sporco alla base.
+	var moss := Color(0.12, 0.16, 0.08, 0.55)
+	_fill_colors(canvas, PackedVector2Array([a - Vector2(0, bottom_a), b - Vector2(0, bottom_b), b - Vector2(0, bottom_b + 24.0), a - Vector2(0, bottom_a + 24.0)]),
+			PackedColorArray([moss, moss, Color(moss, 0.0), Color(moss, 0.0)]))
+	var roll := rng.randf()
+	if roll < 0.28 and height > 60.0:
+		# Nicchia sepolcrale con un teschio e qualche osso.
+		var t := rng.randf_range(0.25, 0.45)
+		var p0 := a.lerp(b, t)
+		var p1 := a.lerp(b, t + 0.32)
+		var h0 := lerpf(bottom_a, bottom_b, t) + 14.0
+		var h1 := lerpf(bottom_a, bottom_b, t + 0.32) + 14.0
+		_fill(canvas, PackedVector2Array([p0 - Vector2(0, h0), p1 - Vector2(0, h1), p1 - Vector2(0, h1 + 26.0), p0 - Vector2(0, h0 + 26.0)]), Color(0.04, 0.03, 0.04))
+		var bone: Color = _metro_colors["rail_color"]
+		var skull := p0.lerp(p1, 0.5) - Vector2(0, lerpf(h0, h1, 0.5) + 9.0)
+		_circle(canvas, skull, 5.5, bone)
+		_fill(canvas, PackedVector2Array([skull + Vector2(-3, 3), skull + Vector2(3, 3), skull + Vector2(2.5, 7), skull + Vector2(-2.5, 7)]), bone)
+		for eye: float in [-2.0, 2.0]:
+			_circle(canvas, skull + Vector2(eye, 0), 1.4, Color(0.05, 0.04, 0.04))
+		_line(canvas, p0.lerp(p1, 0.12) - Vector2(0, h0 + 4.0), p0.lerp(p1, 0.88) - Vector2(0, h1 + 3.0), bone.darkened(0.15), 2.5)
+	elif roll < 0.42 and height > 70.0:
+		# Stendardo strappato che pende dall'alto.
+		var t := rng.randf_range(0.2, 0.6)
+		var p0 := a.lerp(b, t)
+		var p1 := a.lerp(b, t + 0.25)
+		var high0 := lerpf(top_a, top_b, t) - 10.0
+		var high1 := lerpf(top_a, top_b, t + 0.25) - 10.0
+		var cloth := Color.from_hsv([0.0, 0.33, 0.75][rng.randi() % 3], 0.55, 0.35)
+		var drop := minf(56.0, height - 30.0)
+		var middle := p0.lerp(p1, 0.5) - Vector2(0, lerpf(high0, high1, 0.5) - drop - 8.0)
+		_fill(canvas, PackedVector2Array([p0 - Vector2(0, high0), p1 - Vector2(0, high1), p1 - Vector2(0, high1 - drop),
+				middle, p0 - Vector2(0, high0 - drop + rng.randf_range(0.0, 10.0))]), cloth)
+		_line(canvas, p0 - Vector2(0, high0), p1 - Vector2(0, high1), Color(0.35, 0.25, 0.12), 2.5)
+	if rng.randf() < float(_metro_data["blood_chance"]) * 1.5:
+		# Strisciata di sangue che cola giù dalla parete.
+		var blood: Color = _metro_colors["blood_color"]
+		var t := rng.randf_range(0.15, 0.7)
+		var high := rng.randf_range(24.0, maxf(height - 10.0, 26.0))
+		var hand := a.lerp(b, t) - Vector2(0, lerpf(bottom_a, bottom_b, t) + high)
+		var drag := (b - a) * rng.randf_range(0.15, 0.3)
+		_fill(canvas, PackedVector2Array([hand, hand + drag, hand + drag + Vector2(0, 7), hand + Vector2(0, 9)]), blood)
+		var drips := PackedVector2Array()
+		for k in 4:
+			var at := hand + drag * rng.randf() + Vector2(0, 6)
+			drips.append_array([at, at + Vector2(0, rng.randf_range(8.0, high * 0.8))])
+		_lines(canvas, drips, blood, 2.0)
+
+
+## Fianco di una grande tomba: cornice del coperchio in cima, riquadri
+## scolpiti, a volte un teschio inciso o una croce, e il muschio in basso.
+func _draw_tomb_side(canvas: CanvasItem, a: Vector2, b: Vector2, top_a: float, top_b: float,
+		bottom_a: float, bottom_b: float, cell: Vector2i, side: int, color: Color) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash([_decor_seed(), cell.x, cell.y, side, "tomb"])
+	var carving: Color = _metro_colors["train_window"]
+	# Cornice sporgente del coperchio.
+	_fill(canvas, PackedVector2Array([a - Vector2(0, top_a), b - Vector2(0, top_b), b - Vector2(0, top_b - 8.0), a - Vector2(0, top_a - 8.0)]), color.lightened(0.15))
+	var p0 := a.lerp(b, 0.14)
+	var p1 := a.lerp(b, 0.86)
+	var h0 := lerpf(bottom_a, bottom_b, 0.14)
+	var h1 := lerpf(bottom_a, bottom_b, 0.86)
+	var top := minf(top_a - bottom_a, top_b - bottom_b) - 16.0
+	var panel := PackedVector2Array([p0 - Vector2(0, h0 + 12.0), p1 - Vector2(0, h1 + 12.0), p1 - Vector2(0, h1 + top), p0 - Vector2(0, h0 + top)])
+	_fill(canvas, panel, color.darkened(0.12))
+	var frame := PackedVector2Array()
+	for k in 4:
+		frame.append_array([panel[k], panel[(k + 1) % 4]])
+	_lines(canvas, frame, carving, 1.5)
+	var middle := p0.lerp(p1, 0.5) - Vector2(0, lerpf(h0, h1, 0.5) + (12.0 + top) / 2.0)
+	if rng.randf() < 0.4:
+		# Teschio inciso.
+		_circle(canvas, middle, 6.0, carving)
+		for eye: float in [-2.2, 2.2]:
+			_circle(canvas, middle + Vector2(eye, 0), 1.5, color)
+	elif rng.randf() < 0.5:
+		# Croce incisa.
+		_lines(canvas, PackedVector2Array([middle - Vector2(0, 10), middle + Vector2(0, 10), middle - (b - a).normalized() * 6.0 - Vector2(0, 3),
+				middle + (b - a).normalized() * 6.0 - Vector2(0, 3)]), carving, 2.0)
+	var moss := Color(0.12, 0.16, 0.08, 0.6)
+	_fill_colors(canvas, PackedVector2Array([a - Vector2(0, bottom_a), b - Vector2(0, bottom_b), b - Vector2(0, bottom_b + 16.0), a - Vector2(0, bottom_a + 16.0)]),
+			PackedColorArray([moss, moss, Color(moss, 0.0), Color(moss, 0.0)]))
+
+
+## Per ogni punto, di quanti pixel scendere per arrivare al punto in pianta
+## da cui prende la luce (in UV.y, vedi LightShaders.ground): fin sotto la
+## base in pianta della parete (un poco davanti, LIGHT_BASE_NUDGE) o di
+## _light_top. Vuoto se la luce si calcola dove si disegna.
+func _light_uvs(points: PackedVector2Array) -> PackedVector2Array:
+	var uvs := PackedVector2Array()
+	if _light_mode == LightMode.NONE:
+		return uvs
+	uvs.resize(points.size())
+	var a := _light_base_a
+	var b := _light_base_b
+	for k in points.size():
+		var drop := _light_top
+		if _light_mode == LightMode.FACE:
+			var t := clampf((points[k].x - a.x) / (b.x - a.x), 0.0, 1.0) if absf(b.x - a.x) > 0.01 else 0.0
+			drop = maxf(lerpf(a.y, b.y, t) - points[k].y, 0.0) + LIGHT_BASE_NUDGE
+		uvs[k] = Vector2(0.0, drop)
+	return uvs
+
+
+func _fill(canvas: CanvasItem, points: PackedVector2Array, color: Color) -> void:
+	canvas.draw_colored_polygon(points, color, _light_uvs(points))
+
+
+func _fill_colors(canvas: CanvasItem, points: PackedVector2Array, colors: PackedColorArray) -> void:
+	canvas.draw_polygon(points, colors, _light_uvs(points))
+
+
+func _line(canvas: CanvasItem, from: Vector2, to: Vector2, color: Color, width: float) -> void:
+	_lines(canvas, PackedVector2Array([from, to]), color, width)
+
+
+## Segmenti (a coppie di punti) come quadrilateri, così ogni vertice ha la sua luce.
+func _lines(canvas: CanvasItem, pairs: PackedVector2Array, color: Color, width: float) -> void:
+	if _light_mode == LightMode.NONE:
+		canvas.draw_multiline(pairs, color, width)
+		return
+	var colors := PackedColorArray([color, color, color, color])
+	for k in range(0, pairs.size() - 1, 2):
+		var across := (pairs[k + 1] - pairs[k]).orthogonal().normalized() * width / 2.0
+		var quad := PackedVector2Array([pairs[k] + across, pairs[k + 1] + across, pairs[k + 1] - across, pairs[k] - across])
+		canvas.draw_primitive(quad, colors, _light_uvs(quad))
+
+
+## Cerchio pieno che prende la luce come gli altri punti (un poligono, se serve).
+func _circle(canvas: CanvasItem, center: Vector2, radius: float, color: Color) -> void:
+	if _light_mode == LightMode.NONE:
+		canvas.draw_circle(center, radius, color)
+		return
+	var points := PackedVector2Array()
+	for k in 10:
+		points.append(center + Vector2.from_angle(k * TAU / 10.0) * radius)
+	_fill(canvas, points, color)
 
 
 ## Linee lungo la pendenza di una rampa, parallele al lato più alto.
@@ -1397,7 +1774,7 @@ func _draw_ramp_lines(canvas: CanvasItem, top: PackedVector2Array, ramp: Vector2
 		var t := k / 4.0
 		lines.append((low[0] as Vector2).lerp(high[0], t))
 		lines.append((low[1] as Vector2).lerp(high[1], t))
-	canvas.draw_multiline(lines, color.darkened(0.15), 1.5)
+	_lines(canvas, lines, color.darkened(0.15), 1.5)
 
 
 ## Ciuffi d'erba e fiori sui blocchi d'erba, sassolini sui sentieri e nel
@@ -1407,16 +1784,22 @@ func _draw_decor(canvas: CanvasItem, cell: Vector2i, offset: Vector2, kind: int,
 		return
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash([_decor_seed(), cell.x, cell.y, "decor"])
+	# Le decorazioni prendono la luce in pianta come la cima su cui stanno.
+	_light_mode = LightMode.TOP
+	_light_top = _top_height(cell) if ramp_of(cell) == Vector2i.ZERO else level_of(cell) * level_height + level_height / 2.0
+	if dungeon and dungeon.is_metro():
+		_draw_crypt_floor(canvas, cell, offset, rng)
+		return
 	if path or dungeon:
 		for k in rng.randi_range(2, 4):
 			var at := _decor_point(cell, rng, offset)
-			canvas.draw_circle(at, rng.randf_range(1.5, 3.0), _pebble_colors[k % _pebble_colors.size()])
+			_circle(canvas, at, rng.randf_range(1.5, 3.0), _pebble_colors[k % _pebble_colors.size()])
 		if dungeon and rng.randf() < float(_dungeon_data["mushroom_chance"]):
 			var at := _decor_point(cell, rng, offset)
 			var glow := _mushroom_colors[rng.randi() % _mushroom_colors.size()]
-			canvas.draw_circle(at, 7.0, Color(glow, 0.25))
-			canvas.draw_line(at, at + Vector2(0, -5), Color(0.8, 0.8, 0.75), 2.0)
-			canvas.draw_circle(at + Vector2(0, -6), 3.5, glow)
+			_circle(canvas, at, 7.0, Color(glow, 0.25))
+			_line(canvas, at, at + Vector2(0, -5), Color(0.8, 0.8, 0.75), 2.0)
+			_circle(canvas, at + Vector2(0, -6), 3.5, glow)
 		return
 	var grass := _grass_colors[clampi(level_of(cell), 0, _levels - 1)].darkened(0.3)
 	var tufts := PackedVector2Array()
@@ -1424,13 +1807,74 @@ func _draw_decor(canvas: CanvasItem, cell: Vector2i, offset: Vector2, kind: int,
 		var at := _decor_point(cell, rng, offset)
 		tufts.append_array([at, at + Vector2(-4, -7), at, at + Vector2(0, -9), at, at + Vector2(4, -7)])
 	if not tufts.is_empty():
-		canvas.draw_multiline(tufts, grass, 1.5)
+		_lines(canvas, tufts, grass, 1.5)
 	if rng.randf() < float(_decor["flower_chance"]):
 		var color := _flower_colors[rng.randi() % _flower_colors.size()]
 		var at := _decor_point(cell, rng, offset)
 		for k in 3:
-			canvas.draw_circle(at + Vector2.from_angle(k * TAU / 3.0) * 3.0, 2.5, color)
-		canvas.draw_circle(at, 1.5, Color(0.95, 0.8, 0.3))
+			_circle(canvas, at + Vector2.from_angle(k * TAU / 3.0) * 3.0, 2.5, color)
+		_circle(canvas, at, 1.5, Color(0.95, 0.8, 0.3))
+
+
+## Pavimento delle catacombe: nelle fosse ossa sparse e teschi, sulle
+## navate le lastre di pietra e una cornice lungo il bordo sopra le fosse;
+## dappertutto sassolini, pozze di sangue e, qua e là, una candela di
+## fiamma verde.
+func _draw_crypt_floor(canvas: CanvasItem, cell: Vector2i, offset: Vector2, rng: RandomNumberGenerator) -> void:
+	var lift := Vector2(0, _light_top)
+	var point := func(u: float, v: float) -> Vector2:
+		return _from_uv((cell.x + u) * CELL, (cell.y + v) * CELL) + offset - lift
+	var bone: Color = _metro_colors["rail_color"]
+	if dungeon.tile_at(cell) == Dungeon.Tile.TRACK:
+		var bones := PackedVector2Array()
+		for k in rng.randi_range(3, 6):
+			var at: Vector2 = point.call(rng.randf_range(0.1, 0.9), rng.randf_range(0.1, 0.9))
+			var along := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(5.0, 10.0) * Vector2(1.0, 0.5)
+			bones.append_array([at - along, at + along])
+		_lines(canvas, bones, bone.darkened(0.1), 2.5)
+		for k in range(0, bones.size(), 2):
+			_circle(canvas, bones[k], 1.8, bone)
+			_circle(canvas, bones[k + 1], 1.8, bone)
+		if rng.randf() < 0.35:
+			var skull: Vector2 = point.call(rng.randf_range(0.25, 0.75), rng.randf_range(0.25, 0.75))
+			_circle(canvas, skull, 5.0, bone)
+			for eye: float in [-1.8, 1.8]:
+				_circle(canvas, skull + Vector2(eye, 0.5), 1.3, Color(0.05, 0.04, 0.04))
+		if rng.randf() < 0.25:
+			# Acqua nera che ristagna sul fondo.
+			var center: Vector2 = point.call(rng.randf_range(0.3, 0.7), rng.randf_range(0.3, 0.7))
+			var pool := PackedVector2Array()
+			for k in 8:
+				pool.append(center + Vector2.from_angle(TAU * k / 8.0) * Vector2(14.0, 7.0) * rng.randf_range(0.7, 1.15))
+			_fill(canvas, pool, Color(_metro_colors["sleeper_color"], 0.8))
+	else:
+		var joints := PackedVector2Array([point.call(0.5, 0.0), point.call(0.5, 1.0), point.call(0.0, 0.5), point.call(1.0, 0.5)])
+		_lines(canvas, joints, Color(0, 0, 0, 0.15), 1.0)
+		# Cornice di pietra lungo il bordo della navata sopra la fossa.
+		for side: int in [-1, 1]:
+			if dungeon.tile_at(cell + Vector2i(0, side)) == Dungeon.Tile.TRACK:
+				var v := 0.1 if side < 0 else 0.9
+				_line(canvas, point.call(0.0, v), point.call(1.0, v), _metro_colors["edge_color"], 4.0)
+	for k in rng.randi_range(1, 3):
+		_circle(canvas, point.call(rng.randf_range(0.15, 0.85), rng.randf_range(0.15, 0.85)), rng.randf_range(1.5, 3.0), _pebble_colors[k % _pebble_colors.size()])
+	if rng.randf() < float(_metro_data["blood_chance"]):
+		# Pozza di sangue rappreso, con gli schizzi attorno.
+		var blood: Color = _metro_colors["blood_color"]
+		var center: Vector2 = point.call(rng.randf_range(0.3, 0.7), rng.randf_range(0.3, 0.7))
+		var pool := PackedVector2Array()
+		var size := rng.randf_range(10.0, 22.0)
+		for k in 9:
+			pool.append(center + Vector2.from_angle(TAU * k / 9.0) * Vector2(size, size * 0.5) * rng.randf_range(0.6, 1.2))
+		_fill(canvas, pool, blood)
+		for k in 4:
+			_circle(canvas, center + Vector2.from_angle(rng.randf() * TAU) * size * rng.randf_range(1.2, 1.8) * Vector2(1, 0.5), rng.randf_range(1.5, 3.0), blood)
+	if rng.randf() < float(_metro_data["glowstick_chance"]):
+		# Candela consumata con la fiamma verde.
+		var at: Vector2 = point.call(rng.randf_range(0.2, 0.8), rng.randf_range(0.2, 0.8))
+		var glow := _candle_colors[rng.randi() % _candle_colors.size()]
+		_circle(canvas, at - Vector2(0, 8), 10.0, Color(glow, 0.2))
+		_fill(canvas, PackedVector2Array([at + Vector2(-2.5, 0), at + Vector2(2.5, 0), at + Vector2(2.5, -8), at + Vector2(-2.5, -8)]), Color(0.85, 0.82, 0.7))
+		_fill(canvas, PackedVector2Array([at + Vector2(-2.5, -9), at + Vector2(0, -16), at + Vector2(2.5, -9)]), glow)
 
 
 ## Punto a caso sulla faccia superiore del blocco, lontano dai bordi.
@@ -1449,14 +1893,15 @@ func set_dungeon(value: Dungeon) -> void:
 	for chunk: Vector2i in _chunk_views.keys():
 		_hide_chunk(chunk)
 	_view_queue.clear()
-	_faded_blocks.clear()
 	_chunk_obstacles.clear()
 	_near_cache.clear()
 	_close_cache.clear()
 	for cache: Dictionary in [_level_cache, _ramp_cache, _path_cache, _kind_cache]:
 		cache.clear()
 	region = Rect2i()
-	var ground := _dungeon_wall_color if dungeon else _grass_colors[0].darkened(0.3)
+	var ground := _grass_colors[0].darkened(0.3)
+	if dungeon:
+		ground = _metro_colors["wall_color"] if dungeon.is_metro() else _dungeon_wall_color
 	RenderingServer.set_default_clear_color(ground)
 
 
@@ -1466,25 +1911,41 @@ func _decor_seed() -> int:
 	return dungeon.seed_value if dungeon else seed_value
 
 
+## Ostacoli di un piano: stalagmiti (nelle catacombe anche sarcofagi bassi
+## sulle navate e scheletri a terra), i passaggi nelle pareti e le casse.
 func _dungeon_obstacles(chunk: Vector2i) -> Array:
 	var result: Array[Dictionary] = []
 	var rng := RandomNumberGenerator.new()
-	var chance := float(_dungeon_data["stalagmite_chance"])
-	var rock: Dictionary = _obstacle_types["rock"]
-	var radius_range: Array = rock["radius"]
+	var settings := dungeon.settings()
+	var table := {"rock": float(settings["stalagmite_chance"])}
+	if dungeon.is_metro():
+		table["bench"] = float(settings["bench_chance"])
+		table["corpse"] = float(settings["corpse_chance"])
 	for i in CHUNK_CELLS:
 		for j in CHUNK_CELLS:
 			var cell := chunk * CHUNK_CELLS + Vector2i(i, j)
 			if not dungeon.is_open(cell):
 				continue
 			rng.seed = hash([dungeon.seed_value, cell.x, cell.y, "rock"])
-			if rng.randf() >= chance:
+			var roll := rng.randf()
+			var type_id := ""
+			for id: String in table:
+				roll -= table[id]
+				if roll < 0.0:
+					type_id = id
+					break
+			# I sarcofagi stanno sulle navate, non nelle fosse.
+			if type_id == "" or (type_id == "bench" and dungeon.tile_at(cell) != Dungeon.Tile.FLOOR):
 				continue
+			var type: Dictionary = _obstacle_types[type_id]
+			var radius_range: Array = type["radius"]
 			var radius := rng.randf_range(radius_range[0], radius_range[1])
 			var spot := _from_uv(cell.x * CELL + rng.randf_range(PLACE_MIN, PLACE_MAX), cell.y * CELL + rng.randf_range(PLACE_MIN, PLACE_MAX))
+			if type_id == "bench":
+				spot = cell_center(cell)
 			result.append({
-				"type": "rock", "position": spot, "elevation": 0.0, "radius": radius,
-				"collision": radius * float(rock["collision"]), "solid": true, "slow": 1.0, "damage": 0,
+				"type": type_id, "position": spot, "elevation": elevation_at(spot), "radius": radius,
+				"collision": radius * float(type["collision"]), "solid": type["solid"], "slow": type.get("slow", 1.0), "damage": 0,
 				"damage_interval": 0.0, "variant": rng.randi(),
 			})
 	# Passaggi nelle pareti: verso la superficie (all'arrivo) e verso il
@@ -1607,6 +2068,39 @@ func _cave_in_chunk(chunk: Vector2i) -> Dictionary:
 	return {}
 
 
+## Mausoleo in rovina che porta alle catacombe ("metro"): al più uno per
+## pezzo, raro ("crypt_chance"), su un tratto piano d'erba lontano dalla
+## partenza, dalle arene e dai mercanti.
+func _crypt_in_chunk(chunk: Vector2i) -> Dictionary:
+	if _random_unit([seed_value, chunk.x, chunk.y, "crypt"]) >= float(_terrain["crypt_chance"]):
+		return {}
+	# Si provano i rombi interni del pezzo partendo da uno a caso.
+	var side := CHUNK_CELLS - 2
+	var first := posmod(hash([seed_value, chunk.x, chunk.y, "crypt_cell"]), side * side)
+	for k in side * side:
+		var index := (first + k) % (side * side)
+		var cell := chunk * CHUNK_CELLS + Vector2i(1 + index % side, 1 + index / side)
+		var center := cell_center(cell)
+		if center.length() < float(_terrain["start_clear_radius"]) * 2.0:
+			continue
+		var arena := arena_near(center)
+		if arena != Vector2.INF and center.distance_to(arena) < float(_arena["radius"]) + CELL * 3.0:
+			continue
+		var merchant := merchant_near(center)
+		if merchant != Vector2.INF and center.distance_to(merchant) < float(_merchant["clear_radius"]) + CELL * 3.0:
+			continue
+		var flat := true
+		var level := level_of(cell)
+		for i in range(-1, 2):
+			for j in range(-1, 2):
+				var other := cell + Vector2i(i, j)
+				if kind_of(other) != Kind.GROUND or level_of(other) != level or ramp_of(other) != Vector2i.ZERO:
+					flat = false
+		if flat:
+			return make_obstacle("metro", center)
+	return {}
+
+
 ## Un pezzo di terreno sotto i personaggi: disegnato una volta sola alla creazione.
 class ChunkView:
 	extends Node2D
@@ -1625,9 +2119,19 @@ class TerrainBlock:
 
 	var world: World
 	var cell: Vector2i
+	## Altezza della cima.
+	var top := 0.0
+	var _outline := PackedVector2Array()
 
 	func _ready() -> void:
 		physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+
+	## Sagoma sullo schermo (vedi World.is_covered), calcolata la prima volta.
+	func outline() -> PackedVector2Array:
+		if _outline.is_empty():
+			_outline = world.block_outline(cell)
+			top = world._top_height(cell)
+		return _outline
 
 	func _draw() -> void:
 		world.draw_cell(self, cell, -position)

@@ -40,6 +40,7 @@ POWERUP_UPGRADE,×%d
 POWERUP_EMPOWERED,%d s
 CHALLENGE_HINT,Interact with the totem to start a survival challenge
 CHALLENGE_STATUS,Survive! %d s · Enemies: %d
+HORDE_INCOMING,An undead horde is coming!
 CHALLENGE_WON,Challenge complete! +%d XP and a potion
 HUD_MANA,Mana %d/%d · Mana potions %d/%d
 HUD_GOLD,Gold %d
@@ -121,10 +122,10 @@ MENU_CONTROLS,Controls
 CONTROLS_TITLE,Controls
 CONTROLS_MOVE,"Move (mouse: walk to the cursor, hold to follow it)"
 CONTROLS_ATTACK,"Attack (combo, hold to keep attacking)"
-CONTROLS_HEAVY,"Power strike (hold to charge, uses mana while held; keep holding to chain)"
+CONTROLS_HEAVY,"Power strike (uses a little mana; hold to charge, uses more mana while held; keep holding to chain)"
 CONTROLS_PARRY,"Parry (instant, cancels any action)"
 CONTROLS_DODGE,"Dodge (cancels any action, air dash while jumping)"
-CONTROLS_JUMP,"Jump (cancels any action) · Interact (chests, merchants, caves)"
+CONTROLS_JUMP,"Jump (cancels any action) · Interact (chests, merchants, caves, mausoleums)"
 CONTROLS_RUN,Tap: run on/off (dodge while running to slide) · Hold: torch on/off
 CONTROLS_FOCUS,"Focus (hold: dims the world, highlights you, items, chests and passages)"
 CONTROLS_SPELL,Fireball
@@ -138,7 +139,7 @@ CONTROLS_SPECIAL_TITLE,Special attacks
 CONTROLS_SPECIAL_MIXED,Power strike right after a combo: a wide power strike with bonus damage
 CONTROLS_SPECIAL_CHARGED,Charge the first power strike: every power strike chained after it deals extra damage
 CONTROLS_SPECIAL_AIR,Attack in mid-air: wide aerial slashes that also reach the enemies below you
-CONTROLS_SPECIAL_PLUNGE,"Power strike in mid-air, with a Cataclysm rune: smash it, the blast kills the enemies around (hold to float and widen it)"
+CONTROLS_SPECIAL_PLUNGE,"Power strike in mid-air: tap it for a slam that hits the enemies around (costs mana and stamina); hold it, with a Cataclysm rune, to smash the rune: the blast kills the enemies around (keep holding to widen it)"
 CONTROLS_SPECIAL_DASH,Power strike during an air dash: dash strike that smashes a wide area
 CONTROLS_TOUCH,On touch screens use the on-screen buttons
 CONTROLS_BACK,Back
@@ -154,12 +155,16 @@ SLOT_GOLD_POTIONS,Gold %d · Potions %d
 SLOT_KILLS,Enemies defeated: %d
 SLOT_PLACE_SURFACE,On the surface
 SLOT_PLACE_DEPTH,Underground · level %d
+SLOT_PLACE_METRO,In the catacombs · level %d
 SLOT_PLAYTIME,Play time: %s
 SLOT_PLAYTIME_MIN,%d min
 SLOT_PLAYTIME_HOURS,%d h %02d min
 SLOT_PLAYTIME_UNKNOWN,—
 SLOT_SAVED_AT,Saved %s
 SLOT_OVERWRITE,Press again to replace this save
+SLOT_DELETE,Delete
+SLOT_DELETE_SURE,Press again to delete
+SLOT_DELETE_CONFIRM,This save will be deleted for good
 PAUSE_TITLE,Paused
 PAUSE_RESUME,Resume
 PAUSE_SAVE,Save game
@@ -175,16 +180,24 @@ SAVE_BLOCKED_CHALLENGE,Can't save during a challenge
 SAVE_BLOCKED_DEAD,Can't save now
 LOADING_LANDS,Exploring new lands…
 LOADING_DEPTHS,Descending into the cave: level %d of %d
+LOADING_METRO,Down into the catacombs: level %d of %d
 LOADING_SURFACE,Back to the surface
 LOADING_GAME,Loading your game
 CAVE_HINT,A cave: interact to explore the depths
 INTERACT,Interact
 CAVE_CLEARED,This cave has been cleared
+METRO_HINT,A ruined mausoleum: interact to go down into the catacombs
+METRO_CLEARED,These catacombs have been cleansed
+METRO_STAIRS_HINT,Stone steps to the crypt below
+METRO_EXIT_HINT,The way back up to the open air
 STAIRS_HINT,Stairs going down
 EXIT_HINT,The way back to the surface
 DUNGEON_LEVEL,Underground · level %d of %d
+METRO_LEVEL,Catacombs · level %d of %d
 BOSS_NAME,Cave Guardian
 BOSS_DEFEATED,Guardian defeated! The way out is open
+BOSS_NAME_METRO,The Crypt Abomination
+METRO_BOSS_DEFEATED,The Abomination is slain! The way out is open
 MENU_CREDITS,Created by fdamore1984 with Claude Code
 CONTROLS_LOCK,Manual lock on the nearest enemy in sight (again: switch target)
 TOUCH_LOCK,Lock
@@ -202,7 +215,7 @@ CONTROLS_HEADER_ACTION,Action
 MENU_OPTIONS,Options
 PAUSE_OPTIONS,Options
 OPTIONS_TITLE,Options
-OPTIONS_CONTROLS,"Controls: select a binding, then press the new key, mouse button or controller button"
+OPTIONS_CONTROLS,"Controls: select a binding, then press the new key, mouse button or controller button (%s, right click or a long touch: leave it empty)"
 OPTIONS_HEADER_ACTION,Action
 OPTIONS_HEADER_KEYBOARD,Keyboard
 OPTIONS_HEADER_MOUSE,Mouse
@@ -213,6 +226,8 @@ OPTIONS_DEVICE_CONTROLLER,controller button or stick
 OPTIONS_LISTEN,"Press the new %s for ""%s"" (%d s, another device cancels)"
 OPTIONS_BOUND,"""%s"" set to %s"
 OPTIONS_SHARED,also used by: %s
+OPTIONS_CLEARED,"""%s"" now has no %s"
+OPTIONS_CLEAR_REQUIRED,"""%s"" needs at least one key: set another one first"
 OPTIONS_CANCELLED,Cancelled: nothing changed
 OPTIONS_RESET,Reset to defaults
 OPTIONS_RESET_DONE,All controls are back to their defaults
@@ -285,7 +300,7 @@ HUD_FRENZY_READY,FRENZY! %s + %s
 UPGRADE_FRENZY,Frenzy strikes +2
 UPGRADE_H_BOMB,Cataclysm runes carried +1
 ITEM_H_BOMB,Cataclysm rune
-ITEM_H_BOMB_DESC,for the power strike in mid-air: smash it on the ground and the blast kills the enemies around
+ITEM_H_BOMB_DESC,for the power strike held in mid-air: smash it on the ground and the blast kills the enemies around
 MENU_TUTORIAL,Tutorial
 PAUSE_TUTORIAL,Tutorial
 TUTORIAL_TITLE,Tutorial
@@ -297,7 +312,7 @@ TUTORIAL_HINT,%s / %s: previous / next page · %s: close
 TUTORIAL_MOVE_TITLE,Moving
 TUTORIAL_MOVE_TEXT,"Move with the left stick or the keyboard, or walk to the cursor holding the middle mouse button. Tap {run} to start or stop running (it stops by itself when you stand still); hold {run} to light or put out the torch, you need it at night and in the caves: it lights the way you face. {jump} jumps: you climb onto higher ground and enemy strikes pass under you. Dodge while running to slide."
 TUTORIAL_COMBO_TITLE,Sword and combos
-TUTORIAL_COMBO_TEXT,"Press {attack} to strike with the sword: the strike lands right away. Quick strikes form a combo (3 at first), each one stronger than the last; hold {attack} to keep attacking. {heavy_attack} is the power strike, wide and very strong: it ends the combo with a bonus. Hold it to charge it up to double damage (it uses mana) and to chain more power strikes."
+TUTORIAL_COMBO_TEXT,"Press {attack} to strike with the sword: the strike lands right away. Quick strikes form a combo (3 at first), each one stronger than the last; hold {attack} to keep attacking. {heavy_attack} is the power strike, wide and very strong (it uses a little mana): it ends the combo with a bonus. Hold it to charge it up to double damage (it uses mana) and to chain more power strikes."
 TUTORIAL_PARRY_TITLE,Parry
 TUTORIAL_PARRY_TEXT,"Hold {parry} to parry with the sword across your body: you block the strikes coming from the front, arrows and bolts included, but it drains stamina. A perfect parry, started right before the hit, stuns the enemy and for 4 seconds doubles your damage and speeds up your attacks. The parry is instant: it cancels whatever you are doing."
 TUTORIAL_DODGE_TITLE,Dodge and jump
@@ -309,14 +324,16 @@ TUTORIAL_SPECIAL_TEXT,"With a full Frenzy bar press {parry} and {attack} togethe
 TUTORIAL_SUPPLIES_TITLE,Stamina and potions
 TUTORIAL_SUPPLIES_TEXT,"The green bar is your stamina: attacking, dodging, jumping, parrying and running drain it, and it recovers by itself as soon as you stop. When it's empty you can't attack or dodge, and a parry can break your guard. Your potions are in the bar at the bottom: health {potion}, mana {mana_potion}, stamina {stamina_potion}. Drinking takes a moment: enemies rush in to punish you."
 TUTORIAL_ARSENAL_TITLE,"Fireball, shield and runes"
-TUTORIAL_ARSENAL_TEXT,"{spell} casts a fireball that chases the nearest enemy in sight: it costs mana (the blue bar), which does not come back by itself: drink mana potions. {shield} raises a magic bubble that absorbs one hit from any direction (30-second recharge). In mid-air, with a Cataclysm rune in your belt, {heavy_attack} smashes it on the ground: the blast kills the enemies around and takes a big chunk out of the boss."
+TUTORIAL_ARSENAL_TEXT,"{spell} casts a fireball that chases the nearest enemy in sight: it costs mana (the blue bar), which does not come back by itself: drink mana potions. {shield} raises a magic bubble that absorbs one hit from any direction (30-second recharge). In mid-air, tap {heavy_attack} for a slam that hits the enemies around (it costs mana and stamina); hold it, with a Cataclysm rune in your belt, to smash the rune on the ground: the blast kills the enemies around and takes a big chunk out of the boss."
 TUTORIAL_ENEMIES_TITLE,The enemies
-TUTORIAL_ENEMIES_TEXT,"Every enemy blow costs you one heart (two from the boss): a few mistakes and you're down. Before striking enemies glow red and pull back their weapon: that's the moment to parry or dodge. No more than two attack at once, the others circle around. Sometimes they raise their guard: hit them from the side or from behind. Their blows and arrows hurt the other monsters too. You lock on to the nearest enemy in sight by yourself ({lock_on} keeps the lock); it gets a red ring and your strikes and fireballs go its way."
+TUTORIAL_ENEMIES_TEXT,"Every enemy blow costs you one heart (two from the boss): a few mistakes and you're down. Enemies have only a few health points too, shown as segments over their heads: every hit takes one away, the strongest hits two or three. Before striking enemies glow red and pull back their weapon: that's the moment to parry or dodge. No more than two attack at once, the others circle around. Sometimes they raise their guard: hit them from the side or from behind. Their blows and arrows hurt the other monsters too. You lock on to the nearest enemy in sight by yourself ({lock_on} keeps the lock); it gets a red ring and your strikes and fireballs go its way. Every now and then an undead horde shows up: from 50 to 200 of them, very weak, all running at you; they fall apart on contact and hurt you. Cut them down before they reach you, or jump over them."
 TUTORIAL_LOOT_TITLE,"Chests, inventory and merchants"
-TUTORIAL_LOOT_TEXT,"Walk up to chests, merchants, totems and caves and press {interact} when the prompt appears. Chests drop gold and items: swords, armor, boots, amulets, rings and spell books. {inventory} opens the inventory (the game pauses): equip your gear, read the books, sort with {inventory_sort}. Merchants buy what you don't use and sell potions, Cataclysm runes and rare gear."
+TUTORIAL_LOOT_TEXT,"Walk up to chests, merchants, totems, caves and mausoleums and press {interact} when the prompt appears. Chests drop gold and items: swords, armor, boots, amulets, rings and spell books. {inventory} opens the inventory (the game pauses): equip your gear, read the books, sort with {inventory_sort}. Merchants buy what you don't use and sell potions, Cataclysm runes and rare gear."
 TUTORIAL_WORLD_TITLE,Exploring the lands
-TUTORIAL_WORLD_TEXT,"The lands have no borders. The minimap in the top-right corner shows enemies, chests, totems, merchants and caves; {map} opens the full map. At night you need the torch. Hold {focus} for focus mode: the world dims and only the goblin and the things to pick up keep their colors. Jump to climb the hills and ramps."
+TUTORIAL_WORLD_TEXT,"The lands have no borders. The minimap in the top-right corner shows enemies, chests, totems, merchants, caves and mausoleums, but only in the places you have already explored; {map} opens the full map. At night and underground it's pitch black: you need the torch, whose light stops at mountains and walls. Behind a wall you see the goblin's outline. Hold {focus} for focus mode: the world dims and only the goblin and the things to pick up keep their colors. Jump to climb the hills and ramps."
 TUTORIAL_BUILDINGS_TITLE,Caves and the boss
 TUTORIAL_BUILDINGS_TEXT,"Cave entrances open in the mountain walls: go in with {interact}. Down there it's dark and the enemies get tougher level after level: on every level look for the stairs. On the last one the Cave Guardian waits in his arena: he summons help and strikes from afar. Beat him for gold, a Cataclysm rune and gear you won't find anywhere else."
+TUTORIAL_METRO_TITLE,The catacombs
+TUTORIAL_METRO_TEXT,"Ruined mausoleums (a purple square with a skull on the map) lead down into the catacombs: go down with {interact}. It's pitch black and nothing living is left down there: only packs of undead and the ghouls of the crypts, with claws and many red eyes; some spit venomous bile from afar, the bloated ones crush the ground around them. In the middle of every level the stone naves run between two sunken ossuary pits (jump down and climb back up with a jump), with rows of great tombs; around them are chapels and burial chambers. Find the steps going down; on the last level the Crypt Abomination waits, summoning the undead."
 TUTORIAL_PROGRESS_TITLE,"Challenges, levels and saves"
 TUTORIAL_PROGRESS_TEXT,"Interact with a totem for a 30-second challenge in waves: survive it for experience and a potion. Every defeated enemy gives experience; at every level your damage grows and you pick an upgrade among the cards on offer (""Frenzy strikes +2"" too; extra health only shows up now and then). The game saves by itself every 5 minutes and when you enter a cave, with no enemies nearby; from the pause menu ({menu}) you save by hand."

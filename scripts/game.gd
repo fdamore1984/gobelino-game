@@ -7,6 +7,11 @@ extends Node2D
 ## rimossi e ne compaiono di nuovi fuori dallo schermo, così ce ne sono
 ## sempre. Gestisce anche esperienza, livelli e scelta dei potenziamenti.
 ##
+## Ogni tanto, in superficie e fuori dalle sfide, arriva un'orda di non
+## morti (voce "hordes" di data/world.json): tanti, debolissimi, sbucano
+## tutti dalla stessa parte fuori dallo schermo e corrono verso il giocatore
+## (vedi Enemy.is_horde). Non contano tra i nemici che girano di solito.
+##
 ## Toccando il totem al centro di un'arena parte una sfida di
 ## sopravvivenza (parametri in data/challenge.json): per 30 secondi
 ## arrivano ondate di nemici, più numerose e forti salendo di livello, da
@@ -22,6 +27,8 @@ extends Node2D
 ## Entrando in una caverna delle montagne si scende in un sotterraneo
 ## (Dungeon) di 2-5 piani: su ogni piano si cerca la scala per scendere,
 ## all'ultimo c'è il boss; la scala d'arrivo riporta in superficie.
+## Dai mausolei in rovina si scende allo stesso modo nelle catacombe
+## (Dungeon con kind "metro"), dove ci sono solo non morti e ghoul.
 ##
 ## La partita si salva da sola ogni 5 minuti ed entrando in una caverna,
 ## nemici presenti compresi (tipo, posizione e vita): caricandola ritornano
@@ -60,6 +67,8 @@ const PASSAGE_HINT_DISTANCE := 200.0
 const SAVE_SAFE_DISTANCE := 700.0
 ## Arrivando su un piano si compare a questa distanza dal passaggio nella parete.
 const ARRIVAL_DISTANCE := 70.0
+## Stanza di riferimento delle catacombe per i nemici (vedi _spawn_dungeon_enemies).
+const ROOM_AREA := 40.0
 
 ## Partita da riprendere al prossimo avvio della scena (la imposta il menù).
 static var pending_save := {}
@@ -79,6 +88,9 @@ var _kills := 0
 ## si somma tra un salvataggio e l'altro e si vede negli slot del menù.
 var play_time := 0.0
 var _maintain_timer := MAINTAIN_INTERVAL
+## Secondi al prossimo arrivo di un'orda (negativo: ancora da estrarre).
+var _horde_timer := -1.0
+var _horde_data: Dictionary = World.DATA.data["hordes"]
 ## Livelli guadagnati per cui va ancora scelto il potenziamento.
 var _pending_level_ups := 0
 ## Sfida in corso: centro dell'arena (Vector2.INF se nessuna), tempo
@@ -96,6 +108,8 @@ var _autosave_pending := false
 ## Caverna da cui si è scesi (Vector2.INF in superficie), quanti piani ha
 ## il suo sotterraneo e dove si torna in superficie.
 var _cave := Vector2.INF
+## Tipo del sotterraneo: "cave" o "metro" (catacombe, vedi Dungeon.kind).
+var _cave_kind := "cave"
 var _cave_levels := 0
 var _surface_return := Vector2.ZERO
 var _boss: Enemy
@@ -157,6 +171,8 @@ func _process(delta: float) -> void:
 	if _maintain_timer <= 0.0 and _cave == Vector2.INF:
 		_maintain_timer = MAINTAIN_INTERVAL
 		_maintain_enemies()
+	if _cave == Vector2.INF:
+		_update_hordes(delta)
 
 
 func _maintain_enemies() -> void:
@@ -166,12 +182,50 @@ func _maintain_enemies() -> void:
 		if enemy.is_queued_for_deletion():
 			continue
 		var far := enemy.global_position.distance_to(_player.global_position) > DESPAWN_DISTANCE
-		if far and not enemy.is_engaged():
+		# I non morti delle orde inseguono sempre: rimasti indietro si tolgono lo stesso.
+		if far and (not enemy.is_engaged() or enemy.is_horde()):
 			enemy.queue_free()
-		else:
+		elif not enemy.is_horde():
 			alive += 1
 	for i in EnemyTypes.population(_player.level) - alive:
 		_spawn_enemy(EnemyTypes.pick_random(_player.level), _random_position(SPAWN_RANGE), _player.level)
+
+
+## Conto alla rovescia dell'orda: si ferma durante le sfide, l'attacco
+## speciale e da morti.
+func _update_hordes(delta: float) -> void:
+	if _horde_timer < 0.0:
+		_horde_timer = randf_range(_horde_data["first_delay"][0], _horde_data["first_delay"][1])
+	if _challenge_arena != Vector2.INF or _player.is_dead() or _player.is_special_active():
+		return
+	_horde_timer -= delta
+	if _horde_timer <= 0.0:
+		_horde_timer = randf_range(_horde_data["interval"][0], _horde_data["interval"][1])
+		_spawn_horde()
+
+
+## Un'orda di non morti da una direzione a caso, fuori dallo schermo: tanti
+## quanti ne estrae "count" (da 50 a 200; su Android "count_mobile", meno),
+## sparsi in un cerchio più largo per le orde più numerose; un verso e un
+## avviso la annunciano. I non morti arrivano a gruppi di "spawn_per_frame"
+## per frame, così non c'è uno scatto.
+func _spawn_horde() -> void:
+	var count_data: Array = _horde_data["count_mobile" if OS.has_feature("mobile") else "count"]
+	var count := randi_range(int(count_data[0]), int(count_data[1]))
+	var direction := Vector2.from_angle(randf() * TAU)
+	var center := _player.position + direction * randf_range(_horde_data["distance"][0], _horde_data["distance"][1])
+	var spread := float(_horde_data["spread"]) * sqrt(float(count) / float(_horde_data["spread_count"]))
+	Sfx.play("horde", _player.position + direction * 250.0)
+	_hud.flash_challenge(tr("HORDE_INCOMING"))
+	var per_frame := maxi(int(_horde_data["spawn_per_frame"]), 1)
+	for i in count:
+		if i > 0 and i % per_frame == 0:
+			await get_tree().physics_frame
+			# Nel frattempo si è entrati in un sotterraneo o si è tornati al menù.
+			if _cave != Vector2.INF or not is_inside_tree():
+				return
+		var zombie := _spawn_enemy("zombie", center + Vector2.from_angle(randf() * TAU) * spread * sqrt(randf()), _player.level)
+		zombie.alert()
 
 
 ## Nemici a caso attorno al giocatore, quanti ne vuole il suo livello.
@@ -245,9 +299,9 @@ func _find_interactable() -> Dictionary:
 	var totem := _world.totem_touched(at, reach)
 	if totem != Vector2.INF and _world.totem_state(totem) == "ready":
 		return {"type": "totem", "position": totem, "height": 100.0}
-	for type_id: String in (["cave"] if _cave == Vector2.INF else ["stairs", "exit"]):
+	for type_id: String in (["cave", "metro"] if _cave == Vector2.INF else ["stairs", "exit"]):
 		var passage := _world.touched(type_id, at, reach)
-		if not passage.is_empty() and not (type_id == "cave" and _world.is_cave_cleared(passage["position"])):
+		if not passage.is_empty() and not (type_id in ["cave", "metro"] and _world.is_cave_cleared(passage["position"])):
 			return {"type": type_id, "position": passage["position"], "height": 96.0}
 	return {}
 
@@ -269,6 +323,8 @@ func _interact() -> void:
 			_start_challenge(at)
 		"cave":
 			_enter_cave(at)
+		"metro":
+			_enter_cave(at, "metro")
 		"stairs":
 			Sfx.play("summon", _player.global_position, 0.8)
 			_go_to_depth(_world.dungeon.depth + 1, Vector2.INF)
@@ -328,18 +384,24 @@ func _prepare_region(text: String, setup := Callable()) -> void:
 
 ## Suggerimento vicino a un ingresso (chiave del testo, "" se nessuno).
 func _passage_hint() -> String:
-	for pair: Array in [["cave", "CAVE_HINT"], ["stairs", "STAIRS_HINT"], ["exit", "EXIT_HINT"]]:
+	var metro := _world.dungeon != null and _world.dungeon.is_metro()
+	for pair: Array in [["cave", "CAVE_HINT"], ["metro", "METRO_HINT"], ["stairs", "METRO_STAIRS_HINT" if metro else "STAIRS_HINT"],
+			["exit", "METRO_EXIT_HINT" if metro else "EXIT_HINT"]]:
 		var found := _world.touched(pair[0], _player.position, PASSAGE_HINT_DISTANCE)
 		if not found.is_empty():
-			if pair[0] == "cave" and _world.is_cave_cleared(found["position"]):
-				return "CAVE_CLEARED"
+			if pair[0] in ["cave", "metro"] and _world.is_cave_cleared(found["position"]):
+				return "CAVE_CLEARED" if pair[0] == "cave" else "METRO_CLEARED"
 			return pair[1]
 	return ""
 
 
-func _enter_cave(at: Vector2) -> void:
+## Entra in una caverna (kind "cave") o nelle catacombe sotto un mausoleo
+## (kind "metro").
+func _enter_cave(at: Vector2, kind := "cave") -> void:
 	_cave = at
-	_cave_levels = Dungeon.levels_for(_cave_seed())
+	_cave_kind = kind
+	_dungeon_data = Dungeon.data_for(kind)
+	_cave_levels = Dungeon.levels_for(_cave_seed(), kind)
 	_surface_return = _player.position
 	Sfx.play("summon", _player.global_position, 0.7)
 	await _go_to_depth(1, Vector2.INF)
@@ -357,7 +419,8 @@ func _cave_seed() -> int:
 ## all'ultimo piano, il boss. saved: nemici di un salvataggio da rimettere
 ## al posto di quelli nuovi (null se non ci sono).
 func _go_to_depth(depth: int, at: Vector2, saved: Variant = null) -> void:
-	await _prepare_region(tr("LOADING_DEPTHS") % [depth, _cave_levels], _enter_depth.bind(depth, at))
+	var loading_text := "LOADING_METRO" if _cave_kind == "metro" else "LOADING_DEPTHS"
+	await _prepare_region(tr(loading_text) % [depth, _cave_levels], _enter_depth.bind(depth, at))
 	var dungeon := _world.dungeon
 	if saved is Array:
 		_restore_enemies(saved)
@@ -365,15 +428,17 @@ func _go_to_depth(depth: int, at: Vector2, saved: Variant = null) -> void:
 		_spawn_dungeon_enemies(dungeon)
 		if dungeon.is_last() and not _world.is_cave_cleared(_cave):
 			_spawn_boss(dungeon)
-	_hud.flash_challenge(tr("DUNGEON_LEVEL") % [depth, dungeon.levels])
+	_hud.flash_challenge(tr("METRO_LEVEL" if dungeon.is_metro() else "DUNGEON_LEVEL") % [depth, dungeon.levels])
 
 
 ## Prepara il piano (dietro la schermata d'attesa): sotterraneo nuovo e
 ## giocatore davanti al passaggio d'arrivo (o in at).
 func _enter_depth(depth: int, at: Vector2) -> void:
 	_clear_level()
-	var dungeon := Dungeon.new(hash([_cave_seed(), depth]), depth, _cave_levels)
+	var dungeon := Dungeon.new(hash([_cave_seed(), depth]), depth, _cave_levels, _cave_kind)
 	_world.set_dungeon(dungeon)
+	# Ogni piano ha la sua mappa scoperta.
+	_world.set_map_key("%s:%d:%d:%d" % [_cave_kind, roundi(_cave.x), roundi(_cave.y), depth])
 	if at == Vector2.INF or not dungeon.is_floor(World.cell_at(at)):
 		# All'arrivo, o se il salvataggio è di una versione in cui il piano era diverso.
 		at = _world.in_front_of_wall(dungeon.arrival, dungeon.arrival_side, ARRIVAL_DISTANCE)
@@ -389,9 +454,12 @@ func _leave_dungeon() -> void:
 func _return_to_surface() -> void:
 	_clear_level()
 	_world.set_dungeon(null)
+	_world.set_map_key("surface")
 	_day_night.clear_override()
 	_player.teleport(_surface_return)
 	_cave = Vector2.INF
+	_cave_kind = "cave"
+	_dungeon_data = Dungeon.data_for(_cave_kind)
 
 
 ## Toglie nemici, bottino a terra, sangue e corpi del posto che si lascia.
@@ -407,18 +475,30 @@ func _clear_level() -> void:
 
 
 ## Nemici nelle caverne del piano (non in quella d'arrivo né nell'arena),
-## più forti scendendo.
+## più forti scendendo. Nelle catacombe solo i mostri delle cripte
+## ("metro_weight") e gruppi di non morti ("zombies_per_room"), che si
+## svegliano avvicinandosi; le loro stanze hanno misure diverse, quindi i
+## nemici sono in proporzione (per_room vale per una stanza di ROOM_AREA
+## rombi liberi).
 func _spawn_dungeon_enemies(dungeon: Dungeon) -> void:
 	var per_room: Array = _dungeon_data["enemies_per_room"]
+	var zombies: Array = _dungeon_data.get("zombies_per_room", [0, 0])
+	var weight_key := "metro_weight" if dungeon.is_metro() else "spawn_weight"
+	var threat := _player.level + dungeon.depth - 1
 	for i in range(1, dungeon.rooms.size()):
 		var room: Dictionary = dungeon.rooms[i]
 		if room["center"] == dungeon.arena:
 			continue
 		var cells := dungeon.room_cells(room)
-		for k in mini(randi_range(per_room[0], per_room[1]), cells.size()):
+		var share := minf(cells.size() / ROOM_AREA, 2.0) if dungeon.is_metro() else 1.0
+		var count := roundi(randf_range(per_room[0], per_room[1]) * share) if dungeon.is_metro() else randi_range(per_room[0], per_room[1])
+		for k in mini(count, cells.size()):
 			var cell: Vector2i = cells.pop_at(randi() % cells.size())
-			var threat := _player.level + dungeon.depth - 1
-			_spawn_enemy(EnemyTypes.pick_random(threat), World.cell_center(cell), threat)
+			_spawn_enemy(EnemyTypes.pick_random(threat, weight_key), World.cell_center(cell), threat)
+		var pack := roundi(randf_range(zombies[0], zombies[1]) * share)
+		for k in mini(pack, cells.size()):
+			var cell: Vector2i = cells.pop_at(randi() % cells.size())
+			_spawn_enemy("walker", World.cell_center(cell) + Vector2(randf_range(-20, 20), randf_range(-10, 10)), threat)
 
 
 ## Il boss al centro dell'arena, più forte quanto più alto è il livello del
@@ -455,7 +535,7 @@ func _on_boss_died(boss: Enemy) -> void:
 	var dungeon := _world.dungeon
 	_world.add_obstacle(_world.make_wall_obstacle("exit", dungeon.arena_exit, dungeon.arena_exit_side))
 	_player.laugh()
-	_hud.flash_challenge(tr("BOSS_DEFEATED"))
+	_hud.flash_challenge(tr("METRO_BOSS_DEFEATED" if dungeon.is_metro() else "BOSS_DEFEATED"))
 	Sfx.play("level_up", boss.global_position)
 
 
@@ -529,7 +609,7 @@ func _save_data() -> Dictionary:
 	if _cave != Vector2.INF:
 		data["dungeon"] = {
 			"cave": SaveGame.array(_cave), "levels": _cave_levels, "depth": _world.dungeon.depth,
-			"return": SaveGame.array(_surface_return),
+			"return": SaveGame.array(_surface_return), "kind": _cave_kind,
 		}
 	return data
 
@@ -595,6 +675,9 @@ func _load(save: Dictionary) -> void:
 			_populate(START_SPAWN_RANGE)
 	else:
 		_cave = SaveGame.vector(dungeon_state["cave"])
+		# I salvataggi di prima delle catacombe sono tutti nelle caverne.
+		_cave_kind = str(dungeon_state.get("kind", "cave"))
+		_dungeon_data = Dungeon.data_for(_cave_kind)
 		_cave_levels = int(dungeon_state["levels"])
 		_surface_return = SaveGame.vector(dungeon_state["return"])
 		await _go_to_depth(int(dungeon_state["depth"]), position_saved, enemies)
