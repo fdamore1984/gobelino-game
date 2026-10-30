@@ -108,7 +108,7 @@ func _capture_combat(language: String) -> void:
 	_player.apply_upgrade("dodge")
 	_hud_stats()
 	var warrior := _enemy("warrior", Vector2(95, -25), Enemy.State.CHASE, 0.0)
-	warrior.health = 40
+	warrior.health = 2
 	_player._set_lock_target(warrior)
 	_enemy("brute", Vector2(-170, 90), Enemy.State.WINDUP, 0.6)
 	_enemy("caster", Vector2(-330, -140), Enemy.State.WINDUP, 0.6)
@@ -281,7 +281,7 @@ func _capture_slam(language: String) -> void:
 	var hit: Array[Enemy] = []
 	for spot: Array in [["brute", Vector2(110, -40)], ["warrior", Vector2(-100, 30)], ["scout", Vector2(30, 105)]]:
 		var enemy := _enemy(spot[0], origin + spot[1], Enemy.State.STUNNED, 0.2)
-		enemy.health = int(enemy.max_health * 0.4)
+		enemy.health = maxi(int(enemy.max_health * 0.4), 1)
 		hit.append(enemy)
 	await _frames(50)
 	_player._state = Player.State.SLAM
@@ -597,7 +597,7 @@ func _capture_cover(language: String) -> void:
 	_player._state = Player.State.PARRY
 	_player._state_time = 0.05
 	_player._set_lock_target(_enemy("warrior", Vector2(140, 25), Enemy.State.WINDUP, 0.75))
-	_enemy("brute", Vector2(-160, 70), Enemy.State.STUNNED, 0.3).health = 40
+	_enemy("brute", Vector2(-160, 70), Enemy.State.STUNNED, 0.3).health = 3
 	_enemy("scout", Vector2(-300, -120), Enemy.State.CHASE, 0.0)
 	_enemy("summoner", Vector2(300, -110), Enemy.State.CHASE, 0.0)
 

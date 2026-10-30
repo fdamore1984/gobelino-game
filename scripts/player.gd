@@ -167,7 +167,7 @@ const SLAM_RADIUS := {"dash": 165.0, "air": 135.0}
 const START_H_BOMB_CAPACITY := 3
 const H_BOMB_MIN_RADIUS := 190.0
 const H_BOMB_MAX_RADIUS := 280.0
-const H_BOMB_BOSS_DAMAGE := 0.35
+const H_BOMB_BOSS_DAMAGE := 0.5
 const AIR_SLAM_RISE_SPEED := 45.0
 const AIR_SLAM_BOB := 3.0
 ## Fuliggine dell'esplosione: il corpo si annerisce (fino a SOOT_STRENGTH
@@ -1940,9 +1940,9 @@ func _h_bomb_impact() -> void:
 		var direction := offset.normalized() if offset != Vector2.ZERO else facing
 		if enemy.is_boss():
 			# L'armatura non attenua la runa.
-			enemy.take_damage(roundi(enemy.max_health * H_BOMB_BOSS_DAMAGE / (1.0 - enemy.armor)), direction, true)
+			enemy.take_points(ceili(enemy.max_health * H_BOMB_BOSS_DAMAGE), direction, true, true)
 		else:
-			enemy.take_damage(enemy.health * 10 + 1000, direction, true)
+			enemy.take_points(enemy.health, direction, true, true)
 			enemy.shove(direction * SLAM_PUSH_SPEED)
 	var blast := HBombBlast.new()
 	blast.radius = radius

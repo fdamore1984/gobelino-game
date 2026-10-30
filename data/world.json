@@ -52,7 +52,8 @@
 		]
 	},
 	"enemy_scaling": {
-		"health": 0.22,
+		"points": 0.05,
+		"hit_damage": 0.22,
 		"damage": 0.05,
 		"xp": 0.1,
 		"armor": 0.01,
@@ -74,7 +75,6 @@
 	},
 	"enemy_attacks": {
 		"max_simultaneous": 2,
-		"friendly_fire": 8,
 		"player_damage": 1,
 		"boss_player_damage": 2
 	},

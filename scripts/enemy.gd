@@ -24,6 +24,16 @@ extends Node2D
 ## I tipi con "magic" (il boss) ogni tanto si fermano a caricare una magia e
 ## scagliano da lontano un ventaglio di dardi grandi.
 ##
+## Vita a punti, come quella del giocatore: ogni tipo ha pochi punti vita
+## ("points" in data/enemies.json, che crescono un poco col livello di
+## minaccia) mostrati a segmenti sopra la testa. Un colpo toglie 1 punto,
+## 2 o 3 i colpi molto forti: il danno del colpo, meno l'armatura, diviso
+## per POINT_DAMAGE volte il primo colpo del giocatore al livello 1,
+## cresciuto col livello di minaccia del nemico ("hit_damage", più piano
+## dei danni del giocatore; vedi points_for), così combo, colpi potenti,
+## parata perfetta, oggetti e livelli contano ancora. Colpito resta invulnerabile per
+## HURT_INVULNERABLE_TIME secondi e lampeggia, come il giocatore.
+##
 ## I non morti delle orde (tipi con "horde", vedi Game) non girano attorno e
 ## non attaccano: corrono dritti verso il giocatore e, quando lo toccano, si
 ## disfano facendogli un danno (vedi _rush e _burst). Muoiono con un colpo.
@@ -51,6 +61,14 @@ const LEASH_RANGE := 700.0
 const SEPARATION_RANGE := 60.0
 const KNOCKBACK := 320.0
 const HEAVY_KNOCKBACK_FACTOR := 1.6
+## Vita a punti (vedi in cima): danno che vale un punto, rispetto al primo
+## colpo del giocatore al livello 1, e punti al più per colpo.
+const POINT_DAMAGE := 1.25
+const MAX_POINTS_PER_HIT := 3
+## Dopo un colpo si resta invulnerabili per questo tempo, lampeggiando
+## (molto meno del giocatore: le combo devono restare veloci).
+const HURT_INVULNERABLE_TIME := 0.12
+const HURT_BLINK_RATE := 30.0
 
 ## Ogni tanto cambia verso di rotazione o fa uno scatto laterale.
 const DECISION_INTERVAL := Vector2(0.5, 1.6)
@@ -203,8 +221,9 @@ var type_id := "warrior"
 var radius := 24.0
 ## Altezza del terreno sotto il nemico: viene disegnato più in alto.
 var ground_elevation := 0.0
-var health := 40
-var max_health := 40
+## Punti vita (vedi in cima).
+var health := 4
+var max_health := 4
 ## Esperienza data al giocatore quando viene sconfitto.
 var xp_reward := 30
 ## Danno di un colpo: quello del tipo, cresciuto con il livello di minaccia.
@@ -259,6 +278,8 @@ var _slam_landed := false
 var _air := 0.0
 var _knockback := Vector2.ZERO
 var _hit_flash := 0.0
+## Invulnerabilità rimasta dopo un colpo (vedi take_points).
+var _invulnerable := 0.0
 ## Altezza sopra il terreno (salendo su un gradino con un salto o cadendo
 ## da uno), velocità verticale e attesa prima del prossimo salto.
 var _height := 0.0
@@ -326,7 +347,7 @@ func setup(id: String, level := 1) -> void:
 	_type = EnemyTypes.get_type(id)
 	threat_level = maxi(level, 1)
 	radius = _type["radius"]
-	max_health = roundi(EnemyTypes.scaled("health", _type["health"], threat_level))
+	max_health = maxi(roundi(EnemyTypes.scaled("points", _type["points"], threat_level)), 1)
 	health = max_health
 	xp_reward = roundi(EnemyTypes.scaled("xp", _type["xp"], threat_level))
 	damage = floori(EnemyTypes.scaled("damage", _type["damage"], threat_level))
@@ -347,7 +368,7 @@ func setup(id: String, level := 1) -> void:
 ## scena di gioco (boss più forte, nemici evocati).
 func save_state() -> Dictionary:
 	return {
-		"type": type_id, "position": SaveGame.array(position), "health": health, "max_health": max_health,
+		"type": type_id, "position": SaveGame.array(position), "health": health, "max_health": max_health, "points": true,
 		"xp": xp_reward, "damage": damage, "loot": drops_loot, "minion": is_minion,
 		"level": threat_level, "armor": armor,
 		"facing": SaveGame.array(_facing), "look": _look_seed,
@@ -358,8 +379,13 @@ func save_state() -> Dictionary:
 ## alla scena); i campi mancanti restano quelli del tipo.
 func load_state(data: Dictionary) -> void:
 	position = SaveGame.vector(data["position"])
-	max_health = maxi(int(data.get("max_health", max_health)), 1)
-	health = clampi(int(data.get("health", max_health)), 1, max_health)
+	if data.get("points", false):
+		max_health = maxi(int(data.get("max_health", max_health)), 1)
+		health = clampi(int(data.get("health", max_health)), 1, max_health)
+	else:
+		# Salvataggio di prima della vita a punti: si tiene la stessa parte di vita.
+		var share := float(data.get("health", 1)) / maxf(float(data.get("max_health", 1)), 1.0)
+		health = clampi(ceili(share * max_health), 1, max_health)
 	xp_reward = int(data.get("xp", xp_reward))
 	damage = int(data.get("damage", damage))
 	threat_level = int(data.get("level", threat_level))
@@ -471,6 +497,7 @@ func _physics_process(delta: float) -> void:
 	_attack_cooldown = maxf(_attack_cooldown - delta, 0.0)
 	_summon_cooldown = maxf(_summon_cooldown - delta, 0.0)
 	_hit_flash = maxf(_hit_flash - delta, 0.0)
+	_update_invulnerability(delta)
 	_guard_cooldown = maxf(_guard_cooldown - delta, 0.0)
 	_guard_flash = maxf(_guard_flash - delta, 0.0)
 	_slam_cooldown = maxf(_slam_cooldown - delta, 0.0)
@@ -735,12 +762,27 @@ func shove(velocity: Vector2) -> void:
 		_knockback = velocity
 
 
-## heavy: colpo finale della combo, spinge più lontano.
+## Punti vita tolti da un colpo con quel danno (vedi in cima): l'armatura
+## ne assorbe una parte, ma almeno un punto passa sempre.
+func points_for(amount: int) -> int:
+	var unit := EnemyTypes.scaled("hit_damage", POINT_DAMAGE * Player.BASE_DAMAGE, threat_level)
+	return clampi(roundi(amount * (1.0 - armor) / unit), 1, MAX_POINTS_PER_HIT)
+
+
+## Colpo del giocatore con quel danno (vedi points_for); heavy: colpo
+## finale della combo, spinge più lontano.
 func take_damage(amount: int, direction: Vector2, heavy := false) -> void:
-	if _state == State.DEAD:
+	take_points(points_for(amount), direction, heavy)
+
+
+## Toglie punti vita. Durante l'invulnerabilità dopo un colpo non succede
+## nulla, salvo con force (runa del cataclisma, non morto che si disfa) e durante
+## l'attacco speciale della Frenesia (i nemici sono fermi e i colpi vanno a raffica).
+func take_points(points: int, direction: Vector2, heavy := false, force := false) -> void:
+	if _state == State.DEAD or (_invulnerable > 0.0 and not force and not frozen):
 		return
-	# L'armatura assorbe una parte del danno, ma almeno un punto passa sempre.
-	health -= maxi(roundi(amount * (1.0 - armor)), 1)
+	health -= maxi(points, 1)
+	_invulnerable = HURT_INVULNERABLE_TIME
 	_hit_flash = 0.12
 	_knockback = direction * KNOCKBACK * (HEAVY_KNOCKBACK_FACTOR if heavy else 1.0) / float(_type["mass"])
 	GroundFx.bleed(global_position, ground_elevation + radius * 0.8, direction, BLEED_DROPS_HEAVY if heavy else BLEED_DROPS)
@@ -762,6 +804,14 @@ func take_damage(amount: int, direction: Vector2, heavy := false) -> void:
 		_finish_summon()
 	elif _state == State.WANDER:
 		_change_state(State.CHASE)
+
+
+## Conto alla rovescia dell'invulnerabilità, lampeggiando come il giocatore.
+func _update_invulnerability(delta: float) -> void:
+	if _invulnerable <= 0.0 and modulate.a >= 1.0:
+		return
+	_invulnerable = maxf(_invulnerable - delta, 0.0)
+	modulate.a = 0.35 if _invulnerable > 0.0 and int(_invulnerable * HURT_BLINK_RATE) % 2 == 0 else 1.0
 
 
 ## Fa partire subito l'inseguimento del giocatore (per esempio nelle sfide).
@@ -830,7 +880,7 @@ func _burst(to_player: Vector2) -> void:
 		GroundFx.bleed(global_position, ground_elevation + radius * 0.8, Vector2.from_angle(randf() * TAU), BLEED_DROPS_HEAVY)
 	HitSpark.spawn(get_parent(), global_position + to_player.normalized() * radius, ground_elevation + radius * 0.5, 40.0, COLOR_DANGER)
 	Sfx.play("splat", global_position)
-	take_damage(health + 1000, to_player.normalized(), true)
+	take_points(health, to_player.normalized(), true, true)
 	queue_free()
 
 
@@ -1152,7 +1202,7 @@ func _land_slam(player_active: bool, slam: Dictionary) -> void:
 	GroundFx.shockwave(global_position, ground_elevation, impact_radius)
 	Sfx.play("fireball_hit", global_position, 0.5 / sqrt(_type["mass"]))
 	for other in _enemies_near(impact_radius):
-		hurt_enemy(other, damage + int(slam["damage_bonus"]), threat_level, other.global_position - global_position, true)
+		hurt_enemy(other, EnemyTypes.player_damage(is_boss()), other.global_position - global_position, true)
 	if player_active and player.global_position.distance_to(global_position) <= impact_radius + Player.RADIUS:
 		# Anche il colpo a terra si può parare: con una parata perfetta
 		# (istantanea, appena prima dell'impatto) si resta storditi.
@@ -1248,14 +1298,13 @@ func _strike_enemies() -> void:
 		if offset.length() > radius + other.radius and absf(_attack_direction.angle_to(offset)) > _strike_arc() / 2.0:
 			continue
 		_friendly_struck.append(other)
-		hurt_enemy(other, damage, threat_level, offset, false)
+		hurt_enemy(other, EnemyTypes.player_damage(is_boss()), offset, false)
 
 
-## Danno di un colpo nemico a un altro nemico (fuoco amico): points sono i
-## punti di danno del colpo, level il livello di minaccia di chi colpisce.
-static func hurt_enemy(other: Enemy, points: int, level: int, direction: Vector2, heavy: bool) -> void:
-	var amount := roundi(points * EnemyTypes.friendly_fire(level))
-	other.take_damage(amount, direction.normalized() if direction != Vector2.ZERO else Vector2.DOWN, heavy)
+## Colpo di un nemico a un altro nemico (fuoco amico): toglie gli stessi
+## punti vita che toglierebbe al giocatore (points).
+static func hurt_enemy(other: Enemy, points: int, direction: Vector2, heavy: bool) -> void:
+	other.take_points(points, direction.normalized() if direction != Vector2.ZERO else Vector2.DOWN, heavy)
 	Sfx.play("hit", other.global_position, 0.8, -6.0)
 
 
@@ -1389,12 +1438,15 @@ func _draw() -> void:
 			var angle := _state_time * 4.0 + TAU * i / 3.0
 			Shapes.disc(self, Vector2(cos(angle) * 18.0, -radius * 1.6 + sin(angle) * 5.0), 4.0, Color(1, 1, 0.5))
 
-	# Vita residua sopra la testa.
+	# Punti vita rimasti sopra la testa, a segmenti come quelli del giocatore.
 	if health < max_health and _state != State.DEAD:
 		var width := maxf(40.0, radius * 1.8)
 		var origin := Vector2(-width / 2.0, -radius * 1.2 - 14.0)
-		draw_rect(Rect2(origin, Vector2(width, 6)), Color(0, 0, 0, 0.5))
-		draw_rect(Rect2(origin, Vector2(width * health / max_health, 6)), COLOR_DANGER)
+		draw_rect(Rect2(origin - Vector2(1, 1), Vector2(width + 2, 8)), Color(0, 0, 0, 0.5))
+		var gap := 1.5 if max_health <= 10 else 0.0
+		var segment := (width - gap * (max_health - 1)) / max_health
+		for k in health:
+			draw_rect(Rect2(origin + Vector2(k * (segment + gap), 0), Vector2(segment, 6)), COLOR_DANGER)
 
 
 ## "Occhio" che indica la direzione, magia e arma.

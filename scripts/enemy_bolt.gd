@@ -87,7 +87,7 @@ func _hit_enemy() -> bool:
 				or absf(enemy.ground_elevation - altitude) > HIT_HEIGHT_REACH:
 			continue
 		if position.distance_to(enemy.position) < radius + enemy.radius:
-			Enemy.hurt_enemy(enemy, damage, threat_level, direction, false)
+			Enemy.hurt_enemy(enemy, player_damage, direction, false)
 			HitSpark.spawn(get_parent(), position, altitude + FLIGHT_HEIGHT, 12.0, color)
 			return true
 	return false

@@ -28,11 +28,11 @@ static func exists(id: String) -> bool:
 
 
 ## Crescita dei nemici con il livello di minaccia (livello del giocatore,
-## più la profondità nelle caverne o il bonus delle sfide): vita, danno ed
-## esperienza crescono in modo lineare di una parte del valore base per
-## livello (voce "enemy_scaling" di data/world.json), più piano dei danni
-## del giocatore (+30% a livello) così salire di livello si sente ma i
-## nemici restano una minaccia.
+## più la profondità nelle caverne o il bonus delle sfide): punti vita,
+## danno ed esperienza crescono in modo lineare di una parte del valore
+## base per livello (voce "enemy_scaling" di data/world.json). I punti vita
+## crescono piano: un colpo vale già in proporzione al livello (vedi
+## Enemy.points_for).
 static func scaled(stat: String, base: float, threat_level: int) -> float:
 	var scaling: Dictionary = WORLD_DATA.data["enemy_scaling"]
 	return base * (1.0 + float(scaling[stat]) * maxi(threat_level - 1, 0))
@@ -66,15 +66,6 @@ static func max_simultaneous_attacks() -> int:
 static func player_damage(boss: bool) -> int:
 	var data: Dictionary = WORLD_DATA.data["enemy_attacks"]
 	return int(data["boss_player_damage"] if boss else data["player_damage"])
-
-
-## Fuoco amico: danni a un altro nemico per ogni punto di danno del colpo
-## (i punti contano per la vita del giocatore, molto più bassa), cresce con
-## il livello di minaccia come la vita dei nemici, così pesa sempre allo
-## stesso modo.
-static func friendly_fire(threat_level: int) -> float:
-	var data: Dictionary = WORLD_DATA.data["enemy_attacks"]
-	return float(data["friendly_fire"]) * scaled("health", 1.0, threat_level)
 
 
 ## Sceglie un tipo a caso, pesato: salendo di livello compaiono più

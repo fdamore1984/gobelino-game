@@ -37,4 +37,8 @@ func _draw() -> void:
 	if boss.is_casting():
 		var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 60.0)
 		draw_rect(bar.grow(4.0), Color(COLOR_CASTING, 0.5 + 0.5 * pulse), false, 2.0)
-	draw_rect(Rect2(bar.position, Vector2(bar.size.x * float(boss.health) / boss.max_health, bar.size.y)), COLOR_BAR)
+	# Un segmento per punto vita, come la vita del giocatore.
+	var gap := 2.0
+	var segment := (bar.size.x - gap * (boss.max_health - 1)) / boss.max_health
+	for k in boss.health:
+		draw_rect(Rect2(bar.position + Vector2(k * (segment + gap), 0), Vector2(segment, bar.size.y)), COLOR_BAR)
