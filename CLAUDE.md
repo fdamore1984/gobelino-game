@@ -16,6 +16,11 @@
   (per esempio `data/enemies.json`), separate dal codice.
 - **Input**: solo azioni dell'Input Map; tutto deve funzionare con tastiera,
   gamepad (menù compresi) e touch.
+- **Versione web**: il preset "Web" è per il sito ufotizio.com (vedi
+  `docs/web.md`); per ora non si pubblica, né lì né su itch.io. I
+  salvataggi nel browser passano da `scripts/cloud.gd`: ogni nuovo file del
+  giocatore in `user://` va aggiunto a `Cloud.files()` e caricato con
+  `Cloud.push` / `Cloud.remove`.
 - **Asset provvisori**: grafica geometrica disegnata in codice e suoni
   sintetizzati in `scripts/sfx.gd`, finché non arrivano gli asset definitivi.
 - **Verifica prima di pubblicare**: import e avvio senza errori né warning

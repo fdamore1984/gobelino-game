@@ -37,7 +37,11 @@ static func write(data: Dictionary) -> bool:
 		return false
 	data["saved_at"] = int(Time.get_unix_time_from_system())
 	# Precisione piena: le posizioni servono identiche (casse aperte, totem).
-	file.store_string(JSON.stringify(data, "", false, true))
+	var text := JSON.stringify(data, "", false, true)
+	file.store_string(text)
+	file.close()
+	# Nel browser anche sull'account del sito.
+	Cloud.push(path(slot).get_file(), text)
 	return true
 
 
@@ -73,6 +77,7 @@ static func latest() -> int:
 static func delete(index: int) -> void:
 	if exists(index):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(path(index)))
+		Cloud.remove(path(index).get_file())
 
 
 ## Descrizione dello slot per il menù (vuota se lo slot è libero): livello,

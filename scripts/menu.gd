@@ -6,6 +6,10 @@ extends Control
 ## chiude il gioco. Si usa con mouse, touch, tastiera o controller.
 ## In basso a sinistra mostra la versione (per riconoscere a colpo
 ## d'occhio le build scaricate da itch.io) e chi ha fatto il gioco.
+## Nel browser (sito ufotizio.com) non c'è Esci: il gioco si chiude con la
+## pagina. Lì, prima di poter giocare, i salvataggi si allineano con
+## l'account del sito (vedi Cloud) e sotto la versione si dice se sono
+## sull'account o solo nel browser.
 
 const GAME_SCENE := "res://scenes/game.tscn"
 
@@ -40,12 +44,19 @@ func _ready() -> void:
 	_slot_panel.chosen.connect(_on_slot_chosen)
 	_slot_panel.closed.connect(_on_slot_panel_closed)
 	_slot_panel.deleted.connect(_update_continue.unbind(1))
+	_quit.visible = not Platform.is_web
 	_update_continue()
 
 	for button: Button in [_continue, _start, _controls, _tutorial, _options, _quit]:
 		button.focus_entered.connect(Sfx.play_ui.bind("ui_move"))
 	(_continue if _continue.visible else _start).grab_focus()
 	_update_info()
+	if Platform.is_web:
+		Cloud.synced.connect(_on_cloud_synced)
+		Cloud.sync()
+		if Cloud.is_syncing():
+			_set_buttons_active(false)
+			_update_info()
 
 
 ## Continua c'è solo se c'è almeno un salvataggio (anche dopo averne
@@ -54,10 +65,11 @@ func _ready() -> void:
 func _update_continue() -> void:
 	_continue.visible = SaveGame.any_exists()
 	var first := _continue if _continue.visible else _start
-	_quit.focus_neighbor_bottom = first.get_path()
-	first.focus_neighbor_top = _quit.get_path()
+	var last := _quit if _quit.visible else _options
+	last.focus_neighbor_bottom = first.get_path()
+	first.focus_neighbor_top = last.get_path()
 	if not _continue.visible:
-		_start.focus_neighbor_top = _quit.get_path()
+		_start.focus_neighbor_top = last.get_path()
 
 
 func _notification(what: int) -> void:
@@ -74,10 +86,36 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-## In basso a sinistra solo la versione e chi ha fatto il gioco.
+## In basso a sinistra la versione e chi ha fatto il gioco (nel browser
+## anche dove sono i salvataggi).
 func _update_info() -> void:
 	var version: String = ProjectSettings.get_setting("application/config/version", "dev")
-	_info.text = "\n".join([tr("MENU_VERSION") % version, tr("MENU_CREDITS")])
+	var lines := [tr("MENU_VERSION") % version, tr("MENU_CREDITS")]
+	if Platform.is_web:
+		lines.append(_cloud_text())
+	_info.text = "\n".join(lines)
+
+
+func _cloud_text() -> String:
+	match Cloud.state:
+		Cloud.State.SYNCING:
+			return tr("CLOUD_SYNCING")
+		Cloud.State.LINKED:
+			return tr("CLOUD_LINKED") % Cloud.user_name()
+		Cloud.State.FAILED:
+			return tr("CLOUD_FAILED")
+	return tr("CLOUD_LOCAL")
+
+
+## Salvataggi allineati con l'account (o niente account): si può giocare,
+## con gli slot arrivati dall'account.
+func _on_cloud_synced(_changed: bool) -> void:
+	_update_info()
+	if _controls_panel.visible or _options_panel.visible or _slot_panel.visible or _tutorial_panel.visible:
+		return
+	_set_buttons_active(true)
+	_update_continue()
+	(_continue if _continue.visible else _start).grab_focus()
 
 
 func _on_start_pressed() -> void:
