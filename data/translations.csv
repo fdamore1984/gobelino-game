@@ -337,3 +337,7 @@ TUTORIAL_METRO_TITLE,The catacombs
 TUTORIAL_METRO_TEXT,"Ruined mausoleums (a purple square with a skull on the map) lead down into the catacombs: go down with {interact}. It's pitch black and nothing living is left down there: only packs of undead and the ghouls of the crypts, with claws and many red eyes; some spit venomous bile from afar, the bloated ones crush the ground around them. In the middle of every level the stone naves run between two sunken ossuary pits (jump down and climb back up with a jump), with rows of great tombs; around them are chapels and burial chambers. Find the steps going down; on the last level the Crypt Abomination waits, summoning the undead."
 TUTORIAL_PROGRESS_TITLE,"Challenges, levels and saves"
 TUTORIAL_PROGRESS_TEXT,"Interact with a totem for a 30-second challenge in waves: survive it for experience and a potion. Every defeated enemy gives experience; at every level your damage grows and you pick an upgrade among the cards on offer (""Frenzy strikes +2"" too; extra health only shows up now and then). The game saves by itself every 5 minutes and when you enter a cave, with no enemies nearby; from the pause menu ({menu}) you save by hand."
+CLOUD_SYNCING,Syncing saves with your ufotizio.com account…
+CLOUD_LINKED,Saves on the ufotizio.com account %s
+CLOUD_LOCAL,Not signed in to ufotizio.com: saves stay in this browser
+CLOUD_FAILED,"Can't reach your ufotizio.com account: for now saves stay in this browser"

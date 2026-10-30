@@ -16,7 +16,9 @@ jobs:
     strategy:
       fail-fast: false
       # Si pubblicano Linux (SteamOS / Steam Deck) e Windows (anche portatili
-      # come l'MSI Claw 8). Il preset "Android" resta in export_presets.cfg:
+      # come l'MSI Claw 8). La versione Web (per il sito ufotizio.com) per ora
+      # non va su itch.io: resta come artefatto scaricabile dalla pagina
+      # della run (canale vuoto). Il preset "Android" resta in export_presets.cfg:
       # per riattivarlo basta aggiungerlo qui (con --export-debug, firmato
       # con la chiave di debug).
       matrix:
@@ -28,6 +30,10 @@ jobs:
           - preset: "Windows Desktop"
             dir: windows
             channel: windows
+            mode: --export-release
+          - preset: "Web"
+            dir: web
+            channel: ""
             mode: --export-release
     steps:
       - uses: actions/checkout@v4
@@ -53,14 +59,27 @@ jobs:
         run: |
           mkdir -p build/${{ matrix.dir }}
           godot --headless --verbose ${{ matrix.mode }} "${{ matrix.preset }}"
-          # Elenco dei file prodotti: ogni build deve essere un file solo.
+          # Elenco dei file prodotti: ogni build deve essere un file solo
+          # (la versione Web è una cartella con index.html).
           ls -la build/${{ matrix.dir }}
+
+      # Lo spazio per gli artefatti dell'account GitHub è limitato: se è
+      # pieno l'export resta comunque verificato, e l'artefatto si tiene
+      # solo pochi giorni.
+      - name: Conserva la versione Web
+        if: matrix.dir == 'web'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: web
+          path: build/web
+          retention-days: 7
 
       # Sulle PR basta verificare che l'export riesca: si carica su itch.io
       # solo dai push su main. Servono il secret BUTLER_API_KEY e le
       # variabili ITCH_USER e ITCH_GAME del repository.
       - name: Carica su itch.io
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.channel != ''
         env:
           BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
         run: |

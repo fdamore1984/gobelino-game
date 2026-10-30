@@ -29,7 +29,7 @@ Poi apri la cartella da Godot (Importa progetto → `project.godot`) e premi F5.
 | `data/` | Dati di gioco: nemici (`enemies.json`), traduzioni (`translations.csv`) |
 | `store/itch/` | Testi e immagini della pagina itch.io |
 | `tools/` | Strumenti di sviluppo esclusi dalle build (cattura screenshot per lo store) |
-| `docs/` | Documentazione, incluso il [GDD](docs/GDD.md) |
+| `docs/` | Documentazione, incluso il [GDD](docs/GDD.md) e la [versione web](docs/web.md) |
 | `.github/workflows/` | Build automatiche |
 
 ## Piattaforme
@@ -38,25 +38,26 @@ Poi apri la cartella da Godot (Importa progetto → `project.godot`) e premi F5.
 |---|---|---|
 | Windows | export "Windows Desktop" | Pubblicato su itch.io (canale `windows`); pronto anche per i portatili da gioco come l'MSI Claw 8 (16:10, controller XInput, schermo touch): lì parte a schermo intero e disegna con ANGLE (Direct3D 11) |
 | Linux / SteamOS | export "Linux" | La build Linux gira nativa sullo Steam Deck (16:10, controller) |
+| Web | export "Web" | Per il sito ufotizio.com, non ancora pubblicato: la CI la lascia come artefatto `web`. Tastiera e mouse, controller e touch; salvataggi sull'account del sito (vedi [docs/web.md](docs/web.md)) |
 | Android | export "Android" | Distribuzione su Google Play, non su Steam |
 
 Regole di progetto per restare multipiattaforma:
 
 - **Renderer**: Compatibility (OpenGL), il più compatibile per 2D su mobile e PC datati; su Linux Mobile (Vulkan), vedi Build
-- **Input**: solo azioni dell'Input Map (`move_*`, `interact`, `attack`, `heavy_attack`, `parry`, `dodge`, `jump`, `run`, `spell`, `shield`, `potion`, `mana_potion`, `stamina_potion`, `inventory`, `menu`, più `ui_accept` / `ui_cancel` estese al gamepad per i menù), mai tasti scritti nel codice. Tastiera e gamepad sono mappati nel progetto; i controlli touch (`scripts/touch_controls.gd`) premono le stesse azioni
+- **Input**: solo azioni dell'Input Map (`move_*`, `interact`, `attack`, `heavy_attack`, `parry`, `dodge`, `jump`, `run`, `spell`, `shield`, `potion`, `mana_potion`, `stamina_potion`, `inventory`, `menu`, più `ui_accept` / `ui_cancel` estese al gamepad per i menù), mai tasti scritti nel codice. Tastiera e gamepad sono mappati nel progetto; i controlli touch (`scripts/touch_controls.gd`) premono le stesse azioni (i tocchi diventano anche clic emulati per i pulsanti dei menù, ma non premono le azioni del mouse: `Keybinds._apply` lega i tasti del mouse al solo mouse vero, così toccare la levetta non attacca)
 - **UI**: ancoraggi e container, stretch "expand", orientamento landscape
-- **Piattaforma**: il codice chiede a `Platform` (`scripts/platform.gd`) cosa è disponibile (touch, Steam, Deck) invece di controllare il sistema operativo
-- **Salvataggi**: sempre in `user://`
+- **Piattaforma**: il codice chiede a `Platform` (`scripts/platform.gd`) cosa è disponibile (touch, Steam, Deck, browser) invece di controllare il sistema operativo
+- **Salvataggi**: sempre in `user://`; nella versione web l'autoload `Cloud` (`scripts/cloud.gd`) li tiene allineati con l'account del sito, se la pagina offre `window.ufotizioCloud` (vedi [docs/web.md](docs/web.md))
 
 ## Flusso di lavoro
 
 - `main`: ramo unico, sempre in stato funzionante
 - Lavoro in branch di feature (`feature/nome`) con Pull Request verso `main`
-- Ogni push su `main` genera le build Linux (SteamOS / Steam Deck) e Windows e le carica su itch.io (canali `linux` e `windows`; Android non viene pubblicato: il preset resta in `export_presets.cfg` per quando si riattiverà); sulle Pull Request la CI verifica solo che l'export riesca
+- Ogni push su `main` genera le build Linux (SteamOS / Steam Deck) e Windows e le carica su itch.io (canali `linux` e `windows`; Android non viene pubblicato: il preset resta in `export_presets.cfg` per quando si riattiverà); sulle Pull Request la CI verifica solo che l'export riesca. La CI esporta anche la versione Web, che non va su itch.io: resta come artefatto `web` della run
 
 ## Livello di test
 
-All'avvio c'è un menù (Continue / New game / Controls / Tutorial / Options / Quit): *Controls* mostra l'elenco dei comandi e degli attacchi speciali (`scripts/controls_panel.gd`); *Options* (anche nel menù di pausa, `scripts/options_panel.gd`) cambia i tasti di tastiera, mouse e controller di ogni azione; con `ui_clear` (X del controller, Canc o Backspace), il clic destro o un tocco lungo (0,6 s) sul pulsante l'azione resta senza tasti per quel dispositivo (salvato come elenco vuoto in `user://keybinds.json`; il menù di pausa deve conservare almeno un tasto, `Keybinds.REQUIRED`); *Tutorial* (anche nel menù di pausa, `scripts/tutorial_panel.gd`) è una guida di 14 pagine con le immagini del gioco (`assets/tutorial/`, catturate con `tools/store_capture.tscn -- tutorial`), da sfogliare con Indietro/Avanti o con parata e attacco; durante il gioco le istruzioni non sono sullo schermo. In basso a sinistra ci sono solo la versione e i crediti (creato da fdamore1984 con Claude Code). Il livello di test è un mondo senza limiti generato a caso, con nemici di vari tipi sparsi a caso; il protagonista (un goblin) e i nemici sono forme geometriche e i suoni sono sintetizzati in `scripts/sfx.gd`, in attesa degli asset definitivi.
+All'avvio c'è un menù (Continue / New game / Controls / Tutorial / Options / Quit; nel browser niente Quit): *Controls* mostra l'elenco dei comandi e degli attacchi speciali (`scripts/controls_panel.gd`); *Options* (anche nel menù di pausa, `scripts/options_panel.gd`) cambia i tasti di tastiera, mouse e controller di ogni azione; con `ui_clear` (X del controller, Canc o Backspace), il clic destro o un tocco lungo (0,6 s) sul pulsante l'azione resta senza tasti per quel dispositivo (salvato come elenco vuoto in `user://keybinds.json`; il menù di pausa deve conservare almeno un tasto, `Keybinds.REQUIRED`); *Tutorial* (anche nel menù di pausa, `scripts/tutorial_panel.gd`) è una guida di 14 pagine con le immagini del gioco (`assets/tutorial/`, catturate con `tools/store_capture.tscn -- tutorial`), da sfogliare con Indietro/Avanti o con parata e attacco; durante il gioco le istruzioni non sono sullo schermo. In basso a sinistra ci sono solo la versione e i crediti (creato da fdamore1984 con Claude Code); nel browser anche se i salvataggi sono sull'account di ufotizio.com o solo nel browser. Il livello di test è un mondo senza limiti generato a caso, con nemici di vari tipi sparsi a caso; il protagonista (un goblin) e i nemici sono forme geometriche e i suoni sono sintetizzati in `scripts/sfx.gd`, in attesa degli asset definitivi.
 
 | Azione | Tastiera | Gamepad | Touch |
 |---|---|---|---|

@@ -23,6 +23,7 @@ run/max_fps=60
 Platform="*res://scripts/platform.gd"
 Settings="*res://scripts/settings.gd"
 Sfx="*res://scripts/sfx.gd"
+Cloud="*res://scripts/cloud.gd"
 
 [display]
 

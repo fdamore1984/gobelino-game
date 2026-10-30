@@ -8,6 +8,7 @@ const BUTTON_RADIUS := 52.0
 const MENU_BUTTON_RADIUS := 34.0
 const COLOR_BASE := Color(1, 1, 1, 0.15)
 const COLOR_ACTIVE := Color(1, 1, 1, 0.4)
+const COLOR_MENU := Color(1, 1, 1, 0.28)
 const FONT_SIZE := 18
 
 const SMALL_BUTTON_RADIUS := 40.0
@@ -119,9 +120,11 @@ func _action_at(point: Vector2) -> String:
 	return ""
 
 
-## A sinistra della minimappa.
+## In alto a sinistra, sotto il riquadro dello stato (HudStatus): libero,
+## lontano dai pulsanti e dalla minimappa (accanto c'era il quadrante del
+## giorno, che lo copriva).
 func _menu_button_center() -> Vector2:
-	return Vector2(size.x - 250, 56)
+	return Vector2(16 + MENU_BUTTON_RADIUS, 210)
 
 
 func _draw() -> void:
@@ -139,7 +142,8 @@ func _draw() -> void:
 		draw_circle(center, button["radius"], COLOR_ACTIVE if pressed else COLOR_BASE)
 		_draw_centered_text(font, center, tr(button["label"]))
 
-	draw_circle(_menu_button_center(), MENU_BUTTON_RADIUS, COLOR_BASE)
+	# Più evidente degli altri: è l'unico modo di aprire la pausa col touch.
+	draw_circle(_menu_button_center(), MENU_BUTTON_RADIUS, COLOR_ACTIVE if Input.is_action_pressed("menu") else COLOR_MENU)
 	_draw_centered_text(font, _menu_button_center(), tr("TOUCH_MENU"))
 
 

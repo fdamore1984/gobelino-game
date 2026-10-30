@@ -11,6 +11,10 @@ var is_steam_deck: bool = false
 ## si riconosce dal modello o dallo schermo touch.
 var is_handheld_pc: bool = false
 var steam_available: bool = false
+## Versione per il browser (export "Web", per il sito ufotizio.com): non si
+## chiude il gioco dal menù e i salvataggi si sincronizzano con l'account
+## del sito (vedi Cloud).
+var is_web: bool = false
 
 ## Controller virtuale creato da Steam Input (anche sullo Steam Deck).
 const VALVE_VENDOR := 0x28de
@@ -25,6 +29,11 @@ const STEAM_DECK_LAYOUT := "a:b3,b:b4,x:b5,y:b6,leftshoulder:b7,rightshoulder:b8
 ## Tasti e clic tolti dalle azioni mentre sullo Steam Deck c'è un
 ## controller, da rimettere quando il controller sparisce.
 var _removed_desktop_events := {}
+## Frecce della croce e pochi altri simboli dei testi (sottoinsieme di Inter,
+## licenza in assets/fonts/OFL.txt): nel browser non ci sono i font del
+## sistema da cui Godot li prende sul PC.
+const SYMBOLS_FONT := "res://assets/fonts/symbols.otf"
+
 ## Sui PC con schermo touch i controlli a schermo compaiono solo dopo aver
 ## toccato lo schermo e spariscono appena si usa il controller o la tastiera.
 var _touch_active := false
@@ -39,7 +48,12 @@ const TARGET_FPS := 60
 
 func _ready() -> void:
 	Engine.max_fps = TARGET_FPS
-	is_mobile = OS.has_feature("android") or OS.has_feature("ios")
+	is_web = OS.has_feature("web")
+	if is_web:
+		var extra: Array[Font] = [load(SYMBOLS_FONT)]
+		ThemeDB.fallback_font.fallbacks = extra
+	# Nel browser di telefoni e tablet si gioca col touch, come nelle app.
+	is_mobile = OS.has_feature("android") or OS.has_feature("ios") or OS.has_feature("web_android") or OS.has_feature("web_ios")
 	is_desktop = OS.has_feature("windows") or OS.has_feature("linuxbsd") or OS.has_feature("macos")
 	# Steam imposta questa variabile d'ambiente quando avvia il gioco sullo
 	# Steam Deck; avviato da altri programmi (per esempio dall'app di
@@ -168,7 +182,8 @@ func _input(event: InputEvent) -> void:
 		_touch_active = false
 
 
-## True se vanno mostrati i controlli touch a schermo: sempre sui telefoni,
-## sui PC con schermo touch solo dopo averlo toccato (vedi _input).
+## True se vanno mostrati i controlli touch a schermo: sempre sui telefoni
+## (anche nel browser), sui PC con schermo touch solo dopo averlo toccato
+## (vedi _input).
 func use_touch_controls() -> bool:
 	return is_mobile or (_touch_active and DisplayServer.is_touchscreen_available())

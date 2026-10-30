@@ -93,6 +93,7 @@ static func reset() -> void:
 	_apply()
 	if FileAccess.file_exists(PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(PATH))
+		Cloud.remove(PATH.get_file())
 
 
 ## Comandi predefiniti (project.godot) con sopra quelli cambiati. Sullo
@@ -113,13 +114,25 @@ static func _apply() -> void:
 				var event := _deserialize(data)
 				if event:
 					InputMap.action_add_event(action, event)
+	# I tocchi sullo schermo arrivano anche come clic emulati (device
+	# DEVICE_ID_EMULATION, lo stesso numero di "tutti i dispositivi"): i
+	# tasti del mouse valgono solo per il mouse vero (device 0), così
+	# toccare la levetta o un pulsante a schermo non attacca.
+	for action in InputMap.get_actions():
+		for event in InputMap.action_get_events(action):
+			if event is InputEventMouseButton and event.device == InputEvent.DEVICE_ID_EMULATION:
+				event.device = 0
 	Platform.refresh_desktop_events()
 
 
 static func _save() -> void:
 	var file := FileAccess.open(PATH, FileAccess.WRITE)
 	if file:
-		file.store_string(JSON.stringify(_overrides, "\t"))
+		var text := JSON.stringify(_overrides, "\t")
+		file.store_string(text)
+		file.close()
+		# Nel browser anche sull'account del sito.
+		Cloud.push(PATH.get_file(), text)
 
 
 ## Dispositivo di un tasto: "keyboard", "mouse", "controller" ("" se nessuno).
@@ -241,7 +254,7 @@ static func _serialize(event: InputEvent) -> Dictionary:
 
 
 ## Tasto letto dal file (null se non valido). Vale per qualsiasi
-## controller e mouse (device -1), come i tasti predefiniti.
+## controller (device -1), come i tasti predefiniti; il mouse vedi _apply.
 static func _deserialize(data: Variant) -> InputEvent:
 	if not (data is Dictionary):
 		return null

@@ -1392,7 +1392,7 @@ func _covers_behind(cell: Vector2i) -> bool:
 
 # --- Disegno dei blocchi ----------------------------------------------
 
-func draw_chunk(canvas: CanvasItem, chunk: Vector2i, offset: Vector2) -> void:
+func draw_chunk(canvas: Object, chunk: Vector2i, offset: Vector2) -> void:
 	# Da dietro in avanti: prima i rombi con u + v più piccolo. I blocchi che
 	# coprono chi sta dietro li disegna il loro TerrainBlock, tra i personaggi;
 	# qui sotto resta il pavimento da cui salgono, che si vede quando il
@@ -1436,7 +1436,7 @@ func _add_occluders(view: Node2D, chunk: Vector2i) -> void:
 ## Pavimento sotto un blocco che copre chi sta dietro: il rombo piano
 ## all'altezza del vicino dietro più basso (dove sta chi viene coperto), con
 ## le sue pareti verso i vicini davanti. Di solito è nascosto dal blocco.
-func draw_floor(canvas: CanvasItem, cell: Vector2i, offset: Vector2) -> void:
+func draw_floor(canvas: Object, cell: Vector2i, offset: Vector2) -> void:
 	var base := _top_height(cell)
 	for step: Vector2i in [Vector2i(-1, 0), Vector2i(0, -1), Vector2i(-1, -1)]:
 		base = minf(base, _top_height(cell + step))
@@ -1458,7 +1458,7 @@ func draw_floor(canvas: CanvasItem, cell: Vector2i, offset: Vector2) -> void:
 
 ## Un blocco: pareti davanti (dove il vicino è più basso) e faccia
 ## superiore, piana o inclinata, del colore del suo tipo.
-func draw_cell(canvas: CanvasItem, cell: Vector2i, offset: Vector2) -> void:
+func draw_cell(canvas: Object, cell: Vector2i, offset: Vector2) -> void:
 	var corners := cell_corners(cell)
 	var heights: Array[float] = []
 	var top := PackedVector2Array()
@@ -1534,7 +1534,7 @@ func _face_colors_of(kind: int, cell: Vector2i) -> Array[Color]:
 	return _face_colors
 
 
-func _draw_face(canvas: CanvasItem, corners: PackedVector2Array, heights: Array[float], other: Vector2i,
+func _draw_face(canvas: Object, corners: PackedVector2Array, heights: Array[float], other: Vector2i,
 		first: int, second: int, other_first: int, other_second: int, color: Color, lip: bool,
 		cell := Vector2i.ZERO, pattern := "") -> void:
 	var top_a := heights[first]
@@ -1591,7 +1591,7 @@ func _draw_face(canvas: CanvasItem, corners: PackedVector2Array, heights: Array[
 ## bottom): corsi di blocchi sfalsati, un fregio rosso scuro, il muschio che
 ## sale da terra e, qua e là, una nicchia con un teschio e le ossa, uno
 ## stendardo strappato o una strisciata di sangue che cola.
-func _draw_crypt_wall(canvas: CanvasItem, a: Vector2, b: Vector2, top_a: float, top_b: float,
+func _draw_crypt_wall(canvas: Object, a: Vector2, b: Vector2, top_a: float, top_b: float,
 		bottom_a: float, bottom_b: float, cell: Vector2i, side: int, color: Color) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash([_decor_seed(), cell.x, cell.y, side, "crypt"])
@@ -1664,7 +1664,7 @@ func _draw_crypt_wall(canvas: CanvasItem, a: Vector2, b: Vector2, top_a: float, 
 
 ## Fianco di una grande tomba: cornice del coperchio in cima, riquadri
 ## scolpiti, a volte un teschio inciso o una croce, e il muschio in basso.
-func _draw_tomb_side(canvas: CanvasItem, a: Vector2, b: Vector2, top_a: float, top_b: float,
+func _draw_tomb_side(canvas: Object, a: Vector2, b: Vector2, top_a: float, top_b: float,
 		bottom_a: float, bottom_b: float, cell: Vector2i, side: int, color: Color) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash([_decor_seed(), cell.x, cell.y, side, "tomb"])
@@ -1717,20 +1717,20 @@ func _light_uvs(points: PackedVector2Array) -> PackedVector2Array:
 	return uvs
 
 
-func _fill(canvas: CanvasItem, points: PackedVector2Array, color: Color) -> void:
+func _fill(canvas: Object, points: PackedVector2Array, color: Color) -> void:
 	canvas.draw_colored_polygon(points, color, _light_uvs(points))
 
 
-func _fill_colors(canvas: CanvasItem, points: PackedVector2Array, colors: PackedColorArray) -> void:
+func _fill_colors(canvas: Object, points: PackedVector2Array, colors: PackedColorArray) -> void:
 	canvas.draw_polygon(points, colors, _light_uvs(points))
 
 
-func _line(canvas: CanvasItem, from: Vector2, to: Vector2, color: Color, width: float) -> void:
+func _line(canvas: Object, from: Vector2, to: Vector2, color: Color, width: float) -> void:
 	_lines(canvas, PackedVector2Array([from, to]), color, width)
 
 
 ## Segmenti (a coppie di punti) come quadrilateri, così ogni vertice ha la sua luce.
-func _lines(canvas: CanvasItem, pairs: PackedVector2Array, color: Color, width: float) -> void:
+func _lines(canvas: Object, pairs: PackedVector2Array, color: Color, width: float) -> void:
 	if _light_mode == LightMode.NONE:
 		canvas.draw_multiline(pairs, color, width)
 		return
@@ -1742,7 +1742,7 @@ func _lines(canvas: CanvasItem, pairs: PackedVector2Array, color: Color, width: 
 
 
 ## Cerchio pieno che prende la luce come gli altri punti (un poligono, se serve).
-func _circle(canvas: CanvasItem, center: Vector2, radius: float, color: Color) -> void:
+func _circle(canvas: Object, center: Vector2, radius: float, color: Color) -> void:
 	if _light_mode == LightMode.NONE:
 		canvas.draw_circle(center, radius, color)
 		return
@@ -1753,7 +1753,7 @@ func _circle(canvas: CanvasItem, center: Vector2, radius: float, color: Color) -
 
 
 ## Linee lungo la pendenza di una rampa, parallele al lato più alto.
-func _draw_ramp_lines(canvas: CanvasItem, top: PackedVector2Array, ramp: Vector2i, color: Color) -> void:
+func _draw_ramp_lines(canvas: Object, top: PackedVector2Array, ramp: Vector2i, color: Color) -> void:
 	# Lati bassi e alti della rampa, come coppie di vertici (alto, destra, basso, sinistra).
 	var low: Array
 	var high: Array
@@ -1779,7 +1779,7 @@ func _draw_ramp_lines(canvas: CanvasItem, top: PackedVector2Array, ramp: Vector2
 
 ## Ciuffi d'erba e fiori sui blocchi d'erba, sassolini sui sentieri e nel
 ## sotterraneo (dove crescono anche funghi luminosi): solo decorazione.
-func _draw_decor(canvas: CanvasItem, cell: Vector2i, offset: Vector2, kind: int, path: bool) -> void:
+func _draw_decor(canvas: Object, cell: Vector2i, offset: Vector2, kind: int, path: bool) -> void:
 	if kind != Kind.GROUND:
 		return
 	var rng := RandomNumberGenerator.new()
@@ -1820,7 +1820,7 @@ func _draw_decor(canvas: CanvasItem, cell: Vector2i, offset: Vector2, kind: int,
 ## navate le lastre di pietra e una cornice lungo il bordo sopra le fosse;
 ## dappertutto sassolini, pozze di sangue e, qua e là, una candela di
 ## fiamma verde.
-func _draw_crypt_floor(canvas: CanvasItem, cell: Vector2i, offset: Vector2, rng: RandomNumberGenerator) -> void:
+func _draw_crypt_floor(canvas: Object, cell: Vector2i, offset: Vector2, rng: RandomNumberGenerator) -> void:
 	var lift := Vector2(0, _light_top)
 	var point := func(u: float, v: float) -> Vector2:
 		return _from_uv((cell.x + u) * CELL, (cell.y + v) * CELL) + offset - lift
@@ -2107,9 +2107,13 @@ class ChunkView:
 
 	var world: World
 	var chunk: Vector2i
+	## Tutto il pezzo in una mesh sola (vedi MeshCanvas), da tenere finché si vede.
+	var _mesh: ArrayMesh
 
 	func _draw() -> void:
-		world.draw_chunk(self, chunk, -position)
+		var recorder := MeshCanvas.new()
+		world.draw_chunk(recorder, chunk, -position)
+		_mesh = recorder.commit(self)
 
 
 ## Blocco ridisegnato tra i personaggi: la posizione è il suo vertice più
@@ -2122,6 +2126,8 @@ class TerrainBlock:
 	## Altezza della cima.
 	var top := 0.0
 	var _outline := PackedVector2Array()
+	## Il blocco in una mesh sola (vedi MeshCanvas).
+	var _mesh: ArrayMesh
 
 	func _ready() -> void:
 		physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
@@ -2134,7 +2140,9 @@ class TerrainBlock:
 		return _outline
 
 	func _draw() -> void:
-		world.draw_cell(self, cell, -position)
+		var recorder := MeshCanvas.new()
+		world.draw_cell(recorder, cell, -position)
+		_mesh = recorder.commit(self)
 
 
 ## Luce sul tratto di blocco di terreno contro cui il giocatore sbatte
