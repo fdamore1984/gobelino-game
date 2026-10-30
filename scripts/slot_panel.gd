@@ -5,14 +5,20 @@ extends Control
 ## una seconda volta: la partita vecchia viene sostituita); per continuare
 ## solo quelli salvati. Si chiude con B, Esc o il pulsante Indietro.
 ##
+## Sotto ogni slot salvato c'è il pulsante Elimina (anche ui_clear: X, Canc,
+## Backspace sullo slot selezionato): anche questo va premuto due volte, poi
+## il salvataggio viene cancellato (vedi SaveGame.delete) e il menù lo sa
+## dal segnale deleted.
+##
 ## Gli slot sono schede affiancate in una griglia: ognuna mostra livello,
 ## dove si trova il giocatore, vita e danno, monete e pozioni, nemici
 ## sconfitti, tempo di gioco e momento del salvataggio (vedi
 ## SaveGame.summary). Destra e sinistra passano da uno slot all'altro, giù
-## porta a Indietro.
+## porta a Elimina e poi a Indietro.
 
 signal chosen(slot: int)
 signal closed
+signal deleted(slot: int)
 
 const COLOR_TITLE := Color(0.85, 0.75, 0.4)
 const COLOR_EMPTY := Color(1, 1, 1, 0.6)
@@ -25,6 +31,8 @@ const LINES := 8
 
 var _title := Label.new()
 var _buttons: Array[Button] = []
+## Pulsante Elimina sotto ogni slot.
+var _delete_buttons: Array[Button] = []
 ## Righe di testo di ogni scheda (Label dentro il pulsante).
 var _lines: Array[Array] = []
 var _back := Button.new()
@@ -32,6 +40,8 @@ var _back := Button.new()
 var new_game := true
 ## Slot già usato in attesa della seconda pressione (0: nessuno).
 var _confirming := 0
+## Slot da eliminare in attesa della seconda pressione (0: nessuno).
+var _deleting := 0
 
 
 func _ready() -> void:
@@ -67,21 +77,34 @@ func _ready() -> void:
 		grid.add_child(button)
 		_buttons.append(button)
 		_lines.append(_make_card(button))
+	for index in range(1, SaveGame.SLOTS + 1):
+		var delete := Button.new()
+		delete.custom_minimum_size = Vector2(CARD_SIZE.x, 44)
+		delete.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+		delete.add_theme_font_size_override("font_size", 20)
+		delete.pressed.connect(_on_delete_pressed.bind(index))
+		delete.focus_entered.connect(Sfx.play_ui.bind("ui_move"))
+		delete.focus_entered.connect(_on_slot_focused.bind(index))
+		grid.add_child(delete)
+		_delete_buttons.append(delete)
 	_back.text = "CONTROLS_BACK"
 	_back.custom_minimum_size = Vector2(220, 52)
 	_back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_back.add_theme_font_size_override("font_size", 24)
 	_back.pressed.connect(close)
 	_back.focus_entered.connect(Sfx.play_ui.bind("ui_move"))
+	_back.focus_entered.connect(_on_slot_focused.bind(0))
 	box.add_child(_back)
 	# Destra e sinistra girano tra gli slot (dall'ultimo si torna al primo),
-	# su e giù passano dagli slot a Indietro: la navigazione resta qui.
+	# e tra i pulsanti Elimina; su e giù passano dagli slot a Elimina e a
+	# Indietro (vedi _refresh): la navigazione resta qui.
 	for k in _buttons.size():
-		var button := _buttons[k]
-		button.focus_neighbor_left = _buttons[k - 1].get_path()
-		button.focus_neighbor_right = _buttons[(k + 1) % _buttons.size()].get_path()
-		button.focus_neighbor_top = _back.get_path()
-		button.focus_neighbor_bottom = _back.get_path()
+		for row: Array[Button] in [_buttons, _delete_buttons]:
+			row[k].focus_neighbor_left = row[k - 1].get_path()
+			row[k].focus_neighbor_right = row[(k + 1) % row.size()].get_path()
+		_buttons[k].focus_neighbor_top = _back.get_path()
+		_delete_buttons[k].focus_neighbor_top = _buttons[k].get_path()
+		_delete_buttons[k].focus_neighbor_bottom = _back.get_path()
 	_back.focus_neighbor_left = _back.get_path()
 	_back.focus_neighbor_right = _back.get_path()
 
@@ -121,13 +144,11 @@ func _make_card(button: Button) -> Array[Label]:
 func open(for_new_game: bool) -> void:
 	new_game = for_new_game
 	_confirming = 0
+	_deleting = 0
 	_title.text = tr("SLOTS_NEW_TITLE") if for_new_game else tr("SLOTS_LOAD_TITLE")
 	_refresh()
 	visible = true
 	_first().grab_focus.call_deferred()
-	# Da Indietro, su porta al primo slot che si può scegliere.
-	_back.focus_neighbor_top = _first().get_path()
-	_back.focus_neighbor_bottom = _first().get_path()
 
 
 func close() -> void:
@@ -156,7 +177,10 @@ func _refresh() -> void:
 		else:
 			texts.append(tr("SLOT_LEVEL") % info["level"])
 			colors.append(Color.WHITE)
-			if _confirming == index:
+			if _deleting == index:
+				texts.append(tr("SLOT_DELETE_CONFIRM"))
+				colors.append(COLOR_CONFIRM)
+			elif _confirming == index:
 				texts.append(tr("SLOT_OVERWRITE"))
 				colors.append(COLOR_CONFIRM)
 			else:
@@ -179,6 +203,16 @@ func _refresh() -> void:
 		button.focus_mode = Control.FOCUS_NONE if button.disabled else Control.FOCUS_ALL
 		# Gli slot che non si possono scegliere restano visibili ma spenti.
 		button.modulate.a = 0.45 if button.disabled else 1.0
+		# Elimina c'è solo sotto gli slot salvati (negli altri resta il posto).
+		var delete := _delete_buttons[k]
+		delete.text = tr("SLOT_DELETE_SURE") if _deleting == index else tr("SLOT_DELETE")
+		delete.disabled = info.is_empty()
+		delete.focus_mode = Control.FOCUS_NONE if delete.disabled else Control.FOCUS_ALL
+		delete.mouse_filter = Control.MOUSE_FILTER_IGNORE if delete.disabled else Control.MOUSE_FILTER_STOP
+		delete.modulate.a = 0.0 if delete.disabled else 1.0
+		button.focus_neighbor_bottom = (_back if delete.disabled else delete).get_path()
+	_back.focus_neighbor_top = _first().get_path()
+	_back.focus_neighbor_bottom = _first().get_path()
 
 
 ## Tempo di gioco come "12 min" o "1 h 05 min" (sconosciuto nei salvataggi vecchi).
@@ -209,11 +243,45 @@ func _on_slot_pressed(index: int) -> void:
 	chosen.emit(index)
 
 
-## Spostandosi su un altro slot la richiesta di conferma si annulla.
-func _on_slot_focused(index: int) -> void:
-	if _confirming != 0 and _confirming != index:
-		_confirming = 0
+## Elimina: la prima pressione chiede conferma, la seconda cancella il
+## salvataggio.
+func _on_delete_pressed(index: int) -> void:
+	if not SaveGame.exists(index):
+		return
+	_confirming = 0
+	if _deleting != index:
+		_deleting = index
+		Sfx.play_ui("ui_move")
 		_refresh()
+		return
+	_deleting = 0
+	SaveGame.delete(index)
+	Sfx.play_ui("ui_confirm")
+	var focused := get_viewport().gui_get_focus_owner()
+	_refresh()
+	deleted.emit(index)
+	# Il pulsante premuto è sparito: si passa allo slot (se si può ancora
+	# scegliere) o al primo disponibile.
+	if focused == null or focused.focus_mode == Control.FOCUS_NONE:
+		var card := _buttons[index - 1]
+		(card if card.focus_mode != Control.FOCUS_NONE else _first()).grab_focus()
+
+
+## Spostandosi su un altro slot le richieste di conferma si annullano.
+func _on_slot_focused(index: int) -> void:
+	if (_confirming != 0 and _confirming != index) or (_deleting != 0 and _deleting != index):
+		_confirming = 0
+		_deleting = 0
+		_refresh()
+
+
+## Slot della scheda o del pulsante Elimina selezionato (0 se nessuno).
+func _focused_slot() -> int:
+	var focused := get_viewport().gui_get_focus_owner()
+	for k in _buttons.size():
+		if focused == _buttons[k] or focused == _delete_buttons[k]:
+			return k + 1
+	return 0
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -221,6 +289,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("ui_cancel") or event.is_action_pressed("menu") or event.is_action_pressed("dodge"):
 		close()
+	elif event.is_action_pressed("ui_clear") and SaveGame.exists(_focused_slot()):
+		UiNav.consume(event)
+		_on_delete_pressed(_focused_slot())
 	elif not UiNav.handle(event, get_viewport(), _first()):
 		return
 	# Scegliendo uno slot la scena cambia subito: questo pannello non c'è più.

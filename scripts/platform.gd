@@ -117,6 +117,13 @@ func restore_desktop_events() -> void:
 	_removed_desktop_events.clear()
 
 
+## Tasti e clic dell'azione tolti finché c'è il controller (vedi sopra).
+func hidden_events(action: StringName) -> Array[InputEvent]:
+	var found: Array[InputEvent] = []
+	found.assign(_removed_desktop_events.get(action, []))
+	return found
+
+
 ## Dopo aver cambiato i comandi: si ricontrolla se vanno tolti tastiera e mouse.
 func refresh_desktop_events() -> void:
 	_update_desktop_events()

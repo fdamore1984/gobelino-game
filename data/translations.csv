@@ -160,6 +160,9 @@ SLOT_PLAYTIME_HOURS,%d h %02d min
 SLOT_PLAYTIME_UNKNOWN,—
 SLOT_SAVED_AT,Saved %s
 SLOT_OVERWRITE,Press again to replace this save
+SLOT_DELETE,Delete
+SLOT_DELETE_SURE,Press again to delete
+SLOT_DELETE_CONFIRM,This save will be deleted for good
 PAUSE_TITLE,Paused
 PAUSE_RESUME,Resume
 PAUSE_SAVE,Save game
@@ -202,7 +205,7 @@ CONTROLS_HEADER_ACTION,Action
 MENU_OPTIONS,Options
 PAUSE_OPTIONS,Options
 OPTIONS_TITLE,Options
-OPTIONS_CONTROLS,"Controls: select a binding, then press the new key, mouse button or controller button"
+OPTIONS_CONTROLS,"Controls: select a binding, then press the new key, mouse button or controller button (%s, right click or a long touch: leave it empty)"
 OPTIONS_HEADER_ACTION,Action
 OPTIONS_HEADER_KEYBOARD,Keyboard
 OPTIONS_HEADER_MOUSE,Mouse
@@ -213,6 +216,8 @@ OPTIONS_DEVICE_CONTROLLER,controller button or stick
 OPTIONS_LISTEN,"Press the new %s for ""%s"" (%d s, another device cancels)"
 OPTIONS_BOUND,"""%s"" set to %s"
 OPTIONS_SHARED,also used by: %s
+OPTIONS_CLEARED,"""%s"" now has no %s"
+OPTIONS_CLEAR_REQUIRED,"""%s"" needs at least one key: set another one first"
 OPTIONS_CANCELLED,Cancelled: nothing changed
 OPTIONS_RESET,Reset to defaults
 OPTIONS_RESET_DONE,All controls are back to their defaults

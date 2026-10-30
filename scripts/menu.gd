@@ -26,7 +26,6 @@ var _slot_panel := SlotPanel.new()
 func _ready() -> void:
 	_start.pressed.connect(_on_start_pressed)
 	_continue.pressed.connect(_on_continue_pressed)
-	_continue.visible = SaveGame.any_exists()
 	_quit.pressed.connect(_on_quit_pressed)
 	_controls.pressed.connect(_on_controls_pressed)
 	add_child(_controls_panel)
@@ -40,16 +39,25 @@ func _ready() -> void:
 	add_child(_slot_panel)
 	_slot_panel.chosen.connect(_on_slot_chosen)
 	_slot_panel.closed.connect(_on_slot_panel_closed)
-
-	# Navigazione col controller: dall'ultimo pulsante si torna al primo e viceversa.
-	var first := _continue if _continue.visible else _start
-	_quit.focus_neighbor_bottom = first.get_path()
-	first.focus_neighbor_top = _quit.get_path()
+	_slot_panel.deleted.connect(_update_continue.unbind(1))
+	_update_continue()
 
 	for button: Button in [_continue, _start, _controls, _tutorial, _options, _quit]:
 		button.focus_entered.connect(Sfx.play_ui.bind("ui_move"))
-	first.grab_focus()
+	(_continue if _continue.visible else _start).grab_focus()
 	_update_info()
+
+
+## Continua c'è solo se c'è almeno un salvataggio (anche dopo averne
+## eliminato uno). Navigazione col controller: dall'ultimo pulsante si torna
+## al primo e viceversa.
+func _update_continue() -> void:
+	_continue.visible = SaveGame.any_exists()
+	var first := _continue if _continue.visible else _start
+	_quit.focus_neighbor_bottom = first.get_path()
+	first.focus_neighbor_top = _quit.get_path()
+	if not _continue.visible:
+		_start.focus_neighbor_top = _quit.get_path()
 
 
 func _notification(what: int) -> void:
