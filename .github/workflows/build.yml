@@ -63,12 +63,17 @@ jobs:
           # (la versione Web è una cartella con index.html).
           ls -la build/${{ matrix.dir }}
 
+      # Lo spazio per gli artefatti dell'account GitHub è limitato: se è
+      # pieno l'export resta comunque verificato, e l'artefatto si tiene
+      # solo pochi giorni.
       - name: Conserva la versione Web
         if: matrix.dir == 'web'
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: web
           path: build/web
+          retention-days: 7
 
       # Sulle PR basta verificare che l'export riesca: si carica su itch.io
       # solo dai push su main. Servono il secret BUTLER_API_KEY e le
