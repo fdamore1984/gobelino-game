@@ -70,6 +70,7 @@ func files() -> Array[String]:
 	var names: Array[String] = []
 	for index in range(1, SaveGame.SLOTS + 1):
 		names.append((SaveGame.PATH % index).get_file())
+	names.append(Settings.PATH.get_file())
 	names.append(Keybinds.PATH.get_file())
 	return names
 

@@ -1,7 +1,8 @@
 extends Node
 ## Genera copertina e screenshot per la pagina itch.io (store/itch/), in
-## inglese (l'unica lingua del gioco per ora), componendo scene di gioco reali, e
-## le immagini delle pagine del tutorial (assets/tutorial/, vedi TutorialPanel).
+## italiano e in inglese (le lingue del gioco), componendo scene di gioco
+## reali, e le immagini delle pagine del tutorial (assets/tutorial/, una
+## cartella per lingua, vedi TutorialPanel).
 ## Va rilanciato a ogni modifica visibile del gioco. Serve una finestra (non --headless):
 ##
 ##   godot --path . --resolution 1280x720 res://tools/store_capture.tscn -- screenshots
@@ -11,8 +12,8 @@ extends Node
 ## Non fa parte del gioco: la cartella tools/ è esclusa dagli export.
 
 const OUTPUT := "res://store/itch/"
-const LANGUAGES := ["en"]
-const SUBTITLE := {"en": "Action RPG · prototype"}
+const LANGUAGES := ["it", "en"]
+const SUBTITLE := {"it": "Action RPG · prototipo", "en": "Action RPG · prototype"}
 const COVER_SIZE := Vector2i(630, 500)
 ## Immagini del tutorial: più piccole, e quali scene diventano quale pagina
 ## (nome dello screenshot senza la lingua -> immagine del tutorial).
@@ -20,8 +21,8 @@ const TUTORIAL_OUTPUT := "res://assets/tutorial/"
 const TUTORIAL_SIZE := Vector2i(640, 360)
 const TUTORIAL_IMAGES := {
 	"move.png": "move.png", "1_combat.png": "combo.png", "2_parry.png": "parry.png",
-	"dodge.png": "dodge.png", "frenzy_bar.png": "frenzy_bar.png", "16_frenzy.png": "frenzy_special.png",
-	"supplies.png": "supplies.png", "15_h_bomb.png": "arsenal.png", "enemies.png": "enemies.png",
+	"dodge.png": "dodge.png", "frenzy_bar.png": "frenzy_bar.png", "17_frenzy.png": "frenzy_special.png",
+	"supplies.png": "supplies.png", "16_rune.png": "arsenal.png", "enemies.png": "enemies.png",
 	"6_inventory.png": "loot.png", "13_map.png": "world.png", "12_dungeon.png": "buildings.png",
 	"18_metro.png": "metro.png", "3_level_up.png": "progress.png",
 }
@@ -42,6 +43,8 @@ func _ready() -> void:
 		mode = OS.get_cmdline_user_args()[0]
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTPUT))
 	for language: String in LANGUAGES:
+		# Senza Settings.set_language: le foto non cambiano la lingua salvata.
+		Settings.language = language
 		TranslationServer.set_locale(language)
 		if mode == "cover":
 			await _capture_cover(language)
@@ -81,10 +84,11 @@ func _capture_menu(language: String) -> void:
 	menu._on_controls_pressed()
 	await _frames(3)
 	await _save("%s_10_controls.png" % language)
-	menu._controls_panel.close()
-	menu._on_options_pressed()
+	menu._controls_panel._open_keybinds()
 	await _frames(3)
 	await _save("%s_15_options.png" % language)
+	menu._controls_panel._keybinds.close()
+	menu._controls_panel.close()
 	menu.queue_free()
 	await _frames(2)
 
@@ -409,7 +413,7 @@ func _capture_frenzy(language: String) -> void:
 
 
 ## Tutorial: corsa di notte con la torcia accesa.
-func _capture_move(_language: String) -> void:
+func _capture_move(language: String) -> void:
 	await _start_game(Vector2(0, -20), 1.3)
 	_player.level = 2
 	_hud_stats()
@@ -424,12 +428,12 @@ func _capture_move(_language: String) -> void:
 	_player._torch.aim(_player.facing)
 	_player.queue_redraw()
 	_enemy("scout", _player.position + Vector2(330, 60), Enemy.State.CHASE, 0.0)
-	await _save("t_move.png")
+	await _save("%s_move.png" % language)
 	_end_game()
 
 
 ## Tutorial: capriola sotto il colpo di un bruto.
-func _capture_dodge(_language: String) -> void:
+func _capture_dodge(language: String) -> void:
 	await _start_game(Vector2(0, 0), 1.4)
 	_player.level = 3
 	_hud_stats()
@@ -440,13 +444,13 @@ func _capture_dodge(_language: String) -> void:
 	_player._dodge_direction = Vector2(-1, 0.3).normalized()
 	_player.facing = Vector2(-1, 0.3).normalized()
 	_player.queue_redraw()
-	await _save("t_dodge.png")
+	await _save("%s_dodge.png" % language)
 	_end_game()
 
 
 ## Tutorial: la barra della Frenesia piena (pulsa e mostra i tasti) e
 ## l'anello rosso attorno al goblin, in mezzo alla mischia.
-func _capture_frenzy_bar(_language: String) -> void:
+func _capture_frenzy_bar(language: String) -> void:
 	await _start_game(Vector2(0, 20), 1.2)
 	_player.level = 4
 	_hud_stats()
@@ -459,13 +463,13 @@ func _capture_frenzy_bar(_language: String) -> void:
 	_player._set_lock_target(_enemy("warrior", _player.position + Vector2(95, -15), Enemy.State.GUARD, 0.1))
 	_enemy("scout", _player.position + Vector2(-180, 80), Enemy.State.CHASE, 0.0)
 	_enemy("caster", _player.position + Vector2(260, -150), Enemy.State.WINDUP, 0.5)
-	await _save("t_frenzy_bar.png")
+	await _save("%s_frenzy_bar.png" % language)
 	_end_game()
 
 
 ## Tutorial: il goblin beve una pozione con poca vita e poco vigore, un
 ## guerriero gli corre addosso.
-func _capture_supplies(_language: String) -> void:
+func _capture_supplies(language: String) -> void:
 	await _start_game(Vector2(0, 0), 1.3)
 	_player.level = 3
 	_hud_stats()
@@ -479,13 +483,13 @@ func _capture_supplies(_language: String) -> void:
 	(_game.get_node("HUD") as Hud).set_health(_player.health, _player.max_health)
 	_enemy("warrior", _player.position + Vector2(170, 40), Enemy.State.CHASE, 0.0)
 	await _frames(30)
-	await _save("t_supplies.png")
+	await _save("%s_supplies.png" % language)
 	_end_game()
 
 
 ## Tutorial: nemici che caricano l'attacco (bagliore rosso, arco teso)
 ## e uno con la guardia alzata.
-func _capture_enemies(_language: String) -> void:
+func _capture_enemies(language: String) -> void:
 	await _start_game(Vector2(0, 0), 1.15)
 	_player.level = 4
 	_hud_stats()
@@ -495,7 +499,7 @@ func _capture_enemies(_language: String) -> void:
 	_enemy("brute", origin + Vector2(-140, 60), Enemy.State.WINDUP, 0.7)
 	_enemy("archer", origin + Vector2(300, -140), Enemy.State.WINDUP, 0.7)
 	_enemy("golem", origin + Vector2(-260, -130), Enemy.State.CHASE, 0.0)
-	await _save("t_enemies.png")
+	await _save("%s_enemies.png" % language)
 	_end_game()
 
 
@@ -677,7 +681,7 @@ func _capture_cover(language: String) -> void:
 	band.size = Vector2(2000, 300)
 	layer.add_child(band)
 	var width := get_viewport().get_visible_rect().size.x
-	var title := _label("Gobelino", 150, Color(0.85, 0.75, 0.4), width, 30.0)
+	var title := _label(tr("GAME_TITLE"), 150, Color(0.85, 0.75, 0.4), width, 30.0)
 	title.add_theme_constant_override("outline_size", 18)
 	title.add_theme_color_override("font_outline_color", Color(0.08, 0.06, 0.03))
 	layer.add_child(title)
@@ -773,7 +777,9 @@ func _save(file: String) -> void:
 	if page == "":
 		return
 	image.resize(TUTORIAL_SIZE.x, TUTORIAL_SIZE.y, Image.INTERPOLATE_LANCZOS)
-	image.save_png(TUTORIAL_OUTPUT + page)
+	var language := file.substr(0, file.find("_"))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(TUTORIAL_OUTPUT + language))
+	image.save_png(TUTORIAL_OUTPUT + language + "/" + page)
 
 
 func _frames(count: int) -> void:

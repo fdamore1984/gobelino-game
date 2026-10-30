@@ -1,343 +1,349 @@
-keys,en
-MENU_START,New game
-MENU_QUIT,Quit
-MENU_VERSION,Version %s
-HUD_HEALTH,Health  %d / %d
-HUD_KILLS,Enemies defeated  %d
-HUD_DEFEAT,Defeated!
-TOUCH_ATTACK,Attack
-TOUCH_PARRY,Parry
-TOUCH_DODGE,Dodge
-TOUCH_MENU,Menu
-HUD_LEVEL,Level %d
-HUD_XP,XP %d / %d
-LEVELUP_TITLE,Level %d!
-LEVELUP_DAMAGE,Base damage: %d → %d
-LEVELUP_CHOOSE,Choose an upgrade
-UPGRADE_COMBO,Combo hits +1
-UPGRADE_DODGE,Chained dodges +1
-UPGRADE_HEALTH,Health +1
-HUD_POTIONS,Potions  %d / %d
-HUD_SHIELD_READY,Shield: ready
-HUD_SHIELD_ACTIVE,Shield: active
-HUD_SHIELD_COOLDOWN,Shield: %d s
-UPGRADE_HEAVY,Chained power strikes +1
-UPGRADE_SHIELD,Shield recharge -5%
-TOUCH_HEAVY,Power
-TOUCH_POTION,Potion
-TOUCH_SHIELD,Shield
-HUD_STATS,Combo %d · Power strikes %d · Dodges %d · Jumps %d · Run %d%%
-UPGRADE_JUMP,Chained jumps +1
-UPGRADE_RUN,Run speed +5%
-TOUCH_JUMP,Jump
-TOUCH_RUN,Run
-TOUCH_FOCUS,Focus
-DECK_HINT,"Steam Deck: to use the built-in controls as a controller hold the Menu (Start) button for 1 second, or launch the game from Steam"
-UPGRADE_VALUE,%d → %d
-UPGRADE_VALUE_SECONDS,%.1f s → %.1f s
-UPGRADE_VALUE_PERCENT,%d%% → %d%%
-POWERUP_UPGRADE,×%d
-POWERUP_EMPOWERED,%d s
-CHALLENGE_HINT,Interact with the totem to start a survival challenge
-CHALLENGE_STATUS,Survive! %d s · Enemies: %d
-HORDE_INCOMING,An undead horde is coming!
-CHALLENGE_WON,Challenge complete! +%d XP and a potion
-HUD_MANA,Mana %d/%d · Mana potions %d/%d
-HUD_GOLD,Gold %d
-UPGRADE_MANA,Max mana +20
-UPGRADE_SPELL,Spell power +20%
-UPGRADE_STAMINA,Stamina +10%
-UPGRADE_POTION_SLOTS,Potions carried +1 (each kind)
-UPGRADE_POTION_HEAL,Health potion heals +1
-UPGRADE_MANA_RESTORE,Mana potion restores +5%
-UPGRADE_CHOICE,One more upgrade to choose
-INVENTORY_TITLE,Inventory
-INVENTORY_EQUIPPED,"Equipment: weapon, armor, boots, amulet, ring"
-INVENTORY_EMPTY,Nothing yet: open chests to find items
-INVENTORY_HINT,A / Enter: use · %s: sort · B / Esc / %s: close
-INVENTORY_GOLD,Gold: %d
-INVENTORY_SORT,Sort: %s · %s
-INVENTORY_COMPARE,Compared to your %s: %s
-INVENTORY_COMPARE_NONE,You have nothing of this kind equipped
-INVENTORY_COMPARE_SAME,same stats
-DELTA_DAMAGE,%s%% damage
-DELTA_HEALTH,%s max health
-DELTA_SPEED,%s%% speed
-DELTA_MANA,%s max mana
-DELTA_SPELL,%s%% spell power
-INVENTORY_SORT_FOUND,order found
-INVENTORY_SORT_POWER,power
-INVENTORY_SORT_VALUE,value
-INVENTORY_USE_EQUIP,A: equip
-INVENTORY_USE_UNEQUIP,A: unequip
-INVENTORY_USE_READ,A: read (permanent bonus)
-INVENTORY_USE_DRINK,A: drink
-STAT_DAMAGE,+%d%% damage
-STAT_HEALTH,+%d max health
-STAT_SPEED,+%d%% speed
-STAT_MANA,+%d max mana
-STAT_SPELL,+%d%% spell power
-STAT_HEAL,heals %d health
-STAT_RESTORE_MANA,+%d mana
-STAT_RESTORE_STAMINA,restores %d%% stamina
-ITEM_GOLD,Gold
-ITEM_SWORD_IRON,Iron sword
-ITEM_SWORD_STEEL,Steel sword
-ITEM_SWORD_RUNE,Rune sword
-ITEM_ARMOR_LEATHER,Leather armor
-ITEM_ARMOR_CHAIN,Chain mail
-ITEM_BOOTS_SWIFT,Swift boots
-ITEM_AMULET_MANA,Mana amulet
-ITEM_RING_FIRE,Ring of fire
-ITEM_BOOK_FIRE,Book: Flames
-ITEM_BOOK_MANA,Book: Arcane mind
-ITEM_POTION_HEALTH,Health potion
-ITEM_POTION_MANA,Mana potion
-ITEM_POTION_STAMINA,Stamina potion
-TOUCH_SPELL,Spell
-TOUCH_MANA,Mana
-TOUCH_STAMINA,Stamina
-TOUCH_INVENTORY,Bag
-MERCHANT_TITLE,Travelling merchant
-MERCHANT_HINT,A travelling merchant: interact with the stall to buy and sell
-SHOP_BUY,For sale: rare items you won't find in chests
-SHOP_SELL,Sell your items (not the ones you wear)
-SHOP_PRICE,%d gold
-SHOP_BUY_ACTION,A: buy for %d gold
-SHOP_SELL_ACTION,A: sell for %d gold
-SHOP_NOT_ENOUGH,You don't have enough gold
-SHOP_BELT_FULL,Your potion belt is full
-SHOP_NOTHING_TO_SELL,Nothing to sell: collect items from chests
-SHOP_HINT,A / Enter: buy or sell · B / Esc / %s: close
-SHOP_CLOSE,Close
-ITEM_SWORD_DRAGON,Dragon sword
-ITEM_ARMOR_PLATE,Plate armor
-ITEM_BOOTS_WIND,Wind boots
-ITEM_AMULET_ARCHMAGE,Archmage amulet
-ITEM_RING_INFERNO,Inferno ring
-ITEM_BOOK_METEOR,Meteor tome
-ITEM_BOOK_VIGOR,Tome of vigor
-ITEM_POTION_ELIXIR,Elixir
-MENU_CONTROLS,Controls
-CONTROLS_TITLE,Controls
-CONTROLS_MOVE,"Move (mouse: walk to the cursor, hold to follow it)"
-CONTROLS_ATTACK,"Attack (combo, hold to keep attacking)"
-CONTROLS_HEAVY,"Power strike (uses a little mana; hold to charge, uses more mana while held; keep holding to chain)"
-CONTROLS_PARRY,"Parry (instant, cancels any action)"
-CONTROLS_DODGE,"Dodge (cancels any action, air dash while jumping)"
-CONTROLS_JUMP,"Jump (cancels any action) · Interact (chests, merchants, caves, mausoleums)"
-CONTROLS_RUN,Tap: run on/off (dodge while running to slide) · Hold: torch on/off
-CONTROLS_FOCUS,"Focus (hold: dims the world, highlights you, items, chests and passages)"
-CONTROLS_SPELL,Fireball
-CONTROLS_SHIELD,Shield
-CONTROLS_POTION,Health potion
-CONTROLS_MANA,Mana potion
-CONTROLS_STAMINA_POTION,Stamina potion
-CONTROLS_INVENTORY,Inventory · sort it
-CONTROLS_MENU,"Pause menu (save, controls, tutorial, options, quit)"
-CONTROLS_SPECIAL_TITLE,Special attacks
-CONTROLS_SPECIAL_MIXED,Power strike right after a combo: a wide power strike with bonus damage
-CONTROLS_SPECIAL_CHARGED,Charge the first power strike: every power strike chained after it deals extra damage
-CONTROLS_SPECIAL_AIR,Attack in mid-air: wide aerial slashes that also reach the enemies below you
-CONTROLS_SPECIAL_PLUNGE,"Power strike in mid-air: tap it for a slam that hits the enemies around (costs mana and stamina); hold it, with a Cataclysm rune, to smash the rune: the blast kills the enemies around (keep holding to widen it)"
-CONTROLS_SPECIAL_DASH,Power strike during an air dash: dash strike that smashes a wide area
-CONTROLS_TOUCH,On touch screens use the on-screen buttons
-CONTROLS_BACK,Back
-MENU_CONTINUE,Continue
-SLOTS_NEW_TITLE,New game: choose a save slot
-SLOTS_LOAD_TITLE,Continue: choose a save slot
-SLOT_NAME,Slot %d
-SLOT_EMPTY,Empty
-SLOT_EMPTY_NEW,Start a new adventure here
-SLOT_LEVEL,Level %d
-SLOT_HEALTH_DAMAGE,Health %d · Damage %d
-SLOT_GOLD_POTIONS,Gold %d · Potions %d
-SLOT_KILLS,Enemies defeated: %d
-SLOT_PLACE_SURFACE,On the surface
-SLOT_PLACE_DEPTH,Underground · level %d
-SLOT_PLACE_METRO,In the catacombs · level %d
-SLOT_PLAYTIME,Play time: %s
-SLOT_PLAYTIME_MIN,%d min
-SLOT_PLAYTIME_HOURS,%d h %02d min
-SLOT_PLAYTIME_UNKNOWN,—
-SLOT_SAVED_AT,Saved %s
-SLOT_OVERWRITE,Press again to replace this save
-SLOT_DELETE,Delete
-SLOT_DELETE_SURE,Press again to delete
-SLOT_DELETE_CONFIRM,This save will be deleted for good
-PAUSE_TITLE,Paused
-PAUSE_RESUME,Resume
-PAUSE_SAVE,Save game
-PAUSE_CONTROLS,Controls
-PAUSE_QUIT,Quit to title
-PAUSE_QUIT_CONFIRM,Quit to title? Unsaved progress will be lost.
-PAUSE_QUIT_YES,Quit
-PAUSE_QUIT_NO,Cancel
-SAVE_DONE,Game saved
-SAVE_AUTO,Game saved automatically
-SAVE_BLOCKED_ENEMIES,Can't save: enemies nearby
-SAVE_BLOCKED_CHALLENGE,Can't save during a challenge
-SAVE_BLOCKED_DEAD,Can't save now
-LOADING_LANDS,Exploring new lands…
-LOADING_DEPTHS,Descending into the cave: level %d of %d
-LOADING_METRO,Down into the catacombs: level %d of %d
-LOADING_SURFACE,Back to the surface
-LOADING_GAME,Loading your game
-CAVE_HINT,A cave: interact to explore the depths
-INTERACT,Interact
-CAVE_CLEARED,This cave has been cleared
-METRO_HINT,A ruined mausoleum: interact to go down into the catacombs
-METRO_CLEARED,These catacombs have been cleansed
-METRO_STAIRS_HINT,Stone steps to the crypt below
-METRO_EXIT_HINT,The way back up to the open air
-STAIRS_HINT,Stairs going down
-EXIT_HINT,The way back to the surface
-DUNGEON_LEVEL,Underground · level %d of %d
-METRO_LEVEL,Catacombs · level %d of %d
-BOSS_NAME,Cave Guardian
-BOSS_DEFEATED,Guardian defeated! The way out is open
-BOSS_NAME_METRO,The Crypt Abomination
-METRO_BOSS_DEFEATED,The Abomination is slain! The way out is open
-MENU_CREDITS,Created by fdamore1984 with Claude Code
-CONTROLS_LOCK,Manual lock on the nearest enemy in sight (again: switch target)
-TOUCH_LOCK,Lock
-TOUCH_MAP,Map
-MAP_TITLE,Map
-MAP_HINT,%s / B: close
-CONTROLS_MAP,Map
-ITEM_BLADE_GUARDIAN,Guardian's blade
-ITEM_ARMOR_GUARDIAN,Guardian's armor
-ITEM_BOOTS_GUARDIAN,Guardian's boots
-ITEM_CROWN_GUARDIAN,Guardian's crown
-ITEM_RING_GUARDIAN,Guardian's ring
-ITEM_BOOK_GUARDIAN,Guardian's tome
-CONTROLS_HEADER_ACTION,Action
-MENU_OPTIONS,Options
-PAUSE_OPTIONS,Options
-OPTIONS_TITLE,Options
-OPTIONS_CONTROLS,"Controls: select a binding, then press the new key, mouse button or controller button (%s, right click or a long touch: leave it empty)"
-OPTIONS_HEADER_ACTION,Action
-OPTIONS_HEADER_KEYBOARD,Keyboard
-OPTIONS_HEADER_MOUSE,Mouse
-OPTIONS_HEADER_CONTROLLER,Controller
-OPTIONS_DEVICE_KEYBOARD,key
-OPTIONS_DEVICE_MOUSE,mouse button
-OPTIONS_DEVICE_CONTROLLER,controller button or stick
-OPTIONS_LISTEN,"Press the new %s for ""%s"" (%d s, another device cancels)"
-OPTIONS_BOUND,"""%s"" set to %s"
-OPTIONS_SHARED,also used by: %s
-OPTIONS_CLEARED,"""%s"" now has no %s"
-OPTIONS_CLEAR_REQUIRED,"""%s"" needs at least one key: set another one first"
-OPTIONS_CANCELLED,Cancelled: nothing changed
-OPTIONS_RESET,Reset to defaults
-OPTIONS_RESET_DONE,All controls are back to their defaults
-OPTIONS_BACK,Back
-BIND_NONE,—
-BIND_LEFT_STICK,Left stick
-BIND_RIGHT_STICK,Right stick
-BIND_MOUSE,Mouse %d
-BIND_MOUSE_1,Left click
-BIND_MOUSE_2,Right click
-BIND_MOUSE_3,Middle click
-BIND_MOUSE_8,Mouse back
-BIND_MOUSE_9,Mouse forward
-BIND_JOY,Button %d
-BIND_JOY_0,A
-BIND_JOY_1,B
-BIND_JOY_2,X
-BIND_JOY_3,Y
-BIND_JOY_4,Select
-BIND_JOY_5,Guide
-BIND_JOY_6,Start
-BIND_JOY_7,L3
-BIND_JOY_8,R3
-BIND_JOY_9,L1
-BIND_JOY_10,R1
-BIND_JOY_11,D-pad ↑
-BIND_JOY_12,D-pad ↓
-BIND_JOY_13,D-pad ←
-BIND_JOY_14,D-pad →
-BIND_AXIS,Axis %d
-BIND_AXIS_0_NEG,Left stick ←
-BIND_AXIS_0_POS,Left stick →
-BIND_AXIS_1_NEG,Left stick ↑
-BIND_AXIS_1_POS,Left stick ↓
-BIND_AXIS_2_NEG,Right stick ←
-BIND_AXIS_2_POS,Right stick →
-BIND_AXIS_3_NEG,Right stick ↑
-BIND_AXIS_3_POS,Right stick ↓
-BIND_AXIS_4_POS,L2
-BIND_AXIS_5_POS,R2
-BIND_ACTION_MOVE_UP,Move up
-BIND_ACTION_MOVE_DOWN,Move down
-BIND_ACTION_MOVE_LEFT,Move left
-BIND_ACTION_MOVE_RIGHT,Move right
-BIND_ACTION_MOVE_CLICK,Walk to the cursor
-BIND_ACTION_ATTACK,Attack
-BIND_ACTION_HEAVY_ATTACK,Power strike
-BIND_ACTION_PARRY,Parry
-BIND_ACTION_DODGE,Dodge
-BIND_ACTION_JUMP,Jump
-BIND_ACTION_INTERACT,Interact
-BIND_ACTION_RUN,Run / torch
-BIND_ACTION_FOCUS,Focus
-BIND_ACTION_SPELL,Fireball
-BIND_ACTION_SHIELD,Shield
-BIND_ACTION_POTION,Health potion
-BIND_ACTION_MANA_POTION,Mana potion
-BIND_ACTION_STAMINA_POTION,Stamina potion
-BIND_ACTION_INVENTORY,Inventory
-BIND_ACTION_INVENTORY_SORT,Sort the inventory
-BIND_ACTION_MAP,Map
-BIND_ACTION_LOCK_ON,Lock on
-BIND_ACTION_MENU,Pause menu
-BIND_JOY_SHORT_11,↑
-BIND_JOY_SHORT_12,↓
-BIND_JOY_SHORT_13,←
-BIND_JOY_SHORT_14,→
-CONTROLS_SPECIAL_FRENZY,"Full Frenzy, %s + %s together: a flurry of strikes, teleporting from enemy to enemy"
-HUD_FRENZY_READY,FRENZY! %s + %s
-UPGRADE_FRENZY,Frenzy strikes +2
-UPGRADE_H_BOMB,Cataclysm runes carried +1
-ITEM_H_BOMB,Cataclysm rune
-ITEM_H_BOMB_DESC,for the power strike held in mid-air: smash it on the ground and the blast kills the enemies around
-MENU_TUTORIAL,Tutorial
-PAUSE_TUTORIAL,Tutorial
-TUTORIAL_TITLE,Tutorial
-TUTORIAL_PREV,← Back
-TUTORIAL_NEXT,Next →
-TUTORIAL_CLOSE,Close
-TUTORIAL_PAGE,Page %d / %d
-TUTORIAL_HINT,%s / %s: previous / next page · %s: close
-TUTORIAL_MOVE_TITLE,Moving
-TUTORIAL_MOVE_TEXT,"Move with the left stick or the keyboard, or walk to the cursor holding the middle mouse button. Tap {run} to start or stop running (it stops by itself when you stand still); hold {run} to light or put out the torch, you need it at night and in the caves: it lights the way you face. {jump} jumps: you climb onto higher ground and enemy strikes pass under you. Dodge while running to slide."
-TUTORIAL_COMBO_TITLE,Sword and combos
-TUTORIAL_COMBO_TEXT,"Press {attack} to strike with the sword: the strike lands right away. Quick strikes form a combo (3 at first), each one stronger than the last; hold {attack} to keep attacking. {heavy_attack} is the power strike, wide and very strong (it uses a little mana): it ends the combo with a bonus. Hold it to charge it up to double damage (it uses mana) and to chain more power strikes."
-TUTORIAL_PARRY_TITLE,Parry
-TUTORIAL_PARRY_TEXT,"Hold {parry} to parry with the sword across your body: you block the strikes coming from the front, arrows and bolts included, but it drains stamina. A perfect parry, started right before the hit, stuns the enemy and for 4 seconds doubles your damage and speeds up your attacks. The parry is instant: it cancels whatever you are doing."
-TUTORIAL_DODGE_TITLE,Dodge and jump
-TUTORIAL_DODGE_TEXT,"{dodge} dodges: a roll on the ground, a dash in mid-air. For an instant you can't be hit and you can steer; press it again to chain more dodges (upgrades add more). Parrying, dodging and jumping cancel any action at once, even a strike halfway through. Jumps and dodges combine: jump, dash in the air and strike from above with {attack}."
-TUTORIAL_FRENZY_TITLE,Frenzy
-TUTORIAL_FRENZY_TEXT,"The red bar in the top-left panel is Frenzy. It grows with every sword hit that lands, even when the enemy blocks it with his guard; power strikes and ground attacks fill it faster. If you stop attacking for 4 seconds it slowly drains: stay in the fight! When it is full the bar pulses, {parry} + {attack} appears on it and a red ring surrounds the goblin."
-TUTORIAL_SPECIAL_TITLE,Frenzy special attack
-TUTORIAL_SPECIAL_TEXT,"With a full Frenzy bar press {parry} and {attack} together (on touch screens, the two buttons at once). Time stops: the enemies freeze, the world goes dark, the goblin roars in a red glow and the camera zooms in. Then he teleports next to the nearest enemy and strikes in a flurry; when it falls he moves on to the next one. Up to 10 hits (+2 with every ""Frenzy strikes"" upgrade); with no enemies in reach the flurry ends early. You can't be hit during the attack; at the end Frenzy drops to zero."
-TUTORIAL_SUPPLIES_TITLE,Stamina and potions
-TUTORIAL_SUPPLIES_TEXT,"The green bar is your stamina: attacking, dodging, jumping, parrying and running drain it, and it recovers by itself as soon as you stop. When it's empty you can't attack or dodge, and a parry can break your guard. Your potions are in the bar at the bottom: health {potion}, mana {mana_potion}, stamina {stamina_potion}. Drinking takes a moment: enemies rush in to punish you."
-TUTORIAL_ARSENAL_TITLE,"Fireball, shield and runes"
-TUTORIAL_ARSENAL_TEXT,"{spell} casts a fireball that chases the nearest enemy in sight: it costs mana (the blue bar), which does not come back by itself: drink mana potions. {shield} raises a magic bubble that absorbs one hit from any direction (30-second recharge). In mid-air, tap {heavy_attack} for a slam that hits the enemies around (it costs mana and stamina); hold it, with a Cataclysm rune in your belt, to smash the rune on the ground: the blast kills the enemies around and takes a big chunk out of the boss."
-TUTORIAL_ENEMIES_TITLE,The enemies
-TUTORIAL_ENEMIES_TEXT,"Every enemy blow costs you one heart (two from the boss): a few mistakes and you're down. Enemies have only a few health points too, shown as segments over their heads: every hit takes one away, the strongest hits two or three. Before striking enemies glow red and pull back their weapon: that's the moment to parry or dodge. No more than two attack at once, the others circle around. Sometimes they raise their guard: hit them from the side or from behind. Their blows and arrows hurt the other monsters too. You lock on to the nearest enemy in sight by yourself ({lock_on} keeps the lock); it gets a red ring and your strikes and fireballs go its way. Every now and then an undead horde shows up: from 50 to 200 of them, very weak, all running at you; they fall apart on contact and hurt you. Cut them down before they reach you, or jump over them."
-TUTORIAL_LOOT_TITLE,"Chests, inventory and merchants"
-TUTORIAL_LOOT_TEXT,"Walk up to chests, merchants, totems, caves and mausoleums and press {interact} when the prompt appears. Chests drop gold and items: swords, armor, boots, amulets, rings and spell books. {inventory} opens the inventory (the game pauses): equip your gear, read the books, sort with {inventory_sort}. Merchants buy what you don't use and sell potions, Cataclysm runes and rare gear."
-TUTORIAL_WORLD_TITLE,Exploring the lands
-TUTORIAL_WORLD_TEXT,"The lands have no borders. The minimap in the top-right corner shows enemies, chests, totems, merchants, caves and mausoleums, but only in the places you have already explored; {map} opens the full map. At night and underground it's pitch black: you need the torch, whose light stops at mountains and walls. Behind a wall you see the goblin's outline. Hold {focus} for focus mode: the world dims and only the goblin and the things to pick up keep their colors. Jump to climb the hills and ramps."
-TUTORIAL_BUILDINGS_TITLE,Caves and the boss
-TUTORIAL_BUILDINGS_TEXT,"Cave entrances open in the mountain walls: go in with {interact}. Down there it's dark and the enemies get tougher level after level: on every level look for the stairs. On the last one the Cave Guardian waits in his arena: he summons help and strikes from afar. Beat him for gold, a Cataclysm rune and gear you won't find anywhere else."
-TUTORIAL_METRO_TITLE,The catacombs
-TUTORIAL_METRO_TEXT,"Ruined mausoleums (a purple square with a skull on the map) lead down into the catacombs: go down with {interact}. It's pitch black and nothing living is left down there: only packs of undead and the ghouls of the crypts, with claws and many red eyes; some spit venomous bile from afar, the bloated ones crush the ground around them. In the middle of every level the stone naves run between two sunken ossuary pits (jump down and climb back up with a jump), with rows of great tombs; around them are chapels and burial chambers. Find the steps going down; on the last level the Crypt Abomination waits, summoning the undead."
-TUTORIAL_PROGRESS_TITLE,"Challenges, levels and saves"
-TUTORIAL_PROGRESS_TEXT,"Interact with a totem for a 30-second challenge in waves: survive it for experience and a potion. Every defeated enemy gives experience; at every level your damage grows and you pick an upgrade among the cards on offer (""Frenzy strikes +2"" too; extra health only shows up now and then). The game saves by itself every 5 minutes and when you enter a cave, with no enemies nearby; from the pause menu ({menu}) you save by hand."
-CLOUD_SYNCING,Syncing saves with your ufotizio.com account…
-CLOUD_LINKED,Saves on the ufotizio.com account %s
-CLOUD_LOCAL,Not signed in to ufotizio.com: saves stay in this browser
-CLOUD_FAILED,"Can't reach your ufotizio.com account: for now saves stay in this browser"
+keys,en,it
+MENU_START,New game,Nuova partita
+MENU_QUIT,Quit,Esci
+MENU_VERSION,Version %s,Versione %s
+HUD_HEALTH,Health  %d / %d,Vita  %d / %d
+HUD_KILLS,Enemies defeated  %d,Nemici sconfitti  %d
+HUD_DEFEAT,Defeated!,Sconfitto!
+TOUCH_ATTACK,Attack,Attacco
+TOUCH_PARRY,Parry,Parata
+TOUCH_DODGE,Dodge,Schivata
+TOUCH_MENU,Menu,Menù
+HUD_LEVEL,Level %d,Livello %d
+HUD_XP,XP %d / %d,XP %d / %d
+LEVELUP_TITLE,Level %d!,Livello %d!
+LEVELUP_DAMAGE,Base damage: %d → %d,Danno base: %d → %d
+LEVELUP_CHOOSE,Choose an upgrade,Scegli un potenziamento
+UPGRADE_COMBO,Combo hits +1,Colpi della combo +1
+UPGRADE_DODGE,Chained dodges +1,Schivate concatenate +1
+UPGRADE_HEALTH,Health +1,Vita +1
+HUD_POTIONS,Potions  %d / %d,Pozioni  %d / %d
+HUD_SHIELD_READY,Shield: ready,Scudo: pronto
+HUD_SHIELD_ACTIVE,Shield: active,Scudo: attivo
+HUD_SHIELD_COOLDOWN,Shield: %d s,Scudo: %d s
+UPGRADE_HEAVY,Chained power strikes +1,Colpi potenti concatenati +1
+UPGRADE_SHIELD,Shield recharge -5%,Ricarica dello scudo -5%
+TOUCH_HEAVY,Power,Potente
+TOUCH_POTION,Potion,Pozione
+TOUCH_SHIELD,Shield,Scudo
+HUD_STATS,Combo %d · Power strikes %d · Dodges %d · Jumps %d · Run %d%%,Combo %d · Colpi potenti %d · Schivate %d · Salti %d · Corsa %d%%
+UPGRADE_JUMP,Chained jumps +1,Salti concatenati +1
+UPGRADE_RUN,Run speed +5%,Velocità di corsa +5%
+TOUCH_JUMP,Jump,Salto
+TOUCH_RUN,Run,Corsa
+TOUCH_FOCUS,Focus,Focus
+DECK_HINT,"Steam Deck: to use the built-in controls as a controller hold the Menu (Start) button for 1 second, or launch the game from Steam","Steam Deck: per usare i comandi integrati come controller tieni premuto il tasto Menu (Start) per 1 secondo, oppure avvia il gioco da Steam"
+UPGRADE_VALUE,%d → %d,%d → %d
+UPGRADE_VALUE_SECONDS,%.1f s → %.1f s,%.1f s → %.1f s
+UPGRADE_VALUE_PERCENT,%d%% → %d%%,%d%% → %d%%
+POWERUP_UPGRADE,×%d,×%d
+POWERUP_EMPOWERED,%d s,%d s
+CHALLENGE_HINT,Interact with the totem to start a survival challenge,Interagisci col totem per iniziare una sfida di sopravvivenza
+CHALLENGE_STATUS,Survive! %d s · Enemies: %d,Sopravvivi! %d s · Nemici: %d
+HORDE_INCOMING,An undead horde is coming!,Arriva un'orda di non morti!
+CHALLENGE_WON,Challenge complete! +%d XP and a potion,Sfida superata! +%d XP e una pozione
+HUD_MANA,Mana %d/%d · Mana potions %d/%d,Mana %d/%d · Pozioni di mana %d/%d
+HUD_GOLD,Gold %d,Oro %d
+UPGRADE_MANA,Max mana +20,Mana massimo +20
+UPGRADE_SPELL,Spell power +20%,Potere magico +20%
+UPGRADE_STAMINA,Stamina +10%,Vigore +10%
+UPGRADE_POTION_SLOTS,Potions carried +1 (each kind),Pozioni trasportabili +1 (di ogni tipo)
+UPGRADE_POTION_HEAL,Health potion heals +1,La pozione di salute cura +1
+UPGRADE_MANA_RESTORE,Mana potion restores +5%,La pozione di mana ripristina +5%
+UPGRADE_CHOICE,One more upgrade to choose,Un potenziamento in più da scegliere
+INVENTORY_TITLE,Inventory,Inventario
+INVENTORY_EQUIPPED,"Equipment: weapon, armor, boots, amulet, ring","Equipaggiamento: arma, armatura, stivali, amuleto, anello"
+INVENTORY_EMPTY,Nothing yet: open chests to find items,Ancora niente: apri i forzieri per trovare oggetti
+INVENTORY_HINT,A / Enter: use · %s: sort · B / Esc / %s: close,A / Invio: usa · %s: ordina · B / Esc / %s: chiudi
+INVENTORY_GOLD,Gold: %d,Oro: %d
+INVENTORY_SORT,Sort: %s · %s,Ordine: %s · %s
+INVENTORY_COMPARE,Compared to your %s: %s,Rispetto a %s: %s
+INVENTORY_COMPARE_NONE,You have nothing of this kind equipped,Non hai niente di questo tipo addosso
+INVENTORY_COMPARE_SAME,same stats,stesse caratteristiche
+DELTA_DAMAGE,%s%% damage,%s%% danni
+DELTA_HEALTH,%s max health,%s vita massima
+DELTA_SPEED,%s%% speed,%s%% velocità
+DELTA_MANA,%s max mana,%s mana massimo
+DELTA_SPELL,%s%% spell power,%s%% potere magico
+INVENTORY_SORT_FOUND,order found,come trovati
+INVENTORY_SORT_POWER,power,potenza
+INVENTORY_SORT_VALUE,value,valore
+INVENTORY_USE_EQUIP,A: equip,A: indossa
+INVENTORY_USE_UNEQUIP,A: unequip,A: togli
+INVENTORY_USE_READ,A: read (permanent bonus),A: leggi (bonus permanente)
+INVENTORY_USE_DRINK,A: drink,A: bevi
+STAT_DAMAGE,+%d%% damage,+%d%% danni
+STAT_HEALTH,+%d max health,+%d vita massima
+STAT_SPEED,+%d%% speed,+%d%% velocità
+STAT_MANA,+%d max mana,+%d mana massimo
+STAT_SPELL,+%d%% spell power,+%d%% potere magico
+STAT_HEAL,heals %d health,cura %d di vita
+STAT_RESTORE_MANA,+%d mana,+%d mana
+STAT_RESTORE_STAMINA,restores %d%% stamina,ripristina il %d%% del vigore
+ITEM_GOLD,Gold,Oro
+ITEM_SWORD_IRON,Iron sword,Spada di ferro
+ITEM_SWORD_STEEL,Steel sword,Spada d'acciaio
+ITEM_SWORD_RUNE,Rune sword,Spada runica
+ITEM_ARMOR_LEATHER,Leather armor,Armatura di cuoio
+ITEM_ARMOR_CHAIN,Chain mail,Cotta di maglia
+ITEM_BOOTS_SWIFT,Swift boots,Stivali rapidi
+ITEM_AMULET_MANA,Mana amulet,Amuleto del mana
+ITEM_RING_FIRE,Ring of fire,Anello di fuoco
+ITEM_BOOK_FIRE,Book: Flames,Libro: Fiamme
+ITEM_BOOK_MANA,Book: Arcane mind,Libro: Mente arcana
+ITEM_POTION_HEALTH,Health potion,Pozione di salute
+ITEM_POTION_MANA,Mana potion,Pozione di mana
+ITEM_POTION_STAMINA,Stamina potion,Pozione di vigore
+TOUCH_SPELL,Spell,Magia
+TOUCH_MANA,Mana,Mana
+TOUCH_STAMINA,Stamina,Vigore
+TOUCH_INVENTORY,Bag,Zaino
+MERCHANT_TITLE,Travelling merchant,Mercante ambulante
+MERCHANT_HINT,A travelling merchant: interact with the stall to buy and sell,Un mercante ambulante: interagisci con la bancarella per comprare e vendere
+SHOP_BUY,For sale: rare items you won't find in chests,In vendita: oggetti rari che non trovi nei forzieri
+SHOP_SELL,Sell your items (not the ones you wear),Vendi i tuoi oggetti (non quelli che indossi)
+SHOP_PRICE,%d gold,%d oro
+SHOP_BUY_ACTION,A: buy for %d gold,A: compra per %d oro
+SHOP_SELL_ACTION,A: sell for %d gold,A: vendi per %d oro
+SHOP_NOT_ENOUGH,You don't have enough gold,Non hai abbastanza oro
+SHOP_BELT_FULL,Your potion belt is full,La tua cintura delle pozioni è piena
+SHOP_NOTHING_TO_SELL,Nothing to sell: collect items from chests,Niente da vendere: raccogli oggetti dai forzieri
+SHOP_HINT,A / Enter: buy or sell · B / Esc / %s: close,A / Invio: compra o vendi · B / Esc / %s: chiudi
+SHOP_CLOSE,Close,Chiudi
+ITEM_SWORD_DRAGON,Dragon sword,Spada del drago
+ITEM_ARMOR_PLATE,Plate armor,Armatura a piastre
+ITEM_BOOTS_WIND,Wind boots,Stivali del vento
+ITEM_AMULET_ARCHMAGE,Archmage amulet,Amuleto dell'arcimago
+ITEM_RING_INFERNO,Inferno ring,Anello infernale
+ITEM_BOOK_METEOR,Meteor tome,Tomo della meteora
+ITEM_BOOK_VIGOR,Tome of vigor,Tomo del vigore
+ITEM_POTION_ELIXIR,Elixir,Elisir
+MENU_CONTROLS,Controls,Comandi
+CONTROLS_TITLE,Controls,Comandi
+CONTROLS_MOVE,"Move (mouse: walk to the cursor, hold to follow it)","Movimento (mouse: cammina verso il cursore, tieni premuto per seguirlo)"
+CONTROLS_ATTACK,"Attack (combo, hold to keep attacking)","Attacco (combo, tieni premuto per continuare ad attaccare)"
+CONTROLS_HEAVY,"Power strike (uses a little mana; hold to charge, uses more mana while held; keep holding to chain)","Colpo potente (consuma un po' di mana; tieni premuto per caricarlo, consuma altro mana; continua a tenere per concatenarli)"
+CONTROLS_PARRY,"Parry (instant, cancels any action)","Parata (istantanea, annulla qualsiasi azione)"
+CONTROLS_DODGE,"Dodge (cancels any action, air dash while jumping)","Schivata (annulla qualsiasi azione, scatto in aria saltando)"
+CONTROLS_JUMP,"Jump (cancels any action) · Interact (chests, merchants, caves, mausoleums)","Salto (annulla qualsiasi azione) · Interagisci (forzieri, mercanti, grotte, mausolei)"
+CONTROLS_RUN,Tap: run on/off (dodge while running to slide) · Hold: torch on/off,Tocco: corsa sì/no (schiva correndo per scivolare) · Tenuto: torcia sì/no
+CONTROLS_FOCUS,"Focus (hold: dims the world, highlights you, items, chests and passages)","Focus (tieni premuto: il mondo si spegne, restano in evidenza te, oggetti, forzieri e passaggi)"
+CONTROLS_SPELL,Fireball,Palla di fuoco
+CONTROLS_SHIELD,Shield,Scudo
+CONTROLS_POTION,Health potion,Pozione di salute
+CONTROLS_MANA,Mana potion,Pozione di mana
+CONTROLS_STAMINA_POTION,Stamina potion,Pozione di vigore
+CONTROLS_INVENTORY,Inventory · sort it,Inventario · ordinalo
+CONTROLS_MENU,"Pause menu (save, controls, tutorial, options, quit)","Menù di pausa (salva, comandi, tutorial, opzioni, esci)"
+CONTROLS_SPECIAL_TITLE,Special attacks,Attacchi speciali
+CONTROLS_SPECIAL_MIXED,Power strike right after a combo: a wide power strike with bonus damage,Colpo potente subito dopo una combo: un colpo potente ampio con danni in più
+CONTROLS_SPECIAL_CHARGED,Charge the first power strike: every power strike chained after it deals extra damage,Carica il primo colpo potente: ogni colpo potente concatenato dopo fa danni in più
+CONTROLS_SPECIAL_AIR,Attack in mid-air: wide aerial slashes that also reach the enemies below you,Attacco a mezz'aria: fendenti ampi che colpiscono anche i nemici sotto di te
+CONTROLS_SPECIAL_PLUNGE,"Power strike in mid-air: tap it for a slam that hits the enemies around (costs mana and stamina); hold it, with a Cataclysm rune, to smash the rune: the blast kills the enemies around (keep holding to widen it)","Colpo potente a mezz'aria: premuto e lasciato è uno slam che colpisce i nemici attorno (costa mana e vigore); tenuto premuto, con una runa del Cataclisma, spacchi la runa e l'esplosione uccide i nemici attorno (continua a tenere per allargarla)"
+CONTROLS_SPECIAL_DASH,Power strike during an air dash: dash strike that smashes a wide area,Colpo potente durante uno scatto in aria: colpo in scatto che spazza un'area ampia
+CONTROLS_TOUCH,On touch screens use the on-screen buttons,Sugli schermi touch usa i pulsanti a schermo
+CONTROLS_BACK,Back,Indietro
+MENU_CONTINUE,Continue,Continua
+SLOTS_NEW_TITLE,New game: choose a save slot,Nuova partita: scegli uno slot
+SLOTS_LOAD_TITLE,Continue: choose a save slot,Continua: scegli uno slot
+SLOT_NAME,Slot %d,Slot %d
+SLOT_EMPTY,Empty,Vuoto
+SLOT_EMPTY_NEW,Start a new adventure here,Inizia qui una nuova avventura
+SLOT_LEVEL,Level %d,Livello %d
+SLOT_HEALTH_DAMAGE,Health %d · Damage %d,Vita %d · Danno %d
+SLOT_GOLD_POTIONS,Gold %d · Potions %d,Oro %d · Pozioni %d
+SLOT_KILLS,Enemies defeated: %d,Nemici sconfitti: %d
+SLOT_PLACE_SURFACE,On the surface,In superficie
+SLOT_PLACE_DEPTH,Underground · level %d,Sottoterra · livello %d
+SLOT_PLACE_METRO,In the catacombs · level %d,Nelle catacombe · livello %d
+SLOT_PLAYTIME,Play time: %s,Tempo di gioco: %s
+SLOT_PLAYTIME_MIN,%d min,%d min
+SLOT_PLAYTIME_HOURS,%d h %02d min,%d h %02d min
+SLOT_PLAYTIME_UNKNOWN,—,—
+SLOT_SAVED_AT,Saved %s,Salvato il %s
+SLOT_OVERWRITE,Press again to replace this save,Premi di nuovo per sostituire questo salvataggio
+SLOT_DELETE,Delete,Elimina
+SLOT_DELETE_SURE,Press again to delete,Premi di nuovo per eliminare
+SLOT_DELETE_CONFIRM,This save will be deleted for good,Questo salvataggio verrà eliminato per sempre
+PAUSE_TITLE,Paused,Pausa
+PAUSE_RESUME,Resume,Riprendi
+PAUSE_SAVE,Save game,Salva la partita
+PAUSE_CONTROLS,Controls,Comandi
+PAUSE_QUIT,Quit to title,Torna al titolo
+PAUSE_QUIT_CONFIRM,Quit to title? Unsaved progress will be lost.,Tornare al titolo? I progressi non salvati andranno persi.
+PAUSE_QUIT_YES,Quit,Esci
+PAUSE_QUIT_NO,Cancel,Annulla
+SAVE_DONE,Game saved,Partita salvata
+SAVE_AUTO,Game saved automatically,Partita salvata automaticamente
+SAVE_BLOCKED_ENEMIES,Can't save: enemies nearby,Non puoi salvare: ci sono nemici vicini
+SAVE_BLOCKED_CHALLENGE,Can't save during a challenge,Non puoi salvare durante una sfida
+SAVE_BLOCKED_DEAD,Can't save now,Ora non puoi salvare
+LOADING_LANDS,Exploring new lands…,Alla scoperta di nuove terre…
+LOADING_DEPTHS,Descending into the cave: level %d of %d,Si scende nella grotta: livello %d di %d
+LOADING_METRO,Down into the catacombs: level %d of %d,Giù nelle catacombe: livello %d di %d
+LOADING_SURFACE,Back to the surface,Ritorno in superficie
+LOADING_GAME,Loading your game,Caricamento della partita
+CAVE_HINT,A cave: interact to explore the depths,Una grotta: interagisci per esplorare le profondità
+INTERACT,Interact,Interagisci
+CAVE_CLEARED,This cave has been cleared,Questa grotta è stata ripulita
+METRO_HINT,A ruined mausoleum: interact to go down into the catacombs,Un mausoleo in rovina: interagisci per scendere nelle catacombe
+METRO_CLEARED,These catacombs have been cleansed,Queste catacombe sono state purificate
+METRO_STAIRS_HINT,Stone steps to the crypt below,Gradini di pietra verso la cripta di sotto
+METRO_EXIT_HINT,The way back up to the open air,La via per tornare all'aria aperta
+STAIRS_HINT,Stairs going down,Scale che scendono
+EXIT_HINT,The way back to the surface,La via per tornare in superficie
+DUNGEON_LEVEL,Underground · level %d of %d,Sottoterra · livello %d di %d
+METRO_LEVEL,Catacombs · level %d of %d,Catacombe · livello %d di %d
+BOSS_NAME,Cave Guardian,Guardiano della grotta
+BOSS_DEFEATED,Guardian defeated! The way out is open,Guardiano sconfitto! La via d'uscita è aperta
+BOSS_NAME_METRO,The Crypt Abomination,L'Abominio della cripta
+METRO_BOSS_DEFEATED,The Abomination is slain! The way out is open,L'Abominio è morto! La via d'uscita è aperta
+MENU_CREDITS,Created by fdamore1984 with Claude Code,Creato da fdamore1984 con Claude Code
+CONTROLS_LOCK,Manual lock on the nearest enemy in sight (again: switch target),Aggancio manuale del nemico più vicino in vista (di nuovo: cambia)
+TOUCH_LOCK,Lock,Aggancia
+TOUCH_MAP,Map,Mappa
+MAP_TITLE,Map,Mappa
+MAP_HINT,%s / B: close,%s / B: chiudi
+CONTROLS_MAP,Map,Mappa
+ITEM_BLADE_GUARDIAN,Guardian's blade,Lama del Guardiano
+ITEM_ARMOR_GUARDIAN,Guardian's armor,Armatura del Guardiano
+ITEM_BOOTS_GUARDIAN,Guardian's boots,Stivali del Guardiano
+ITEM_CROWN_GUARDIAN,Guardian's crown,Corona del Guardiano
+ITEM_RING_GUARDIAN,Guardian's ring,Anello del Guardiano
+ITEM_BOOK_GUARDIAN,Guardian's tome,Tomo del Guardiano
+CONTROLS_HEADER_ACTION,Action,Azione
+MENU_OPTIONS,Options,Opzioni
+PAUSE_OPTIONS,Options,Opzioni
+OPTIONS_TITLE,Options,Opzioni
+OPTIONS_CONTROLS,"Controls: select a binding, then press the new key, mouse button or controller button (%s, right click or a long touch: leave it empty)","Comandi: scegli un tasto, poi premi il nuovo tasto della tastiera, del mouse o del controller (%s, clic destro o un tocco lungo: lascialo vuoto)"
+OPTIONS_HEADER_ACTION,Action,Azione
+OPTIONS_HEADER_KEYBOARD,Keyboard,Tastiera
+OPTIONS_HEADER_MOUSE,Mouse,Mouse
+OPTIONS_HEADER_CONTROLLER,Controller,Controller
+OPTIONS_DEVICE_KEYBOARD,key,tasto della tastiera
+OPTIONS_DEVICE_MOUSE,mouse button,tasto del mouse
+OPTIONS_DEVICE_CONTROLLER,controller button or stick,tasto o levetta del controller
+OPTIONS_LISTEN,"Press the new %s for ""%s"" (%d s, another device cancels)","Premi il nuovo %s per ""%s"" (%d s, un altro dispositivo annulla)"
+OPTIONS_BOUND,"""%s"" set to %s","""%s"" impostato su %s"
+OPTIONS_SHARED,also used by: %s,usato anche da: %s
+OPTIONS_CLEARED,"""%s"" now has no %s","""%s"" ora non ha nessun %s"
+OPTIONS_CLEAR_REQUIRED,"""%s"" needs at least one key: set another one first","""%s"" deve avere almeno un tasto: assegnane prima un altro"
+OPTIONS_CANCELLED,Cancelled: nothing changed,Annullato: nessuna modifica
+OPTIONS_RESET,Reset to defaults,Ripristina i predefiniti
+OPTIONS_RESET_DONE,All controls are back to their defaults,Tutti i comandi sono tornati quelli predefiniti
+OPTIONS_BACK,Back,Indietro
+BIND_NONE,—,—
+BIND_LEFT_STICK,Left stick,Levetta sinistra
+BIND_RIGHT_STICK,Right stick,Levetta destra
+BIND_MOUSE,Mouse %d,Mouse %d
+BIND_MOUSE_1,Left click,Clic sinistro
+BIND_MOUSE_2,Right click,Clic destro
+BIND_MOUSE_3,Middle click,Clic centrale
+BIND_MOUSE_8,Mouse back,Mouse indietro
+BIND_MOUSE_9,Mouse forward,Mouse avanti
+BIND_JOY,Button %d,Tasto %d
+BIND_JOY_0,A,A
+BIND_JOY_1,B,B
+BIND_JOY_2,X,X
+BIND_JOY_3,Y,Y
+BIND_JOY_4,Select,Select
+BIND_JOY_5,Guide,Guide
+BIND_JOY_6,Start,Start
+BIND_JOY_7,L3,L3
+BIND_JOY_8,R3,R3
+BIND_JOY_9,L1,L1
+BIND_JOY_10,R1,R1
+BIND_JOY_11,D-pad ↑,Croce ↑
+BIND_JOY_12,D-pad ↓,Croce ↓
+BIND_JOY_13,D-pad ←,Croce ←
+BIND_JOY_14,D-pad →,Croce →
+BIND_AXIS,Axis %d,Asse %d
+BIND_AXIS_0_NEG,Left stick ←,Levetta sinistra ←
+BIND_AXIS_0_POS,Left stick →,Levetta sinistra →
+BIND_AXIS_1_NEG,Left stick ↑,Levetta sinistra ↑
+BIND_AXIS_1_POS,Left stick ↓,Levetta sinistra ↓
+BIND_AXIS_2_NEG,Right stick ←,Levetta destra ←
+BIND_AXIS_2_POS,Right stick →,Levetta destra →
+BIND_AXIS_3_NEG,Right stick ↑,Levetta destra ↑
+BIND_AXIS_3_POS,Right stick ↓,Levetta destra ↓
+BIND_AXIS_4_POS,L2,L2
+BIND_AXIS_5_POS,R2,R2
+BIND_ACTION_MOVE_UP,Move up,Su
+BIND_ACTION_MOVE_DOWN,Move down,Giù
+BIND_ACTION_MOVE_LEFT,Move left,Sinistra
+BIND_ACTION_MOVE_RIGHT,Move right,Destra
+BIND_ACTION_MOVE_CLICK,Walk to the cursor,Cammina verso il cursore
+BIND_ACTION_ATTACK,Attack,Attacco
+BIND_ACTION_HEAVY_ATTACK,Power strike,Colpo potente
+BIND_ACTION_PARRY,Parry,Parata
+BIND_ACTION_DODGE,Dodge,Schivata
+BIND_ACTION_JUMP,Jump,Salto
+BIND_ACTION_INTERACT,Interact,Interagisci
+BIND_ACTION_RUN,Run / torch,Corsa / torcia
+BIND_ACTION_FOCUS,Focus,Focus
+BIND_ACTION_SPELL,Fireball,Palla di fuoco
+BIND_ACTION_SHIELD,Shield,Scudo
+BIND_ACTION_POTION,Health potion,Pozione di salute
+BIND_ACTION_MANA_POTION,Mana potion,Pozione di mana
+BIND_ACTION_STAMINA_POTION,Stamina potion,Pozione di vigore
+BIND_ACTION_INVENTORY,Inventory,Inventario
+BIND_ACTION_INVENTORY_SORT,Sort the inventory,Ordina l'inventario
+BIND_ACTION_MAP,Map,Mappa
+BIND_ACTION_LOCK_ON,Lock on,Aggancio
+BIND_ACTION_MENU,Pause menu,Menù di pausa
+BIND_JOY_SHORT_11,↑,↑
+BIND_JOY_SHORT_12,↓,↓
+BIND_JOY_SHORT_13,←,←
+BIND_JOY_SHORT_14,→,→
+CONTROLS_SPECIAL_FRENZY,"Full Frenzy, %s + %s together: a flurry of strikes, teleporting from enemy to enemy","Frenesia piena, %s + %s insieme: raffica di colpi teletrasportandoti da un nemico all'altro"
+HUD_FRENZY_READY,FRENZY! %s + %s,FRENESIA! %s + %s
+UPGRADE_FRENZY,Frenzy strikes +2,Colpi della Frenesia +2
+UPGRADE_H_BOMB,Cataclysm runes carried +1,Rune del Cataclisma trasportabili +1
+ITEM_H_BOMB,Cataclysm rune,Runa del Cataclisma
+ITEM_H_BOMB_DESC,for the power strike held in mid-air: smash it on the ground and the blast kills the enemies around,per il colpo potente tenuto premuto a mezz'aria: spaccala a terra e l'esplosione uccide i nemici attorno
+MENU_TUTORIAL,Tutorial,Tutorial
+PAUSE_TUTORIAL,Tutorial,Tutorial
+TUTORIAL_TITLE,Tutorial,Tutorial
+TUTORIAL_PREV,← Back,← Indietro
+TUTORIAL_NEXT,Next →,Avanti →
+TUTORIAL_CLOSE,Close,Chiudi
+TUTORIAL_PAGE,Page %d / %d,Pagina %d / %d
+TUTORIAL_HINT,%s / %s: previous / next page · %s: close,%s / %s: pagina precedente / successiva · %s: chiudi
+TUTORIAL_MOVE_TITLE,Moving,Muoversi
+TUTORIAL_MOVE_TEXT,"Move with the left stick or the keyboard, or walk to the cursor holding the middle mouse button. Tap {run} to start or stop running (it stops by itself when you stand still); hold {run} to light or put out the torch, you need it at night and in the caves: it lights the way you face. {jump} jumps: you climb onto higher ground and enemy strikes pass under you. Dodge while running to slide.","Muoviti con la levetta sinistra o la tastiera, oppure cammina verso il cursore tenendo premuto il tasto centrale del mouse. Premi {run} per iniziare o smettere di correre (smetti da solo quando ti fermi); tieni premuto {run} per accendere o spegnere la torcia, ti serve di notte e nelle grotte: illumina la direzione in cui guardi. {jump} salta: sali sui rilievi e i colpi dei nemici ti passano sotto. Schiva mentre corri per scivolare."
+TUTORIAL_COMBO_TITLE,Sword and combos,Spada e combo
+TUTORIAL_COMBO_TEXT,"Press {attack} to strike with the sword: the strike lands right away. Quick strikes form a combo (3 at first), each one stronger than the last; hold {attack} to keep attacking. {heavy_attack} is the power strike, wide and very strong (it uses a little mana): it ends the combo with a bonus. Hold it to charge it up to double damage (it uses mana) and to chain more power strikes.","Premi {attack} per colpire con la spada: il colpo parte subito. Colpi rapidi formano una combo (3 all'inizio), ognuno più forte del precedente; tieni premuto {attack} per continuare ad attaccare. {heavy_attack} è il colpo potente, ampio e fortissimo (consuma un po' di mana): chiude la combo con un bonus. Tienilo premuto per caricarlo fino al doppio dei danni (consuma mana) e per concatenare altri colpi potenti."
+TUTORIAL_PARRY_TITLE,Parry,Parata
+TUTORIAL_PARRY_TEXT,"Hold {parry} to parry with the sword across your body: you block the strikes coming from the front, arrows and bolts included, but it drains stamina. A perfect parry, started right before the hit, stuns the enemy and for 4 seconds doubles your damage and speeds up your attacks. The parry is instant: it cancels whatever you are doing.","Tieni premuto {parry} per parare con la spada di traverso: blocchi i colpi che arrivano da davanti, frecce e dardi compresi, ma consumi vigore. Una parata perfetta, iniziata appena prima del colpo, stordisce il nemico e per 4 secondi raddoppia i tuoi danni e velocizza i tuoi attacchi. La parata è istantanea: annulla qualsiasi cosa tu stia facendo."
+TUTORIAL_DODGE_TITLE,Dodge and jump,Schivata e salto
+TUTORIAL_DODGE_TEXT,"{dodge} dodges: a roll on the ground, a dash in mid-air. For an instant you can't be hit and you can steer; press it again to chain more dodges (upgrades add more). Parrying, dodging and jumping cancel any action at once, even a strike halfway through. Jumps and dodges combine: jump, dash in the air and strike from above with {attack}.","{dodge} schiva: una capriola a terra, uno scatto a mezz'aria. Per un istante non puoi essere colpito e puoi cambiare direzione; premilo di nuovo per concatenare altre schivate (i potenziamenti ne aggiungono). Parare, schivare e saltare annullano subito qualsiasi azione, anche un colpo a metà. Salti e schivate si combinano: salta, scatta in aria e colpisci dall'alto con {attack}."
+TUTORIAL_FRENZY_TITLE,Frenzy,La Frenesia
+TUTORIAL_FRENZY_TEXT,"The red bar in the top-left panel is Frenzy. It grows with every sword hit that lands, even when the enemy blocks it with his guard; power strikes and ground attacks fill it faster. If you stop attacking for 4 seconds it slowly drains: stay in the fight! When it is full the bar pulses, {parry} + {attack} appears on it and a red ring surrounds the goblin.","La barra rossa nel pannello in alto a sinistra è la Frenesia. Cresce a ogni colpo di spada andato a segno, anche quando il nemico lo blocca con la guardia; i colpi potenti e gli attacchi a terra la riempiono più in fretta. Se smetti di attaccare per 4 secondi cala piano piano: resta nella mischia! Quando è piena la barra pulsa, ci compare {parry} + {attack} e un anello rosso circonda il goblin."
+TUTORIAL_SPECIAL_TITLE,Frenzy special attack,Attacco speciale della Frenesia
+TUTORIAL_SPECIAL_TEXT,"With a full Frenzy bar press {parry} and {attack} together (on touch screens, the two buttons at once). Time stops: the enemies freeze, the world goes dark, the goblin roars in a red glow and the camera zooms in. Then he teleports next to the nearest enemy and strikes in a flurry; when it falls he moves on to the next one. Up to 10 hits (+2 with every ""Frenzy strikes"" upgrade); with no enemies in reach the flurry ends early. You can't be hit during the attack; at the end Frenzy drops to zero.","Con la barra della Frenesia piena premi {parry} e {attack} insieme (sugli schermi touch, i due pulsanti insieme). Il tempo si ferma: i nemici si bloccano, il mondo si oscura, il goblin ruggisce in un bagliore rosso e la visuale si avvicina. Poi si teletrasporta accanto al nemico più vicino e lo colpisce a raffica; quando cade passa al successivo. Fino a 10 colpi (+2 con ogni potenziamento ""Colpi della Frenesia""); senza nemici a portata la raffica finisce prima. Durante l'attacco non puoi essere colpito; alla fine la Frenesia torna a zero."
+TUTORIAL_SUPPLIES_TITLE,Stamina and potions,Vigore e pozioni
+TUTORIAL_SUPPLIES_TEXT,"The green bar is your stamina: attacking, dodging, jumping, parrying and running drain it, and it recovers by itself as soon as you stop. When it's empty you can't attack or dodge, and a parry can break your guard. Your potions are in the bar at the bottom: health {potion}, mana {mana_potion}, stamina {stamina_potion}. Drinking takes a moment: enemies rush in to punish you.","La barra verde è il vigore: attaccare, schivare, saltare, parare e correre lo consumano, e si ricarica da solo appena ti fermi. Quando è vuoto non puoi attaccare né schivare, e una parata può spezzarti la guardia. Le pozioni sono nella barra in basso: salute {potion}, mana {mana_potion}, vigore {stamina_potion}. Bere richiede un attimo: i nemici ne approfittano per punirti."
+TUTORIAL_ARSENAL_TITLE,"Fireball, shield and runes","Palla di fuoco, scudo e rune"
+TUTORIAL_ARSENAL_TEXT,"{spell} casts a fireball that chases the nearest enemy in sight: it costs mana (the blue bar), which does not come back by itself: drink mana potions. {shield} raises a magic bubble that absorbs one hit from any direction (30-second recharge). In mid-air, tap {heavy_attack} for a slam that hits the enemies around (it costs mana and stamina); hold it, with a Cataclysm rune in your belt, to smash the rune on the ground: the blast kills the enemies around and takes a big chunk out of the boss.","{spell} lancia una palla di fuoco che insegue il nemico più vicino in vista: costa mana (la barra blu), che non torna da solo: bevi pozioni di mana. {shield} alza una bolla magica che assorbe un colpo da qualsiasi direzione (si ricarica in 30 secondi). A mezz'aria premi e lascia {heavy_attack} per uno slam che colpisce i nemici attorno (costa mana e vigore); tienilo premuto, con una runa del Cataclisma nella cintura, per spaccare la runa a terra: l'esplosione uccide i nemici attorno e toglie un bel pezzo di vita al boss."
+TUTORIAL_ENEMIES_TITLE,The enemies,I nemici
+TUTORIAL_ENEMIES_TEXT,"Every enemy blow costs you one heart (two from the boss): a few mistakes and you're down. Enemies have only a few health points too, shown as segments over their heads: every hit takes one away, the strongest hits two or three. Before striking enemies glow red and pull back their weapon: that's the moment to parry or dodge. No more than two attack at once, the others circle around. Sometimes they raise their guard: hit them from the side or from behind. Their blows and arrows hurt the other monsters too. You lock on to the nearest enemy in sight by yourself ({lock_on} keeps the lock); it gets a red ring and your strikes and fireballs go its way. Every now and then an undead horde shows up: from 50 to 200 of them, very weak, all running at you; they fall apart on contact and hurt you. Cut them down before they reach you, or jump over them.","Ogni colpo nemico ti costa un cuore (due quelli del boss): pochi errori e sei a terra. Anche i nemici hanno pochi punti vita, segnati a tacche sopra la testa: ogni colpo ne toglie una, i più forti due o tre. Prima di colpire i nemici si illuminano di rosso e caricano l'arma: è il momento di parare o schivare. Non più di due attaccano insieme, gli altri ti girano attorno. A volte alzano la guardia: colpiscili di fianco o alle spalle. I loro colpi e le loro frecce feriscono anche gli altri mostri. Agganci da solo il nemico più vicino in vista ({lock_on} tiene l'aggancio); ha un anello rosso e i tuoi colpi e le palle di fuoco vanno verso di lui. Ogni tanto arriva un'orda di non morti: da 50 a 200, debolissimi, tutti di corsa verso di te; si sfasciano al contatto e ti feriscono. Abbattili prima che ti raggiungano, o saltaci sopra."
+TUTORIAL_LOOT_TITLE,"Chests, inventory and merchants","Forzieri, inventario e mercanti"
+TUTORIAL_LOOT_TEXT,"Walk up to chests, merchants, totems, caves and mausoleums and press {interact} when the prompt appears. Chests drop gold and items: swords, armor, boots, amulets, rings and spell books. {inventory} opens the inventory (the game pauses): equip your gear, read the books, sort with {inventory_sort}. Merchants buy what you don't use and sell potions, Cataclysm runes and rare gear.","Avvicinati a forzieri, mercanti, totem, grotte e mausolei e premi {interact} quando compare la scritta. I forzieri danno oro e oggetti: spade, armature, stivali, amuleti, anelli e libri di magia. {inventory} apre l'inventario (il gioco va in pausa): equipaggia l'attrezzatura, leggi i libri, ordina con {inventory_sort}. I mercanti comprano quello che non usi e vendono pozioni, rune del Cataclisma e attrezzatura rara."
+TUTORIAL_WORLD_TITLE,Exploring the lands,Esplorare le terre
+TUTORIAL_WORLD_TEXT,"The lands have no borders. The minimap in the top-right corner shows enemies, chests, totems, merchants, caves and mausoleums, but only in the places you have already explored; {map} opens the full map. At night and underground it's pitch black: you need the torch, whose light stops at mountains and walls. Behind a wall you see the goblin's outline. Hold {focus} for focus mode: the world dims and only the goblin and the things to pick up keep their colors. Jump to climb the hills and ramps.","Le terre non hanno confini. La minimappa in alto a destra mostra nemici, forzieri, totem, mercanti, grotte e mausolei, ma solo nei posti che hai già esplorato; {map} apre la mappa completa. Di notte e sottoterra è buio pesto: ti serve la torcia, la cui luce si ferma contro montagne e muri. Dietro un muro vedi la sagoma del goblin. Tieni premuto {focus} per il focus: il mondo si spegne e solo il goblin e le cose da raccogliere restano a colori. Salta per salire su colline e rampe."
+TUTORIAL_BUILDINGS_TITLE,Caves and the boss,Grotte e boss
+TUTORIAL_BUILDINGS_TEXT,"Cave entrances open in the mountain walls: go in with {interact}. Down there it's dark and the enemies get tougher level after level: on every level look for the stairs. On the last one the Cave Guardian waits in his arena: he summons help and strikes from afar. Beat him for gold, a Cataclysm rune and gear you won't find anywhere else.","Nelle pareti delle montagne si aprono gli ingressi delle grotte: entra con {interact}. Laggiù è buio e i nemici si fanno più duri livello dopo livello: a ogni livello cerca le scale. Nell'ultimo il Guardiano della grotta ti aspetta nella sua arena: chiama rinforzi e colpisce da lontano. Battilo per oro, una runa del Cataclisma e attrezzatura che non trovi altrove."
+TUTORIAL_METRO_TITLE,The catacombs,Le catacombe
+TUTORIAL_METRO_TEXT,"Ruined mausoleums (a purple square with a skull on the map) lead down into the catacombs: go down with {interact}. It's pitch black and nothing living is left down there: only packs of undead and the ghouls of the crypts, with claws and many red eyes; some spit venomous bile from afar, the bloated ones crush the ground around them. In the middle of every level the stone naves run between two sunken ossuary pits (jump down and climb back up with a jump), with rows of great tombs; around them are chapels and burial chambers. Find the steps going down; on the last level the Crypt Abomination waits, summoning the undead.","I mausolei in rovina (un quadrato viola con un teschio sulla mappa) portano giù nelle catacombe: scendi con {interact}. È buio pesto e laggiù non è rimasto niente di vivo: solo branchi di non morti e i ghoul delle cripte, con artigli e tanti occhi rossi; alcuni sputano bile velenosa da lontano, quelli gonfi schiacciano il terreno attorno a sé. In mezzo a ogni livello le navate di pietra corrono fra due fosse ossarie sprofondate (salta giù e risali con un salto), con file di grandi tombe; attorno ci sono cappelle e camere sepolcrali. Trova i gradini che scendono; nell'ultimo livello ti aspetta l'Abominio della cripta, che evoca i non morti."
+TUTORIAL_PROGRESS_TITLE,"Challenges, levels and saves","Sfide, livelli e salvataggi"
+TUTORIAL_PROGRESS_TEXT,"Interact with a totem for a 30-second challenge in waves: survive it for experience and a potion. Every defeated enemy gives experience; at every level your damage grows and you pick an upgrade among the cards on offer (""Frenzy strikes +2"" too; extra health only shows up now and then). The game saves by itself every 5 minutes and when you enter a cave, with no enemies nearby; from the pause menu ({menu}) you save by hand.","Interagisci con un totem per una sfida di 30 secondi a ondate: sopravvivi per esperienza e una pozione. Ogni nemico sconfitto dà esperienza; a ogni livello i tuoi danni crescono e scegli un potenziamento fra le carte proposte (anche ""Colpi della Frenesia +2""; la salute in più compare solo ogni tanto). Il gioco salva da solo ogni 5 minuti e quando entri in una grotta, senza nemici vicini; dal menù di pausa ({menu}) salvi a mano."
+CLOUD_SYNCING,Syncing saves with your ufotizio.com account…,Sincronizzo i salvataggi con il tuo account ufotizio.com…
+CLOUD_LINKED,Saves on the ufotizio.com account %s,Salvataggi sull'account ufotizio.com %s
+CLOUD_LOCAL,Not signed in to ufotizio.com: saves stay in this browser,Accesso a ufotizio.com non fatto: i salvataggi restano in questo browser
+CLOUD_FAILED,Can't reach your ufotizio.com account: for now saves stay in this browser,Account ufotizio.com non raggiungibile: per ora i salvataggi restano in questo browser
+GAME_TITLE,Gobelino,Gobelino
+OPTIONS_LANGUAGE,Language: %s,Lingua: %s
+LANGUAGE_NAME_IT,Italiano,Italiano
+LANGUAGE_NAME_EN,English,English
+CONTROLS_EDIT,Edit,Modifica
+KEYBINDS_TITLE,Edit controls,Modifica comandi

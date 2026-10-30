@@ -1,15 +1,18 @@
 # Regole di lavoro per Gobelino
 
-- **Lingua**: per ora tutto ciò che vede il giocatore è solo in inglese.
-  I testi del gioco stanno in `data/translations.csv` (colonna `en`)
-  e nel codice si usano con `tr("CHIAVE")`; mai testi scritti nel codice.
-  Anche la pagina itch.io è solo in inglese. Documentazione interna, commenti e
-  commit restano in italiano.
+- **Lingua**: tutto ciò che vede il giocatore è in italiano e in inglese
+  (si sceglie in Opzioni; nel browser vale la lingua del sito). I testi del
+  gioco stanno in `data/translations.csv` (colonne `it` ed `en`, sempre
+  allineate: ogni testo nuovo o cambiato va scritto in tutte e due) e nel
+  codice si usano con `tr("CHIAVE")`; mai testi scritti nel codice. La pagina
+  itch.io resta in inglese (dice che il gioco è in italiano e in inglese).
+  Documentazione interna, commenti e commit restano in italiano.
 - **Pagina itch.io sempre aggiornata**: a ogni modifica che cambia ciò che il
   gioco fa o mostra, aggiorna `store/itch/README.md` (descrizione, comandi,
   tag) e rigenera copertina e screenshot con `tools/store_capture.tscn`
   (istruzioni nel README della cartella); con la stessa scena (`-- tutorial`)
-  rigenera anche le immagini del tutorial in `assets/tutorial/` e, se cambia
+  rigenera anche le immagini del tutorial in `assets/tutorial/` (una
+  cartella per lingua) e, se cambia
   una meccanica, aggiorna i testi delle sue pagine (`TUTORIAL_*`). itch.io non ha API per la pagina:
   segnala all'utente cosa ricaricare a mano.
 - **Contenuti nei dati**: caratteristiche di nemici e simili in `data/`

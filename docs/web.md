@@ -39,6 +39,9 @@ anche la pagina itch.io (`store/itch/`) mostrata sotto il gioco.
 
 ## Cosa cambia nel browser
 
+- **Lingua**: è quella del sito (`ufotizioCloud.language()`, vedi sotto),
+  anche se nel browser ne era salvata un'altra; cambiandola dalle Opzioni
+  del gioco cambia anche quella del sito (`setLanguage`).
 - `Platform.is_web` è vero: nel menù iniziale non c'è **Esci** (il gioco si
   chiude chiudendo la pagina).
 - **Comandi**: tastiera e mouse come sul PC; controller con l'API Gamepad del
@@ -62,6 +65,7 @@ I file del giocatore in `user://` (nel browser stanno in IndexedDB) sono:
 | File | Contenuto |
 |---|---|
 | `savegame_1.json` … `savegame_3.json` | i tre slot |
+| `settings.json` | lingua |
 | `keybinds.json` | comandi personalizzati |
 
 L'autoload `Cloud` li tiene allineati con l'account del sito, **se la pagina
@@ -95,6 +99,12 @@ window.ufotizioCloud = {
   signedIn() { return true; },
   // Nome da mostrare nel menù del gioco.
   userName() { return "Mario"; },
+  // Lingua del sito ("it" o "en"): il gioco la usa al posto di quella
+  // salvata (facoltativo: senza, vale quella salvata).
+  language() { return "it"; },
+  // Il giocatore ha cambiato lingua dalle Opzioni del gioco: il sito passa
+  // alla stessa lingua (facoltativo).
+  setLanguage(code) { /* ... */ },
   // Promise di un TESTO JSON: { "<name>": { "text": "...", "updated_at": 1730000000, "deleted": false }, ... }
   loadFiles(game) { /* ... */ },
   // Salva (o sostituisce) un file; Promise.

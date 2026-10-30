@@ -1,7 +1,8 @@
 class_name PauseMenu
 extends Control
-## Menù di pausa (Start / Esc durante il gioco): riprendi, salva, comandi,
-## tutorial, opzioni (rimappatura dei tasti, OptionsPanel), torna al titolo
+## Menù di pausa (Start / Esc durante il gioco): riprendi, salva, comandi
+## (con la rimappatura dei tasti), tutorial, opzioni (lingua, OptionsPanel),
+## torna al titolo
 ## (dopo una conferma: i progressi non salvati si perdono).
 ## Si salva solo senza nemici vicini (anche in movimento): se non si può, il
 ## pulsante è spento e sotto c'è il motivo. Il tasto che
