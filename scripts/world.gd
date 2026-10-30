@@ -26,8 +26,13 @@ extends Node2D
 ## alto. Il terreno viene generato e disegnato a blocchi di rombi attorno
 ## alla telecamera; i blocchi più alti di quelli dietro vengono disegnati
 ## tra i personaggi (non col resto del terreno), così coprono chi ci passa
-## dietro; quelli che coprono il giocatore, e tutti quelli attorno,
-## diventano trasparenti finché resta lì dietro.
+## dietro. Non diventano trasparenti: di chi sta dietro si vede solo la
+## sagoma (vedi is_covered e Silhouette).
+##
+## Mappa e minimappa mostrano solo le zone scoperte: i rombi entro un raggio
+## dal giocatore ("map" in data/world.json) si segnano a mano a mano che si
+## esplora e restano scoperti (vedi reveal_around, is_explored), una mappa
+## per la superficie e una per ogni piano dei sotterranei (map_key).
 ##
 ## Luce della torcia (vedi Flashlight): si calcola in pianta, cioè nel punto
 ## del terreno a quota zero sotto quello che si disegna, dove stanno anche
@@ -60,19 +65,14 @@ const PREFETCH_MARGIN := 380.0
 const KEEP_MARGIN := 320.0
 ## I dati fuori dalla regione si dimenticano solo oltre questi rombi in memoria.
 const FORGET_THRESHOLD := 110000
-## Blocchi davanti al giocatore: del tutto trasparenti entro OCCLUSION_INNER
-## pixel dal suo corpo sullo schermo, di nuovo pieni oltre OCCLUSION_OUTER.
-const OCCLUSION_INNER := 150.0
-const OCCLUSION_OUTER := 240.0
-## Altezza del corpo del giocatore sopra i piedi, dove si misura la distanza.
-const OCCLUSION_BODY := 30.0
-const OCCLUSION_FADE_SPEED := 5.0
-## I blocchi da rendere trasparenti si cercano solo ogni tanto (la
-## dissolvenza continua a ogni frame): costa meno e non si nota.
-const OCCLUSION_INTERVAL := 0.05
-## Solo i blocchi più alti dei piedi di almeno tanto coprono davvero il corpo
-## (i gradini bassi restano pieni).
+## Solo i blocchi più alti dei piedi di almeno tanto coprono davvero il
+## corpo di un personaggio (i gradini bassi no, vedi is_covered).
 const OCCLUSION_MIN_HEIGHT := 40.0
+## I blocchi tra i personaggi si ordinano qualche pixel dopo il loro
+## vertice più arretrato (vedi _show_chunk).
+const BLOCK_SORT_BIAS := 8.0
+## Lato dei quadrati della griglia dei blocchi che coprono (vedi is_covered).
+const COVER_GRID := 128.0
 ## Gli ostacoli vengono messi solo in questa parte del rombo, lontano dai bordi.
 const PLACE_MIN := 14.0
 const PLACE_MAX := 44.0
@@ -201,12 +201,18 @@ var _maintain_timer := 0.0
 var _blocking_cell := Vector2i.ZERO
 var _has_blocking_cell := false
 var _contact_glow := ContactGlow.new()
-## Blocchi resi trasparenti perché coprono il giocatore.
-var _faded_blocks := {}
-## Blocchi che adesso coprono il giocatore (blocco -> true) e attesa prima di
-## ricontrollarli.
-var _wanted_blocks := {}
-var _occlusion_timer := 0.0
+## Blocchi tra i personaggi per quadrato dello schermo (vedi is_covered).
+var _cover_grid := {}
+## Zone scoperte delle mappe (vedi reveal_around): chiave della mappa
+## (map_key) -> pezzo di mondo -> 64 bit, uno per rombo del pezzo.
+var explored := {}
+## Mappa in cui si è adesso: "surface" o il piano di un sotterraneo (la
+## imposta Game).
+var map_key := "surface"
+var _map_data: Dictionary = DATA.data["map"]
+## Ultimo punto attorno a cui si è scoperta la mappa e attesa per il prossimo.
+var _revealed_at := Vector2.INF
+var _reveal_timer := 0.0
 ## Punto in pianta in cui si calcola la luce di quello che si disegna (vedi LightMode).
 var _light_mode := LightMode.NONE
 var _light_base_a := Vector2.ZERO
@@ -288,7 +294,20 @@ func save_state() -> Dictionary:
 	return {
 		"chests": _opened_chests.keys().map(SaveGame.array), "totems": totems,
 		"stocks": stocks, "caves": cleared_caves.keys().map(SaveGame.array),
+		"explored": _explored_state(),
 	}
+
+
+## Zone scoperte da salvare: per ogni mappa, terne [x, y, bit] dei pezzi
+## (i bit come testo: i numeri del JSON non tengono 64 bit).
+func _explored_state() -> Dictionary:
+	var result := {}
+	for key: String in explored:
+		var list := []
+		for chunk: Vector2i in explored[key]:
+			list.append([chunk.x, chunk.y, str(explored[key][chunk])])
+		result[key] = list
+	return result
 
 
 func load_state(data: Dictionary) -> void:
@@ -302,6 +321,13 @@ func load_state(data: Dictionary) -> void:
 		_merchant_stocks[SaveGame.vector(entry["at"])] = stock
 	for at: Array in data.get("caves", []):
 		cleared_caves[SaveGame.vector(at)] = true
+	# I salvataggi di prima non hanno le zone scoperte: la mappa riparte vuota.
+	var saved_maps: Dictionary = data.get("explored", {})
+	for key: String in saved_maps:
+		var seen := {}
+		for entry: Array in saved_maps[key]:
+			seen[Vector2i(int(entry[0]), int(entry[1]))] = str(entry[2]).to_int()
+		explored[key] = seen
 
 
 func _setup_noise(noise: FastNoiseLite, offset: int, frequency: float, octaves: int) -> void:
@@ -321,68 +347,109 @@ func _process(delta: float) -> void:
 		var chunk: Vector2i = _view_queue.pop_back()
 		if not _chunk_views.has(chunk):
 			_show_chunk(chunk)
-	_update_occlusion(delta)
+	_update_reveal(delta)
 
 
-## I blocchi davanti al giocatore che lo coprirebbero diventano
-## trasparenti in tutta la zona attorno a lui: si vede cosa succede dietro
-## pareti, muri del sotterraneo e montagne.
-func _update_occlusion(delta: float) -> void:
-	var hero := player as Player
-	if hero == null:
-		return
-	var feet := hero.position
-	var altitude := hero.altitude()
-	var body := feet - Vector2(0, altitude + OCCLUSION_BODY)
-	_occlusion_timer -= delta
-	if _occlusion_timer <= 0.0:
-		_occlusion_timer = OCCLUSION_INTERVAL
-		_wanted_blocks.clear()
-		var center := _chunk_of(cell_at(feet))
-		for i in range(-1, 3):
-			for j in range(-1, 3):
-				var entry: Variant = _chunk_views.get(center + Vector2i(i, j))
-				if entry == null:
-					continue
-				for node: Node in entry["nodes"]:
-					var block := node as TerrainBlock
-					if block and _covers(block, feet, altitude, body):
-						_wanted_blocks[block] = true
-	var wanted := _wanted_blocks
-	for block: Variant in wanted:
-		if is_instance_valid(block):
-			_faded_blocks[block] = true
-	for key: Variant in _faded_blocks.keys():
-		# I blocchi dei pezzi tolti nel frattempo non esistono più.
-		if not is_instance_valid(key):
-			_faded_blocks.erase(key)
+## Il punto (sullo schermo, già alzato dell'altezza a cui è disegnato) è
+## coperto da un blocco del terreno disegnato davanti a chi ha i piedi in
+## feet: i muri non diventano trasparenti, dietro si vede la sagoma (vedi
+## Silhouette). Si guardano i blocchi tra i personaggi dei pezzi vicini.
+func is_covered(feet: Vector2, altitude: float, points: PackedVector2Array) -> bool:
+	for point in points:
+		var blocks: Variant = _cover_grid.get(Vector2i((point / COVER_GRID).floor()))
+		if blocks == null:
 			continue
-		var block := key as TerrainBlock
-		var target := 0.0
-		if not wanted.has(block):
-			target = 1.0
-		elif OCCLUSION_OUTER > OCCLUSION_INNER:
-			target = smoothstep(OCCLUSION_INNER, OCCLUSION_OUTER, _block_distance(block, body))
-		block.modulate.a = move_toward(block.modulate.a, target, OCCLUSION_FADE_SPEED * delta)
-		if target >= 1.0 and block.modulate.a >= 1.0:
-			_faded_blocks.erase(block)
+		for block: TerrainBlock in blocks:
+			if block.position.y > feet.y and block.top > altitude + OCCLUSION_MIN_HEIGHT \
+					and Geometry2D.is_point_in_polygon(point, block.outline()):
+				return true
+	return false
 
 
-## Il blocco è disegnato dopo il giocatore (gli sta davanti), è più alto
-## dei suoi piedi ed è vicino al suo corpo sullo schermo.
-func _covers(block: TerrainBlock, feet: Vector2, altitude: float, body: Vector2) -> bool:
-	if block.position.y <= feet.y or _top_height(block.cell) < altitude + OCCLUSION_MIN_HEIGHT:
-		return false
-	return _block_distance(block, body) < OCCLUSION_OUTER
+## Aggiunge (o toglie) il blocco nei quadrati della griglia toccati dalla
+## sua sagoma sullo schermo, così is_covered guarda solo quelli lì.
+func _index_cover(block: TerrainBlock, add: bool) -> void:
+	var bounds := Rect2(block.outline()[0], Vector2.ZERO)
+	for point in block.outline():
+		bounds = bounds.expand(point)
+	var first := Vector2i((bounds.position / COVER_GRID).floor())
+	var last := Vector2i((bounds.end / COVER_GRID).floor())
+	for x in range(first.x, last.x + 1):
+		for y in range(first.y, last.y + 1):
+			var key := Vector2i(x, y)
+			if add:
+				if not _cover_grid.has(key):
+					_cover_grid[key] = []
+				_cover_grid[key].append(block)
+			elif _cover_grid.has(key):
+				_cover_grid[key].erase(block)
+				if _cover_grid[key].is_empty():
+					_cover_grid.erase(key)
 
 
-## Distanza sullo schermo tra il punto e la parete del blocco (dalla cima
-## alla base, al centro del rombo).
-func _block_distance(block: TerrainBlock, point: Vector2) -> float:
-	var ground := cell_center(block.cell)
-	var top := ground - Vector2(0, _top_height(block.cell))
-	var y := clampf(point.y, top.y, ground.y)
-	return point.distance_to(Vector2(ground.x, y))
+## Sagoma sullo schermo del blocco disegnato (base e cima), per is_covered.
+func block_outline(cell: Vector2i) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	var corners := cell_corners(cell)
+	for k in 4:
+		points.append(corners[k])
+		points.append(corners[k] - Vector2(0, corner_height(cell, k)))
+	return Geometry2D.convex_hull(points)
+
+
+# --- Mappa scoperta ----------------------------------------------------
+
+## Raggio attorno al giocatore entro cui si scopre la mappa (e si vedono
+## i nemici sulla minimappa), in pixel sullo schermo.
+func reveal_radius() -> float:
+	return float(_map_data["reveal_radius"])
+
+
+## Scopre la mappa attorno al giocatore ogni tanto, quando si è spostato.
+func _update_reveal(delta: float) -> void:
+	_reveal_timer -= delta
+	if player == null or _reveal_timer > 0.0:
+		return
+	_reveal_timer = float(_map_data["reveal_interval"])
+	if _revealed_at.distance_to(player.position) >= float(_map_data["reveal_step"]):
+		reveal_around(player.position)
+
+
+## Segna come scoperti i rombi entro reveal_radius dal punto, nella mappa
+## attuale: restano scoperti per sempre (si salvano, vedi save_state).
+func reveal_around(point: Vector2) -> void:
+	_revealed_at = point
+	var radius := reveal_radius()
+	if not explored.has(map_key):
+		explored[map_key] = {}
+	var seen: Dictionary = explored[map_key]
+	var low := to_grid(point + Vector2(-radius, 0)).min(to_grid(point + Vector2(0, -radius)))
+	var high := to_grid(point + Vector2(radius, 0)).max(to_grid(point + Vector2(0, radius)))
+	for u in range(floori(low.x), ceili(high.x) + 1):
+		for v in range(floori(low.y), ceili(high.y) + 1):
+			var cell := Vector2i(u, v)
+			if cell_center(cell).distance_to(point) > radius:
+				continue
+			var chunk := _chunk_of(cell)
+			var bit := 1 << ((cell.x - chunk.x * CHUNK_CELLS) + (cell.y - chunk.y * CHUNK_CELLS) * CHUNK_CELLS)
+			seen[chunk] = int(seen.get(chunk, 0)) | bit
+
+
+## Il punto è in una zona già scoperta della mappa attuale.
+func is_explored(point: Vector2) -> bool:
+	var seen: Dictionary = explored.get(map_key, {})
+	var cell := cell_at(point)
+	var chunk := _chunk_of(cell)
+	var mask := int(seen.get(chunk, 0))
+	return mask & (1 << ((cell.x - chunk.x * CHUNK_CELLS) + (cell.y - chunk.y * CHUNK_CELLS) * CHUNK_CELLS)) != 0
+
+
+## Cambia mappa (superficie o piano di un sotterraneo) e scopre subito
+## attorno al giocatore.
+func set_map_key(key: String) -> void:
+	map_key = key
+	_revealed_at = Vector2.INF
+	_reveal_timer = 0.0
 
 
 # --- Coordinate --------------------------------------------------------
@@ -1281,10 +1348,13 @@ func _show_chunk(chunk: Vector2i) -> void:
 					var block := TerrainBlock.new()
 					block.world = self
 					block.cell = cell
-					block.position = cell_corners(cell)[0]
+					# Ordinato poco dopo il suo vertice più arretrato: a pari
+					# altezza sullo schermo il blocco copre chi gli sta dietro.
+					block.position = cell_corners(cell)[0] + Vector2(0, BLOCK_SORT_BIAS)
 					block.material = LightShaders.ground()
 					entities.add_child(block)
 					nodes.append(block)
+					_index_cover(block, true)
 	_chunk_views[chunk] = {"view": view, "nodes": nodes}
 
 
@@ -1292,17 +1362,31 @@ func _hide_chunk(chunk: Vector2i) -> void:
 	var entry: Dictionary = _chunk_views[chunk]
 	entry["view"].queue_free()
 	for node: Node in entry["nodes"]:
+		if node is TerrainBlock:
+			_index_cover(node, false)
 		node.queue_free()
 	_chunk_views.erase(chunk)
 
 
 ## Un blocco più alto di quelli dietro può coprire chi ci passa dietro:
-## va disegnato anche tra i personaggi, ordinato con loro.
+## va disegnato anche tra i personaggi, ordinato con loro. Anche i blocchi
+## in mezzo a un edificio o a un muro, se dietro di loro, abbastanza vicino
+## da finire sotto il loro tetto sullo schermo, c'è un posto in cui si
+## cammina: altrimenti chi passa dietro un edificio alto verrebbe disegnato
+## sopra il tetto.
 func _covers_behind(cell: Vector2i) -> bool:
 	var top := _top_height(cell)
 	for step: Vector2i in [Vector2i(-1, 0), Vector2i(0, -1), Vector2i(-1, -1)]:
 		if _top_height(cell + step) < top:
 			return true
+	if top <= 0.0 or not is_barrier(cell):
+		return false
+	# Ogni rombo più indietro è mezzo rombo più in alto sullo schermo.
+	var reach := ceili((top + CELL) / (CELL * 0.5))
+	for a in reach + 1:
+		for b in reach + 1 - a:
+			if (a > 0 or b > 0) and not is_barrier(cell - Vector2i(a, b)):
+				return true
 	return false
 
 
@@ -1312,7 +1396,7 @@ func draw_chunk(canvas: CanvasItem, chunk: Vector2i, offset: Vector2) -> void:
 	# Da dietro in avanti: prima i rombi con u + v più piccolo. I blocchi che
 	# coprono chi sta dietro li disegna il loro TerrainBlock, tra i personaggi;
 	# qui sotto resta il pavimento da cui salgono, che si vede quando il
-	# blocco diventa trasparente (vedi _update_occlusion).
+	# blocco non c'è (vedi refresh_now).
 	for depth in 2 * CHUNK_CELLS - 1:
 		for i in range(maxi(0, depth - CHUNK_CELLS + 1), mini(depth, CHUNK_CELLS - 1) + 1):
 			var cell := chunk * CHUNK_CELLS + Vector2i(i, depth - i)
@@ -1809,7 +1893,6 @@ func set_dungeon(value: Dungeon) -> void:
 	for chunk: Vector2i in _chunk_views.keys():
 		_hide_chunk(chunk)
 	_view_queue.clear()
-	_faded_blocks.clear()
 	_chunk_obstacles.clear()
 	_near_cache.clear()
 	_close_cache.clear()
@@ -2036,9 +2119,19 @@ class TerrainBlock:
 
 	var world: World
 	var cell: Vector2i
+	## Altezza della cima.
+	var top := 0.0
+	var _outline := PackedVector2Array()
 
 	func _ready() -> void:
 		physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+
+	## Sagoma sullo schermo (vedi World.is_covered), calcolata la prima volta.
+	func outline() -> PackedVector2Array:
+		if _outline.is_empty():
+			_outline = world.block_outline(cell)
+			top = world._top_height(cell)
+		return _outline
 
 	func _draw() -> void:
 		world.draw_cell(self, cell, -position)

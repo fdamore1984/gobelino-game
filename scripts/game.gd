@@ -437,6 +437,8 @@ func _enter_depth(depth: int, at: Vector2) -> void:
 	_clear_level()
 	var dungeon := Dungeon.new(hash([_cave_seed(), depth]), depth, _cave_levels, _cave_kind)
 	_world.set_dungeon(dungeon)
+	# Ogni piano ha la sua mappa scoperta.
+	_world.set_map_key("%s:%d:%d:%d" % [_cave_kind, roundi(_cave.x), roundi(_cave.y), depth])
 	if at == Vector2.INF or not dungeon.is_floor(World.cell_at(at)):
 		# All'arrivo, o se il salvataggio è di una versione in cui il piano era diverso.
 		at = _world.in_front_of_wall(dungeon.arrival, dungeon.arrival_side, ARRIVAL_DISTANCE)
@@ -452,6 +454,7 @@ func _leave_dungeon() -> void:
 func _return_to_surface() -> void:
 	_clear_level()
 	_world.set_dungeon(null)
+	_world.set_map_key("surface")
 	_day_night.clear_override()
 	_player.teleport(_surface_return)
 	_cave = Vector2.INF

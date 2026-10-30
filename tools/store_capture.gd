@@ -516,8 +516,11 @@ func _capture_cave(language: String) -> void:
 	hud.show_interact(cave["position"] - Vector2(0, world.elevation_at(cave["position"]) + 96.0))
 	await _frames(2)
 	await _save("%s_11_cave.png" % language)
-	# Mappa completa aperta lì: montagne, caverne, casse, mercanti.
+	# Mappa completa aperta lì: montagne, caverne, casse, mercanti, solo
+	# nelle zone scoperte lungo un percorso.
 	hud.hide_interact()
+	for k in range(-6, 7):
+		world.reveal_around(_player.position + Vector2(k * 380.0, sin(k * 0.9) * 420.0))
 	hud._world_map.open()
 	await _frames(20)
 	await _save("%s_13_map.png" % language)

@@ -52,6 +52,11 @@
 			{"range": 1250, "angle": 140, "energy": 0.25}
 		]
 	},
+	"map": {
+		"reveal_radius": 700,
+		"reveal_interval": 0.2,
+		"reveal_step": 32
+	},
 	"enemy_scaling": {
 		"points": 0.05,
 		"hit_damage": 0.22,

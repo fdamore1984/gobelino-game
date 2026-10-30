@@ -3,7 +3,9 @@ extends Control
 ## Minimappa in alto a destra: il terreno attorno al giocatore (livelli
 ## d'altezza e sentieri), i nemici come puntini rossi, casse, totem,
 ## mercanti, ingressi delle caverne, scale, uscite e oggetti a terra; il
-## giocatore è la freccia bianca al centro.
+## giocatore è la freccia bianca al centro. Si vedono solo le zone già
+## scoperte (vedi World.is_explored; il resto è COLOR_UNKNOWN) e i nemici e
+## gli oggetti a terra entro il raggio di scoperta attorno al giocatore.
 ##
 ## Prestazioni: il terreno è un'immagine preparata a poco a poco; i punti
 ## d'interesse si cercano solo ogni POI_REFRESH secondi e i puntini (nemici,
@@ -32,6 +34,8 @@ const COLOR_CAVE := Color(0.95, 0.55, 0.2)
 ## Mausolei che portano alle catacombe.
 const COLOR_METRO := Color(0.5, 0.3, 0.65)
 const COLOR_EXIT := Color(1.0, 0.85, 0.45)
+## Zone non ancora scoperte.
+const COLOR_UNKNOWN := Color(0.06, 0.07, 0.06)
 
 ## Righe campionate a ogni frame: l'immagine nuova si prepara in più
 ## frame e sostituisce la vecchia quando è pronta, così non ci sono scatti.
@@ -102,7 +106,7 @@ func _sample_rows() -> void:
 	for j in range(_next_row, mini(_next_row + ROWS_PER_FRAME, SAMPLES)):
 		for i in SAMPLES:
 			var point := _next_center + Vector2(-RANGE + (i + 0.5) * step, -RANGE + (j + 0.5) * step)
-			_next_image.set_pixel(i, j, world.map_color(point))
+			_next_image.set_pixel(i, j, world.map_color(point) if world.is_explored(point) else COLOR_UNKNOWN)
 	_next_row += ROWS_PER_FRAME
 	if _next_row >= SAMPLES:
 		var ready := _next_image
@@ -122,17 +126,18 @@ func _draw() -> void:
 	if world:
 		for point: Dictionary in _points:
 			var at := _to_map(point["position"])
-			if not _inside(at):
+			if not _inside(at) or not world.is_explored(point["position"]):
 				continue
 			draw_point(self, world, point, at)
+	var near := world.reveal_radius() if world else RANGE
 	for node in get_tree().get_nodes_in_group("loot"):
 		var at := _to_map((node as Node2D).global_position)
-		if _inside(at):
+		if _inside(at) and (node as Node2D).global_position.distance_to(_player.position) <= near:
 			Shapes.disc(self, at, 3.5, COLOR_OUTLINE)
 			Shapes.disc(self, at, 2.5, COLOR_LOOT)
 	for node in get_tree().get_nodes_in_group("enemies"):
 		var at := _to_map((node as Node2D).global_position)
-		if _inside(at):
+		if _inside(at) and (node as Node2D).global_position.distance_to(_player.position) <= near:
 			Shapes.disc(self, at, 5.0, COLOR_OUTLINE)
 			Shapes.disc(self, at, 3.8, COLOR_ENEMY)
 	# Giocatore: freccia nella direzione in cui guarda.

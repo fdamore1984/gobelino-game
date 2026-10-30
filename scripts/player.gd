@@ -362,6 +362,8 @@ const TORCH_HOLD_TIME := 0.45
 ## Con la torcia accesa e il fascio almeno così forte (vedi
 ## Flashlight.strength) il personaggio è disegnato con i colori del giorno.
 const TORCH_SELF_LIGHT := 0.5
+## Contorno del goblin quando è dietro a un muro (vedi Silhouette).
+const COLOR_SILHOUETTE := Color(0.8, 1.0, 0.75, 0.75)
 
 ## Ogni pozione cura questi punti vita.
 const POTION_HEAL := 3
@@ -645,6 +647,8 @@ var _click_stuck := 0.0
 var _aim_cursor := false
 var _aim := Vector2.ZERO
 var _torch := Flashlight.new()
+## Sagoma che si vede quando il goblin è dietro a un muro (vedi Silhouette).
+var _silhouette := Silhouette.new(COLOR_SILHOUETTE, true)
 ## Potenziamento -> quante volte è stato scelto, nell'ordine di scelta.
 var upgrades_taken := {}
 ## Frenesia (0-FRENZY_MAX, non si salva) e da quanto non si attacca.
@@ -676,6 +680,8 @@ func _ready() -> void:
 		_torch.enabled = torch_on
 		_torch.aim(facing)
 		add_child(_torch)
+	if not _silhouette.is_inside_tree():
+		add_child(_silhouette)
 	if not _voice.is_inside_tree():
 		_voice.tone = VOICE_TONE
 		add_child(_voice)
@@ -928,6 +934,7 @@ func _physics_process(delta: float) -> void:
 		_torch.position = Vector2(0, RADIUS * 0.6)
 		_torch.aim(facing)
 	update_torch_light()
+	_update_silhouette()
 	_squash = move_toward(_squash, 0.0, SQUASH_RECOVERY * delta)
 	if _camera:
 		# Mentre si precipita nel burrone la telecamera resta al bordo.
@@ -2518,6 +2525,16 @@ func _update_run_button(delta: float) -> void:
 	else:
 		_run_hold = -1.0
 		_run_on = not _run_on
+
+
+## Dietro a un muro si vede la sagoma del goblin (vedi Silhouette).
+func _update_silhouette() -> void:
+	_silhouette.body_center = Vector2(0, -altitude() - LEG_LENGTH)
+	_silhouette.radius = RADIUS
+	_silhouette.facing = facing
+	_silhouette.leg_spacing = LEG_SPACING
+	_silhouette.feet_y = -altitude() + RADIUS * 0.85
+	_silhouette.update(position, altitude())
 
 
 ## Al buio con la torcia accesa il goblin si vede come di giorno: il buio

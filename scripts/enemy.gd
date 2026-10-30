@@ -203,6 +203,9 @@ const COLOR_STUNNED := Color(0.55, 0.55, 0.8)
 const COLOR_DANGER := Color(1.0, 0.25, 0.15)
 const COLOR_SUMMON := Color(0.4, 1.0, 0.9)
 const COLOR_DAMAGE := Color(1.0, 1.0, 1.0)
+## Contorno del nemico dietro a un muro (vedi Silhouette).
+const COLOR_SILHOUETTE := Color(1.0, 0.3, 0.25, 0.75)
+const SILHOUETTE_INTERVAL := 3
 ## Tinta del nemico agganciato dal giocatore (vedi set_locked): i valori
 ## sopra 1 lo illuminano di rosso invece di scurirlo.
 const COLOR_LOCKED := Color(1.7, 0.5, 0.45)
@@ -335,6 +338,10 @@ var _trail_time := 0.0
 var _body_mesh: ArrayMesh
 var _outline_mesh: ArrayMesh
 var _shape_radius := -1.0
+
+## Sagoma che si vede quando il nemico è dietro a un muro (vedi Silhouette):
+## si controlla un passo di fisica ogni SILHOUETTE_INTERVAL.
+var _silhouette := Silhouette.new(COLOR_SILHOUETTE, false)
 
 ## Aggiornamento a passi alterni da lontano: in quali passi (da 0 a 3) e tempo saltato.
 var _update_slot := randi() % 4
@@ -472,6 +479,7 @@ func _ready() -> void:
 	add_child(_danger_front)
 	for fx: CanvasItem in [_telegraph, _danger_back, _danger_front]:
 		fx.material = _unshaded_material()
+	add_child(_silhouette)
 	_voice.tone = (BOSS_VOICE if is_boss() else randf_range(VOICE_SPREAD.x, VOICE_SPREAD.y)) / pow(float(_type["mass"]), 0.25)
 	add_child(_voice)
 	if World.current:
@@ -666,6 +674,7 @@ func _physics_process(delta: float) -> void:
 				ground_elevation = World.current.elevation_at(position)
 			queue_redraw()
 			if _state_time >= DEATH_FALL_TIME:
+				_silhouette.visible = false
 				GroundFx.corpse(global_position, ground_elevation, _corpse_points(1.0), _corpse_color())
 				queue_free()
 			_redraw_danger()
@@ -720,10 +729,25 @@ func _physics_process(delta: float) -> void:
 	_update_trail(delta)
 	if _on_screen():
 		queue_redraw()
+		if (Engine.get_physics_frames() + _update_slot) % SILHOUETTE_INTERVAL == 0:
+			_update_silhouette()
+	elif _silhouette.visible:
+		_silhouette.visible = false
 	_redraw_danger()
 	if _state in [State.SUMMON, State.SLAM] or _telegraph_shown:
 		_telegraph_shown = _state in [State.SUMMON, State.SLAM]
 		_telegraph.queue_redraw()
+
+
+## Dietro a un muro si vede la sagoma del nemico (vedi Silhouette).
+func _update_silhouette() -> void:
+	var lift := _air + _height
+	_silhouette.body_center = _body_offset()
+	_silhouette.radius = radius
+	_silhouette.facing = _facing
+	_silhouette.leg_spacing = radius * LEG_SPACING
+	_silhouette.feet_y = -ground_elevation - lift + radius * 0.85
+	_silhouette.update(position, ground_elevation + lift)
 
 
 ## Ridisegna gli effetti rossi mentre ci sono, e una volta in più per
@@ -800,6 +824,7 @@ func take_points(points: int, direction: Vector2, heavy := false, force := false
 	if health <= 0:
 		_fall_side = 1.0 if direction.x >= 0.0 else -1.0
 		_trail.clear()
+		_silhouette.visible = false
 		GroundFx.pool(global_position, radius * DEATH_POOL)
 		_change_state(State.DEAD)
 		remove_from_group("enemies")
