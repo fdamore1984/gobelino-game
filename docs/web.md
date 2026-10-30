@@ -2,9 +2,10 @@
 
 Il gioco si esporta anche per il browser (preset **Web** di
 `export_presets.cfg`), per pubblicarlo su **ufotizio.com** insieme agli altri
-giochi del sito. Per ora non si pubblica da nessuna parte: la CI fa l'export a
-ogni PR e lo lascia come artefatto `web` scaricabile dalla pagina della run
-(non va su itch.io).
+giochi del sito. La CI fa l'export a ogni PR e lo lascia come artefatto `web`
+scaricabile dalla pagina della run (non va su itch.io); sul sito lo si carica
+nel bucket R2 con `tools/carica-giochi.sh` del repo ufotizio-site, che carica
+anche la pagina itch.io (`store/itch/`) mostrata sotto il gioco.
 
 ## Export
 
@@ -20,6 +21,21 @@ ogni PR e lo lascia come artefatto `web` scaricabile dalla pagina della run
 - Nel browser non ci sono i font del sistema: le frecce della croce e pochi
   altri simboli dei testi vengono da `assets/fonts/symbols.otf` (sottoinsieme
   di Inter, licenza OFL in `assets/fonts/OFL.txt`, inclusa nell'export).
+
+## Prestazioni sui telefoni
+
+- Il terreno di ogni pezzo di mappa e ogni blocco tra i personaggi si
+  disegnano come una mesh sola (`scripts/mesh_canvas.gd`, usata da
+  `World.ChunkView` e `World.TerrainBlock`) invece che poligono per poligono:
+  nel browser ogni chiamata di disegno costa molto, e così in partita sono
+  poche centinaia per frame invece di qualche migliaio.
+- Sui dispositivi touch (`pointer: coarse`) lo script in `html/head_include`
+  limita `devicePixelRatio`, così la tela del gioco ha al più circa 540 pixel
+  sul lato corto invece di tutti quelli dello schermo (2-3 volte tanti per
+  lato sui telefoni): molti meno pixel da disegnare, con testi ancora
+  leggibili. Su PC non cambia nulla.
+- Le orde di non morti sono più piccole su telefoni e tablet, anche nel
+  browser (`count_mobile` in `data/world.json`, vedi `Platform.is_mobile`).
 
 ## Cosa cambia nel browser
 
