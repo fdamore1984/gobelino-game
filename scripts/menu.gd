@@ -1,9 +1,9 @@
 extends Control
 ## Menù iniziale: Continua riprende subito la partita salvata più di
 ## recente (se ce n'è), Nuova partita ne avvia una scegliendo uno dei tre
-## slot (SlotPanel); mostra i comandi (ControlsPanel), il tutorial a pagine
-## (TutorialPanel), le opzioni con la rimappatura dei tasti (OptionsPanel) o
-## chiude il gioco. Si usa con mouse, touch, tastiera o controller.
+## slot (SlotPanel); mostra i comandi (ControlsPanel, da cui si rimappano i
+## tasti), il tutorial a pagine (TutorialPanel), le opzioni con la lingua
+## (OptionsPanel) o chiude il gioco. Si usa con mouse, touch, tastiera o controller.
 ## In basso a sinistra mostra la versione (per riconoscere a colpo
 ## d'occhio le build scaricate da itch.io) e chi ha fatto il gioco.
 ## Nel browser (sito ufotizio.com) non c'è Esci: il gioco si chiude con la

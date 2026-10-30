@@ -1,7 +1,7 @@
 class_name Keybinds
 ## Comandi personalizzati: per ogni azione dell'Input Map (ACTIONS) si può
 ## cambiare il tasto della tastiera, il tasto del mouse e quello del
-## controller (vedi OptionsPanel). Cambiare un dispositivo sostituisce tutti
+## controller (vedi KeybindsPanel). Cambiare un dispositivo sostituisce tutti
 ## i tasti di quel dispositivo per l'azione e lascia stare gli altri; un
 ## dispositivo si può anche lasciare senza tasti (clear).
 ##

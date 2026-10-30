@@ -2,7 +2,8 @@ class_name TutorialPanel
 extends Control
 ## Tutorial a pagine, aperto dal menù iniziale e da quello di pausa: ogni
 ## pagina ha un'immagine del gioco (catturata con tools/store_capture.tscn,
-## vedi assets/tutorial/), un titolo e un testo che spiega una meccanica,
+## in assets/tutorial/ una cartella per lingua, perché nelle immagini si
+## vedono i testi dell'HUD), un titolo e un testo che spiega una meccanica,
 ## Frenesia compresa. Si sfoglia con i pulsanti Indietro e Avanti (croce o
 ## levetta per spostarsi, A per premere) o direttamente con L1 e R1; B, il
 ## pulsante Chiudi o Start chiudono.
@@ -11,7 +12,10 @@ extends Control
 
 signal closed
 
-const IMAGE_DIR := "res://assets/tutorial/"
+## Cartella delle immagini di una lingua; se manca un'immagine si usa
+## quella di IMAGE_FALLBACK_LANGUAGE.
+const IMAGE_DIR := "res://assets/tutorial/%s/"
+const IMAGE_FALLBACK_LANGUAGE := "en"
 ## Pagine: immagine (in IMAGE_DIR), titolo e testo (chiavi di traduzione).
 const PAGES := [
 	["move.png", "TUTORIAL_MOVE_TITLE", "TUTORIAL_MOVE_TEXT"],
@@ -192,7 +196,9 @@ func _turn(step: int) -> void:
 func _show_page(index: int) -> void:
 	_page = index
 	var entry: Array = PAGES[index]
-	var path: String = IMAGE_DIR + entry[0]
+	var path: String = IMAGE_DIR % Settings.language + entry[0]
+	if not ResourceLoader.exists(path):
+		path = IMAGE_DIR % IMAGE_FALLBACK_LANGUAGE + entry[0]
 	# Senza l'immagine (non ancora catturata) resta la cornice vuota.
 	_image.texture = load(path) as Texture2D if ResourceLoader.exists(path) else null
 	_page_title.text = tr(entry[1])

@@ -35,7 +35,7 @@ window/handheld/orientation=0
 
 [internationalization]
 
-locale/translations=PackedStringArray("res://data/translations.en.translation")
+locale/translations=PackedStringArray("res://data/translations.en.translation", "res://data/translations.it.translation")
 locale/fallback="en"
 
 [physics]
