@@ -64,6 +64,8 @@ Gobelino is a 2D medieval fantasy action RPG with an isometric view: a feral gob
 Fast, deadly Souls-like combat: combos, parries, dodges, jumps and the Frenzy special attack. Prototype with placeholder graphics and sounds.
 
 Controller, keyboard and mouse or touch. English and Italian. Windows, Linux and Steam Deck.
+
+Play it right in your browser, with your saves on every device: https://ufotizio.com/en/gobelino
 ```
 
 ---
