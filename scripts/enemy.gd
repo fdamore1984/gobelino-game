@@ -747,8 +747,6 @@ func _update_silhouette() -> void:
 	_silhouette.body_center = _body_offset()
 	_silhouette.radius = radius
 	_silhouette.facing = _facing
-	_silhouette.leg_spacing = radius * LEG_SPACING
-	_silhouette.feet_y = -ground_elevation - lift + radius * 0.85
 	_silhouette.update(position, ground_elevation + lift)
 
 

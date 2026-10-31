@@ -50,7 +50,8 @@
 		"beams": [
 			{"range": 960, "angle": 80, "energy": 1.0},
 			{"range": 1250, "angle": 140, "energy": 0.25}
-		]
+		],
+		"halo": {"range": 150, "energy": 0.7}
 	},
 	"map": {
 		"reveal_radius": 700,

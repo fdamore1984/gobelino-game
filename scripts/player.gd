@@ -931,10 +931,7 @@ func _physics_process(delta: float) -> void:
 	_walk_phase += _velocity.length() * delta * WALK_CYCLE
 	_blood.update(delta)
 	_wounds.update(delta)
-	if torch_on:
-		# Il fascio parte dal terreno in pianta, sotto il personaggio, verso lo sguardo.
-		_torch.position = Vector2(0, RADIUS * 0.6)
-		_torch.aim(facing)
+	place_torch()
 	update_torch_light()
 	_update_silhouette()
 	_squash = move_toward(_squash, 0.0, SQUASH_RECOVERY * delta)
@@ -2534,9 +2531,20 @@ func _update_silhouette() -> void:
 	_silhouette.body_center = Vector2(0, -altitude() - LEG_LENGTH)
 	_silhouette.radius = RADIUS
 	_silhouette.facing = facing
-	_silhouette.leg_spacing = LEG_SPACING
-	_silhouette.feet_y = -altitude() + RADIUS * 0.85
-	_silhouette.update(position, altitude())
+	var covered := _silhouette.update(position, altitude())
+	if World.current:
+		World.current.update_cutout(position, altitude(), position + _silhouette.body_center, covered,
+				get_physics_process_delta_time())
+
+
+## La torcia sta a terra sotto il personaggio, all'altezza del terreno su
+## cui si trova, e punta verso lo sguardo; le ombre si calcolano a quella
+## altezza (vedi LightShaders e World.set_light_lift).
+func place_torch() -> void:
+	_torch.position = Vector2(0, -ground_elevation + RADIUS * 0.6)
+	_torch.aim(facing)
+	if World.current:
+		World.current.set_light_lift(ground_elevation)
 
 
 ## Al buio con la torcia accesa il goblin si vede come di giorno: il buio

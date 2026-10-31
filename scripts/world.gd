@@ -34,17 +34,18 @@ extends Node2D
 ## esplora e restano scoperti (vedi reveal_around, is_explored), una mappa
 ## per la superficie e una per ogni piano dei sotterranei (map_key).
 ##
-## Luce della torcia (vedi Flashlight): si calcola in pianta, cioè nel punto
-## del terreno a quota zero sotto quello che si disegna, dove stanno anche
-## la torcia e i piedi di personaggi e oggetti (vedi LightShaders). Così
-## altopiani, rampe e pareti prendono la luce del punto su cui stanno. Non
-## passa attraverso montagne e pareti del sotterraneo: ogni blocco
-## invalicabile (non i burroni) che confina con un posto in cui si cammina
-## ha un ostacolo per la luce (LightOccluder2D) sulla sua base in pianta.
-## Gli altopiani su cui si sale la lasciano passare. Pareti, cime e
-## decorazioni dicono nella coordinata UV.y di ogni vertice di quanti pixel
-## scendere per arrivare in pianta (vedi _light_uvs); una parete si accende
-## solo se il fascio arriva davanti a lei.
+## Luce della torcia (vedi Flashlight): il fascio parte dai piedi del
+## giocatore, all'altezza del terreno su cui si trova, e si stende sullo
+## schermo; le ombre si calcolano in pianta, nel punto del terreno sotto
+## quello che si disegna, alzato quanto il terreno sotto il giocatore (vedi
+## LightShaders e set_light_lift). Non passa attraverso montagne e pareti
+## del sotterraneo: ogni blocco invalicabile (non i burroni) che confina
+## con un posto in cui si cammina ha un ostacolo per la luce
+## (LightOccluder2D) sulla sua base in pianta. Gli altopiani su cui si sale
+## la lasciano passare. Pareti, cime e decorazioni dicono nella coordinata
+## UV.y di ogni vertice di quanti pixel scendere per arrivare in pianta
+## (vedi _light_uvs); una parete si accende solo se il fascio arriva
+## davanti a lei.
 ##
 ## Prestazioni: i dati del terreno (livelli, rampe, ostacoli) di una regione
 ## grande attorno al giocatore sono generati in anticipo (begin_region,
@@ -77,6 +78,10 @@ const OCCLUSION_MIN_HEIGHT := 40.0
 const BLOCK_SORT_BIAS := 8.0
 ## Lato dei quadrati della griglia dei blocchi che coprono (vedi is_covered).
 const COVER_GRID := 128.0
+## Muro trasparente attorno al giocatore coperto (vedi update_cutout):
+## raggio del cerchio e tempo per aprirlo o chiuderlo.
+const CUTOUT_RADIUS := 90.0
+const CUTOUT_FADE_TIME := 0.25
 ## Gli ostacoli vengono messi solo in questa parte del rombo, lontano dai bordi.
 const PLACE_MIN := 14.0
 const PLACE_MAX := 44.0
@@ -207,6 +212,12 @@ var _has_blocking_cell := false
 var _contact_glow := ContactGlow.new()
 ## Blocchi tra i personaggi per quadrato dello schermo (vedi is_covered).
 var _cover_grid := {}
+## Altezza del terreno sotto la torcia (vedi set_light_lift).
+var _light_lift := 0.0
+## Blocchi resi trasparenti attorno al giocatore (vedi update_cutout) e
+## quanto è aperto il cerchio, da 0 a 1.
+var _cutout_blocks := {}
+var _cutout_strength := 0.0
 ## Zone scoperte delle mappe (vedi reveal_around): chiave della mappa
 ## (map_key) -> pezzo di mondo -> 64 bit, uno per rombo del pezzo.
 var explored := {}
@@ -226,6 +237,7 @@ var _light_top := 0.0
 
 func _ready() -> void:
 	current = self
+	LightShaders.set_lift(0.0)
 	if seed_value == 0:
 		seed_value = randi_range(1, 1 << 30)
 	_levels = _terrain["levels"]
@@ -389,6 +401,60 @@ func _index_cover(block: TerrainBlock, add: bool) -> void:
 				_cover_grid[key].erase(block)
 				if _cover_grid[key].is_empty():
 					_cover_grid.erase(key)
+
+
+## La torcia è all'altezza lift (il terreno sotto il giocatore): le ombre
+## si calcolano in pianta alzata di tanto, con gli ostacoli alzati insieme
+## (vedi LightShaders).
+func set_light_lift(lift: float) -> void:
+	if is_equal_approx(lift, _light_lift):
+		return
+	_light_lift = lift
+	LightShaders.set_lift(lift)
+	for chunk: Vector2i in _chunk_views:
+		var holder: Node2D = _chunk_views[chunk]["occluders"]
+		holder.position = Vector2(0, -lift)
+
+
+## Muro trasparente: mentre il giocatore (piedi in feet, alla quota
+## altitude, corpo in center) è coperto, i blocchi davanti a lui diventano
+## trasparenti in un cerchio attorno al corpo (vedi LightShaders.cutout).
+## Il cerchio si apre e si chiude in CUTOUT_FADE_TIME secondi.
+func update_cutout(feet: Vector2, altitude: float, center: Vector2, covered: bool, delta: float) -> void:
+	_cutout_strength = move_toward(_cutout_strength, 1.0 if covered else 0.0, delta / CUTOUT_FADE_TIME)
+	var material := LightShaders.cutout()
+	material.set_shader_parameter("hole_center", center)
+	material.set_shader_parameter("hole_radius", CUTOUT_RADIUS)
+	material.set_shader_parameter("hole_strength", _cutout_strength)
+	if not covered and _cutout_strength > 0.0:
+		return
+	var wanted := {}
+	if covered:
+		var area := Rect2(center - Vector2(CUTOUT_RADIUS, CUTOUT_RADIUS), Vector2(CUTOUT_RADIUS, CUTOUT_RADIUS) * 2.0)
+		var first := Vector2i((area.position / COVER_GRID).floor())
+		var last := Vector2i((area.end / COVER_GRID).floor())
+		for x in range(first.x, last.x + 1):
+			for y in range(first.y, last.y + 1):
+				var blocks: Variant = _cover_grid.get(Vector2i(x, y))
+				if blocks == null:
+					continue
+				for block: TerrainBlock in blocks:
+					if wanted.has(block) or block.position.y <= feet.y:
+						continue
+					var outline := block.outline()
+					if block.top <= altitude + OCCLUSION_MIN_HEIGHT:
+						continue
+					var bounds := Rect2(outline[0], Vector2.ZERO)
+					for point in outline:
+						bounds = bounds.expand(point)
+					if bounds.intersects(area):
+						wanted[block] = true
+	for block: Variant in _cutout_blocks:
+		if not wanted.has(block) and is_instance_valid(block):
+			(block as TerrainBlock).material = LightShaders.ground()
+	for block: TerrainBlock in wanted:
+		block.material = material
+	_cutout_blocks = wanted
 
 
 ## Sagoma sullo schermo del blocco disegnato (base e cima), per is_covered.
@@ -1339,7 +1405,7 @@ func _show_chunk(chunk: Vector2i) -> void:
 	view.chunk = chunk
 	view.position = _from_uv(chunk.x * CHUNK_CELLS * CELL, chunk.y * CHUNK_CELLS * CELL)
 	view.material = LightShaders.ground()
-	_add_occluders(view, chunk)
+	var occluders := _add_occluders(view, chunk)
 	add_child(view)
 	var nodes: Array[Node] = []
 	if entities:
@@ -1359,7 +1425,7 @@ func _show_chunk(chunk: Vector2i) -> void:
 					entities.add_child(block)
 					nodes.append(block)
 					_index_cover(block, true)
-	_chunk_views[chunk] = {"view": view, "nodes": nodes}
+	_chunk_views[chunk] = {"view": view, "nodes": nodes, "occluders": occluders}
 
 
 func _hide_chunk(chunk: Vector2i) -> void:
@@ -1411,8 +1477,13 @@ func draw_chunk(canvas: Object, chunk: Vector2i, offset: Vector2) -> void:
 
 
 ## Ostacoli per la luce dei blocchi invalicabili del pezzo che confinano
-## con un posto in cui si cammina (vedi in cima), figli di view.
-func _add_occluders(view: Node2D, chunk: Vector2i) -> void:
+## con un posto in cui si cammina (vedi in cima), in un nodo figlio di view
+## che li alza quanto il terreno sotto il giocatore (vedi set_light_lift).
+func _add_occluders(view: Node2D, chunk: Vector2i) -> Node2D:
+	var holder := Node2D.new()
+	holder.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+	holder.position = Vector2(0, -_light_lift)
+	view.add_child(holder)
 	for i in CHUNK_CELLS:
 		for j in CHUNK_CELLS:
 			var cell := chunk * CHUNK_CELLS + Vector2i(i, j)
@@ -1434,7 +1505,8 @@ func _add_occluders(view: Node2D, chunk: Vector2i) -> void:
 			var occluder := LightOccluder2D.new()
 			occluder.occluder = shape
 			occluder.occluder_light_mask = OCCLUDER_BASE
-			view.add_child(occluder)
+			holder.add_child(occluder)
+	return holder
 
 
 ## Pavimento sotto un blocco che copre chi sta dietro: il rombo piano
