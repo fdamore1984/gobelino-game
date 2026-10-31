@@ -191,8 +191,7 @@ func _capture_challenge(language: String) -> void:
 	(_game.get_node("DayNight") as DayNight).time = 0.7
 	_player.torch_on = true
 	_player._torch.enabled = true
-	_player._torch.position = Vector2(0, Player.RADIUS * 0.6)
-	_player._torch.aim(_player.facing)
+	_player.place_torch()
 	var fireball := Fireball.new()
 	fireball.position = _player.position + Vector2(120, -70)
 	fireball.direction = Vector2(1, -0.4).normalized()
@@ -424,8 +423,7 @@ func _capture_move(language: String) -> void:
 	_player._walk_phase = 1.3
 	_player.torch_on = true
 	_player._torch.enabled = true
-	_player._torch.position = Vector2(0, Player.RADIUS * 0.6)
-	_player._torch.aim(_player.facing)
+	_player.place_torch()
 	_player.queue_redraw()
 	_enemy("scout", _player.position + Vector2(330, 60), Enemy.State.CHASE, 0.0)
 	await _save("%s_move.png" % language)
@@ -549,8 +547,7 @@ func _capture_dungeon(language: String) -> void:
 	_player.facing = (arena - _player.position).normalized()
 	_player.torch_on = true
 	_player._torch.enabled = true
-	_player._torch.position = Vector2(0, Player.RADIUS * 0.6)
-	_player._torch.aim(_player.facing)
+	_player.place_torch()
 	var boss: Enemy = _game._boss
 	boss.position = arena
 	boss._change_state(Enemy.State.WINDUP)
@@ -591,8 +588,7 @@ func _capture_metro(language: String) -> void:
 	_player.facing = Vector2(1, 0.5).normalized()
 	_player.torch_on = true
 	_player._torch.enabled = true
-	_player._torch.position = Vector2(0, Player.RADIUS * 0.6)
-	_player._torch.aim(_player.facing)
+	_player.place_torch()
 	var spot := func(du: int, dv: int) -> Vector2:
 		return World.cell_center(cell + Vector2i(du, dv))
 	_player._set_lock_target(_enemy("mutant_stalker", spot.call(2, 0), Enemy.State.WINDUP, 0.7))
@@ -615,8 +611,7 @@ func _capture_horde(language: String) -> void:
 	_player.facing = Vector2(1, 0.2).normalized()
 	_player.torch_on = true
 	_player._torch.enabled = true
-	_player._torch.position = Vector2(0, Player.RADIUS * 0.6)
-	_player._torch.aim(_player.facing)
+	_player.place_torch()
 	var origin := _player.position
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7

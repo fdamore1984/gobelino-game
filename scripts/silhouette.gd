@@ -2,10 +2,11 @@ class_name Silhouette
 extends Node2D
 ## Sagoma di un personaggio (giocatore o nemico) che sta dietro a un muro:
 ## i muri non diventano trasparenti, ma sopra di loro si vedono, in
-## trasparenza, solo i contorni del corpo e delle gambe (vedi
+## trasparenza, solo i contorni del corpo, senza gambe (vedi
 ## World.is_covered). Il personaggio controlla ogni tanto se è coperto
-## (update) e la sagoma copia la sua posa: centro e raggio del corpo,
-## direzione dello sguardo e piedi.
+## (update) e la sagoma copia la sua posa: centro e raggio del corpo e
+## direzione dello sguardo. Per il giocatore, in più, il muro davanti diventa
+## trasparente attorno al corpo (vedi World.update_cutout).
 ##
 ## La sagoma del goblin si vede sempre (senza luci); quella dei nemici prende
 ## la luce come i loro piedi (LightShaders.feet): al buio si vede solo se la
@@ -23,8 +24,6 @@ var color := Color(1, 1, 1, 0.6)
 var body_center := Vector2.ZERO
 var radius := 20.0
 var facing := Vector2.RIGHT
-var leg_spacing := 8.0
-var feet_y := 0.0
 
 
 func _init(line_color: Color, always_visible: bool) -> void:
@@ -60,7 +59,3 @@ func _draw() -> void:
 	var side := facing.orthogonal() * radius * 0.35
 	var base := body_center + facing * radius * 0.85
 	draw_polyline(PackedVector2Array([base + side, body_center + facing * (radius + 10.0), base - side]), color, WIDTH, true)
-	# Gambe.
-	var hip := body_center.y + radius * 0.6
-	for x: float in [-leg_spacing, leg_spacing]:
-		draw_line(Vector2(body_center.x + x, hip), Vector2(body_center.x + x, feet_y), color, WIDTH)
