@@ -52,6 +52,10 @@ extends Node2D
 ## regione nuova. I pezzi da disegnare vengono creati un po' prima che
 ## entrino nello schermo, uno per frame, così non ci sono scatti.
 
+## Contorno a inchiostro delle pareti dei blocchi (stile fumetto).
+const CLIFF_INK_WIDTH := 3.0
+const CLIFF_INK_ALPHA := 0.85
+
 const DATA := preload("res://data/world.json")
 
 ## Mezza altezza di un rombo della griglia (i rombi sono 128 x 64).
@@ -1583,8 +1587,20 @@ func _draw_face(canvas: Object, corners: PackedVector2Array, heights: Array[floa
 			lip_points.append(a - Vector2(0, top_a - lip_a))
 		if lip_points.size() >= 3:
 			_fill(canvas, lip_points, _lip_color)
-	_line(canvas, a - Vector2(0, bottom_a), b - Vector2(0, bottom_b), Color(0, 0, 0, 0.3), 2.0)
+	_ink_face(canvas, a, b, top_a, top_b, bottom_a, bottom_b)
 	_light_mode = LightMode.NONE
+
+
+## Contorno a inchiostro della parete tra a e b (stile fumetto): bordo in
+## cima, base e spigoli ai lati.
+func _ink_face(canvas: Object, a: Vector2, b: Vector2, top_a: float, top_b: float, bottom_a: float, bottom_b: float) -> void:
+	var ink := Color(Shapes.INK, CLIFF_INK_ALPHA)
+	_line(canvas, a - Vector2(0, top_a), b - Vector2(0, top_b), ink, CLIFF_INK_WIDTH)
+	_line(canvas, a - Vector2(0, bottom_a), b - Vector2(0, bottom_b), ink, CLIFF_INK_WIDTH)
+	if top_a - bottom_a >= 0.5:
+		_line(canvas, a - Vector2(0, top_a), a - Vector2(0, bottom_a), ink, CLIFF_INK_WIDTH * 0.8)
+	if top_b - bottom_b >= 0.5:
+		_line(canvas, b - Vector2(0, top_b), b - Vector2(0, bottom_b), ink, CLIFF_INK_WIDTH * 0.8)
 
 
 ## Parete di pietra delle catacombe tra a e b (dall'alto top alla base

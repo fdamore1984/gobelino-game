@@ -184,8 +184,23 @@ func _draw() -> void:
 
 func _draw_shadow(width: float) -> void:
 	draw_set_transform(Vector2(0, -_lift), 0.0, Vector2(1.0, 0.45))
-	draw_circle(Vector2.ZERO, width, Color(0, 0, 0, 0.25))
+	draw_circle(Vector2.ZERO, width, Shapes.SHADOW)
 	draw_set_transform(Vector2(0, -_lift))
+
+
+## Contorno a inchiostro (stile fumetto): disegnati prima del pieno, un
+## cerchio, un poligono o un rettangolo un po' più grandi, neri.
+func _ink_circle(center: Vector2, circle_radius: float, alpha := 1.0) -> void:
+	draw_circle(center, circle_radius + Shapes.INK_WIDTH, Color(Shapes.INK, alpha))
+
+
+func _ink_polygon(points: PackedVector2Array, alpha := 1.0) -> void:
+	for grown in Geometry2D.offset_polygon(points, Shapes.INK_WIDTH, Geometry2D.JOIN_ROUND):
+		draw_colored_polygon(grown, Color(Shapes.INK, alpha))
+
+
+func _ink_rect(rect: Rect2) -> void:
+	draw_rect(rect.grow(Shapes.INK_WIDTH), Shapes.INK)
 
 
 ## Tronco e chioma: tonda (latifoglia) o a strati di triangoli (abete).
@@ -193,6 +208,7 @@ func _draw_tree(rng: RandomNumberGenerator) -> void:
 	_draw_shadow(radius * 0.9)
 	var trunk := _type_color("trunk")
 	var trunk_height := radius * 1.1
+	_ink_rect(Rect2(-radius * 0.18, -trunk_height, radius * 0.36, trunk_height))
 	draw_rect(Rect2(-radius * 0.18, -trunk_height, radius * 0.36, trunk_height), trunk)
 	draw_rect(Rect2(-radius * 0.18, -trunk_height, radius * 0.12, trunk_height), trunk.lightened(0.15))
 	var leaves := _color(rng.randi())
@@ -203,10 +219,16 @@ func _draw_tree(rng: RandomNumberGenerator) -> void:
 			var width := radius * (1.1 - k * 0.25)
 			var base_y := -trunk_height * 0.6 - k * radius * 0.7
 			var tip_y := base_y - radius * 1.3
+			_ink_polygon(PackedVector2Array([Vector2(-width, base_y), Vector2(width, base_y), Vector2(0, tip_y)]), _canopy_alpha)
 			draw_colored_polygon(PackedVector2Array([Vector2(-width, base_y), Vector2(width, base_y), Vector2(0, tip_y)]), dark if k == 0 else leaves)
 			draw_colored_polygon(PackedVector2Array([Vector2(0, base_y), Vector2(width, base_y), Vector2(0, tip_y)]), leaves.darkened(0.12))
 	else:
 		var center := Vector2(0, -trunk_height - radius * 0.55)
+		# Contorno unico attorno a tutta la chioma.
+		_ink_circle(center + Vector2(0, radius * 0.2), radius, _canopy_alpha)
+		_ink_circle(center + Vector2(-radius * 0.45, 0), radius * 0.7, _canopy_alpha)
+		_ink_circle(center + Vector2(radius * 0.4, -radius * 0.1), radius * 0.75, _canopy_alpha)
+		_ink_circle(center + Vector2(0, -radius * 0.45), radius * 0.7, _canopy_alpha)
 		draw_circle(center + Vector2(0, radius * 0.2), radius, dark)
 		draw_circle(center + Vector2(-radius * 0.45, 0), radius * 0.7, leaves)
 		draw_circle(center + Vector2(radius * 0.4, -radius * 0.1), radius * 0.75, leaves)
@@ -223,6 +245,7 @@ func _draw_rock(rng: RandomNumberGenerator) -> void:
 	for k in sides:
 		var angle := TAU * k / sides + rng.randf_range(-0.2, 0.2)
 		points.append(Vector2(cos(angle), sin(angle) * 0.75) * radius * rng.randf_range(0.8, 1.05) + Vector2(0, -radius * 0.45))
+	_ink_polygon(points)
 	draw_colored_polygon(points, color.darkened(0.15))
 	var top := PackedVector2Array()
 	for point in points:
@@ -239,6 +262,9 @@ func _draw_bush(rng: RandomNumberGenerator) -> void:
 	var blobs := []
 	for k in 5:
 		blobs.append([Vector2(rng.randf_range(-0.6, 0.6), rng.randf_range(-0.9, -0.3)) * radius, radius * rng.randf_range(0.4, 0.6)])
+	for blob: Array in blobs:
+		_ink_circle(blob[0] + Vector2(0, 4), blob[1])
+		_ink_circle(blob[0], blob[1])
 	for blob: Array in blobs:
 		draw_circle(blob[0] + Vector2(0, 4), blob[1], color.darkened(0.3))
 	for blob: Array in blobs:
@@ -273,6 +299,7 @@ func _draw_totem() -> void:
 		var height := radius * (0.9 - k * 0.1)
 		y -= height
 		# Faccia davanti e lato in ombra, come un blocco squadrato.
+		_ink_rect(Rect2(-width, y, width * 2.0, height))
 		draw_rect(Rect2(-width, y, width * 2.0, height), stone.darkened(0.05 * k))
 		draw_rect(Rect2(width * 0.55, y, width * 0.45, height), stone.darkened(0.25))
 		draw_line(Vector2(-width, y), Vector2(width, y), stone.lightened(0.2), 2.0)
@@ -293,6 +320,7 @@ func _draw_chest() -> void:
 	var metal := _type_color("metal")
 	var width := radius * 1.3
 	var height := radius * 0.9
+	_ink_rect(Rect2(-width, -height, width * 2.0, height))
 	draw_rect(Rect2(-width, -height, width * 2.0, height), wood)
 	draw_rect(Rect2(width * 0.55, -height, width * 0.45, height), wood.darkened(0.25))
 	for x: float in [-width * 0.6, width * 0.4]:
@@ -302,6 +330,7 @@ func _draw_chest() -> void:
 		draw_colored_polygon(PackedVector2Array([Vector2(-width, -height - 2.0), Vector2(width, -height - 2.0), Vector2(width * 0.9, -height - radius * 1.1), Vector2(-width * 0.9, -height - radius * 1.1)]), wood.lightened(0.05))
 		return
 	var lid := PackedVector2Array([Vector2(-width, -height), Vector2(width, -height), Vector2(width * 0.85, -height - radius * 0.6), Vector2(-width * 0.85, -height - radius * 0.6)])
+	_ink_polygon(lid)
 	draw_colored_polygon(lid, wood.lightened(0.12))
 	draw_rect(Rect2(-4.0, -height - 3.0, 8.0, 9.0), metal)
 	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 300.0)
@@ -325,11 +354,12 @@ func _draw_merchant() -> void:
 	# Il mercante dondola appena, come se respirasse.
 	var breath := sin(Time.get_ticks_msec() / 400.0) * 1.5
 	var body := Vector2(0, -height - 6.0 + breath * 0.5)
-	draw_circle(body, radius * 0.42, robe)
 	var head := body + Vector2(0, -radius * 0.55 + breath * 0.3)
+	_ink_circle(body, radius * 0.42)
+	_ink_circle(head, radius * 0.28)
+	draw_circle(body, radius * 0.42, robe)
 	draw_circle(head, radius * 0.28, skin)
-	draw_circle(head + Vector2(-4, -1), 2.2, Color(0.1, 0.1, 0.1))
-	draw_circle(head + Vector2(4, -1), 2.2, Color(0.1, 0.1, 0.1))
+	Shapes.eyes(self, head + Vector2(0, -1), radius * 0.09, Vector2.DOWN)
 	draw_colored_polygon(PackedVector2Array([head + Vector2(-radius * 0.36, -radius * 0.14), head + Vector2(radius * 0.36, -radius * 0.14),
 			head + Vector2(radius * 0.12, -radius * 0.85)]), robe.darkened(0.25))
 	draw_line(head + Vector2(-radius * 0.42, -radius * 0.14), head + Vector2(radius * 0.42, -radius * 0.14), robe.darkened(0.45), 3.0)
@@ -344,6 +374,7 @@ func _draw_merchant() -> void:
 		draw_colored_polygon(PackedVector2Array([Vector2(x0 * 0.92, back), Vector2(x1 * 0.92, back), Vector2(x1, front), Vector2(x0, front)]), color)
 		draw_circle(Vector2((x0 + x1) / 2.0, front), (x1 - x0) / 2.0, color.darkened(0.08))
 	# Bancone con la merce.
+	_ink_rect(Rect2(-width, -height, width * 2.0, height))
 	draw_rect(Rect2(-width, -height, width * 2.0, height), wood)
 	draw_rect(Rect2(width * 0.6, -height, width * 0.4, height), wood.darkened(0.25))
 	draw_rect(Rect2(-width - 4.0, -height - 5.0, width * 2.0 + 8.0, 6.0), wood.lightened(0.15))
@@ -354,6 +385,7 @@ func _draw_merchant() -> void:
 	# Insegna con la moneta sopra la tenda.
 	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 300.0)
 	var board := Vector2(0, top - 10.0)
+	_ink_circle(board, 9.0)
 	draw_circle(board, 9.0, gold.darkened(0.3))
 	draw_circle(board, 7.0, gold)
 	draw_circle(board + Vector2(7, -7), 1.5 + pulse * 1.5, Color(1.0, 0.97, 0.7, 0.5 + 0.5 * pulse))
@@ -371,6 +403,7 @@ func _draw_arch(inside: Color) -> PackedVector2Array:
 		arch.append(_edge * cos(angle) * width + Vector2(0, -sin(angle) * height))
 		rim.append(_edge * cos(angle) * (width + 7.0) + Vector2(0, -sin(angle) * (height + 7.0)))
 	var stone := _color(1)
+	_ink_polygon(rim)
 	draw_colored_polygon(rim, stone.darkened(0.2))
 	draw_colored_polygon(arch, inside)
 	for k in 7:
@@ -473,12 +506,15 @@ func _draw_mausoleum() -> void:
 	var depth := radius * 0.5
 	var wall_h := radius * 1.25
 	# Basamento a gradino.
+	_ink_polygon(PackedVector2Array([Vector2(-w - 8, 4), Vector2(w + 8, 4), Vector2(w + 8, -6), Vector2(-w - 8, -6)]))
 	draw_colored_polygon(PackedVector2Array([Vector2(-w - 8, 4), Vector2(w + 8, 4), Vector2(w + 8, -6), Vector2(-w - 8, -6)]), stone.darkened(0.25))
 	# Cella: fianco in ombra e facciata.
+	_ink_polygon(PackedVector2Array([Vector2(w, -6), Vector2(w + depth * 0.6, -6 - depth * 0.5), Vector2(w + depth * 0.6, -6 - depth * 0.5 - wall_h), Vector2(w, -6 - wall_h)]))
 	draw_colored_polygon(PackedVector2Array([Vector2(w, -6), Vector2(w + depth * 0.6, -6 - depth * 0.5), Vector2(w + depth * 0.6, -6 - depth * 0.5 - wall_h), Vector2(w, -6 - wall_h)]), stone.darkened(0.3))
 	draw_colored_polygon(PackedVector2Array([Vector2(-w, -6), Vector2(w, -6), Vector2(w, -6 - wall_h), Vector2(-w, -6 - wall_h)]), stone)
 	# Frontone triangolare con una crepa.
 	var roof := -6 - wall_h
+	_ink_polygon(PackedVector2Array([Vector2(-w - 6, roof), Vector2(w + 6, roof), Vector2(0, roof - radius * 0.6)]))
 	draw_colored_polygon(PackedVector2Array([Vector2(-w - 6, roof), Vector2(w + 6, roof), Vector2(0, roof - radius * 0.6)]), stone.lightened(0.1))
 	draw_colored_polygon(PackedVector2Array([Vector2(w + 6, roof), Vector2(w + 6 + depth * 0.6, roof - depth * 0.5), Vector2(depth * 0.6, roof - radius * 0.6 - depth * 0.5), Vector2(0, roof - radius * 0.6)]), stone.darkened(0.15))
 	draw_polyline(PackedVector2Array([Vector2(-w * 0.3, roof - 4), Vector2(-w * 0.15, roof - 12), Vector2(-w * 0.25, roof - 20)]), stone.darkened(0.45), 1.5)
