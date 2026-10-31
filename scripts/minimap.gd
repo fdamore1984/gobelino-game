@@ -17,8 +17,9 @@ const RANGE := 1100.0
 const SAMPLES := 60
 const REFRESH_TIME := 0.4
 const REFRESH_DISTANCE := 40.0
-const COLOR_FRAME := Color(0, 0, 0, 0.55)
-const COLOR_BORDER := Color(1, 1, 1, 0.5)
+const COLOR_BORDER := UiStyle.INK
+## Cornice col contorno nero e l'ombra piena, come i pannelli del sito.
+const FRAME := 7.0
 ## Bordo scuro attorno ai segni, perché si leggano su ogni terreno.
 const COLOR_OUTLINE := Color(0, 0, 0, 0.75)
 const COLOR_ENEMY := Color(1.0, 0.2, 0.15)
@@ -118,7 +119,7 @@ func _sample_rows() -> void:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size).grow(3.0), COLOR_FRAME)
+	draw_style_box(UiStyle.box(UiStyle.PANEL, 14, UiStyle.BORDER, 4.0), Rect2(Vector2.ZERO, size).grow(FRAME))
 	if _player == null or _center == Vector2.INF:
 		return
 	draw_texture_rect(_texture, Rect2(_to_map(_center - Vector2(RANGE, RANGE)), size), false)
@@ -149,7 +150,7 @@ func _draw() -> void:
 	draw_colored_polygon(PackedVector2Array([
 		center + facing * 9.0, center - facing * 5.0 + facing.orthogonal() * 5.5, center - facing * 5.0 - facing.orthogonal() * 5.5,
 	]), Color.WHITE)
-	draw_rect(Rect2(Vector2.ZERO, size), COLOR_BORDER, false, 2.0)
+	draw_rect(Rect2(Vector2.ZERO, size), COLOR_BORDER, false, 3.0)
 
 
 func _to_map(point: Vector2) -> Vector2:

@@ -6,13 +6,11 @@ extends Control
 
 const PANEL_SIZE := Vector2(98, 60)
 ## Distanza dal bordo destro dello schermo: la minimappa più uno spazio.
-const RIGHT_MARGIN := 216.0 + 10.0
+const RIGHT_MARGIN := 216.0 + 20.0
 const TOP_MARGIN := 16.0
 ## Il sole si muove piano: basta ridisegnare ogni tanto.
 const REDRAW_INTERVAL := 0.25
 const ARC_RADIUS := 35.0
-const COLOR_PANEL := Color(0.05, 0.07, 0.05, 0.72)
-const COLOR_BORDER := Color(1, 1, 1, 0.14)
 const COLOR_SKY_DAY := Color(0.38, 0.62, 0.92)
 const COLOR_SKY_NIGHT := Color(0.07, 0.09, 0.24)
 const COLOR_SUN := Color(1.0, 0.86, 0.3)
@@ -25,7 +23,7 @@ const STARS := [Vector2(0.5, 0.7), Vector2(1.1, 0.45), Vector2(1.7, 0.8), Vector
 
 var day_night: DayNight
 
-var _panel := StyleBoxFlat.new()
+var _panel := UiStyle.box(UiStyle.PANEL, 14, 3, 4.0)
 var _redraw_timer := 0.0
 
 
@@ -36,10 +34,6 @@ func _ready() -> void:
 	offset_right = -RIGHT_MARGIN
 	offset_top = TOP_MARGIN
 	offset_bottom = TOP_MARGIN + PANEL_SIZE.y
-	_panel.bg_color = COLOR_PANEL
-	_panel.border_color = COLOR_BORDER
-	_panel.set_border_width_all(2)
-	_panel.set_corner_radius_all(10)
 
 
 func _process(delta: float) -> void:
@@ -62,6 +56,8 @@ func _draw() -> void:
 	for k in 25:
 		dome.append(horizon + Vector2.from_angle(PI + PI * k / 24.0) * (ARC_RADIUS + 4.0))
 	draw_colored_polygon(dome, sky)
+	dome.append(dome[0])
+	draw_polyline(dome, UiStyle.INK, 3.0, true)
 	draw_rect(Rect2(Vector2(horizon.x - ARC_RADIUS - 4.0, horizon.y - 1.0), Vector2(ARC_RADIUS * 2.0 + 8.0, 4.0)), COLOR_GROUND)
 	for star: Vector2 in STARS:
 		var at := horizon + Vector2.from_angle(-star.x) * ARC_RADIUS * star.y
@@ -73,6 +69,7 @@ func _draw() -> void:
 		for k in 8:
 			var ray := Vector2.from_angle(TAU * k / 8.0)
 			draw_line(at + ray * 7.5, at + ray * 10.0, COLOR_SUN, 1.5)
+		Shapes.disc(self, at, 7.5, UiStyle.INK)
 		Shapes.disc(self, at, 6.0, COLOR_SUN)
 	else:
 		Shapes.disc(self, at, 6.0, COLOR_MOON)

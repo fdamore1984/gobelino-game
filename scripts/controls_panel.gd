@@ -52,7 +52,7 @@ func _ready() -> void:
 	visible = false
 	var dim := ColorRect.new()
 	# Opaco: sotto non si deve leggere il menù.
-	dim.color = Color(0.04, 0.05, 0.04)
+	dim.color = UiStyle.OVERLAY
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(dim)
 	var center := CenterContainer.new()

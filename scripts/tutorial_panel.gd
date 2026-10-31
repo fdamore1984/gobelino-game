@@ -60,7 +60,7 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	visible = false
 	var dim := ColorRect.new()
-	dim.color = Color(0.04, 0.05, 0.04, 1.0)
+	dim.color = UiStyle.OVERLAY
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(dim)
 	var center := CenterContainer.new()
@@ -75,11 +75,7 @@ func _ready() -> void:
 	box.add_child(page)
 	# Immagine incorniciata a sinistra, titolo e spiegazione a destra.
 	var frame := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0, 0, 0, 0.6)
-	style.border_color = Color(1, 1, 1, 0.2)
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(6)
+	var style := UiStyle.box(UiStyle.INK, 14)
 	style.set_content_margin_all(4)
 	frame.add_theme_stylebox_override("panel", style)
 	frame.size_flags_vertical = Control.SIZE_SHRINK_CENTER

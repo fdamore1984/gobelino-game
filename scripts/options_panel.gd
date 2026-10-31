@@ -19,7 +19,7 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	visible = false
 	var dim := ColorRect.new()
-	dim.color = Color(0.04, 0.05, 0.04)
+	dim.color = UiStyle.OVERLAY
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(dim)
 	var center := CenterContainer.new()

@@ -24,7 +24,7 @@ const VISIBLE_ROWS := 4
 ## Ordini possibili della griglia, nell'ordine in cui il pulsante li propone.
 const SORTS := ["found", "power", "value"]
 const COLOR_EQUIPPED := Color(1.0, 0.85, 0.35)
-const COLOR_DIM := Color(0, 0, 0, 0.7)
+const COLOR_DIM := Color(UiStyle.OVERLAY, 0.8)
 const COLOR_TEXT := Color(1, 1, 1, 0.8)
 
 var player: Player
@@ -224,15 +224,14 @@ static func cell_button(id: String, highlight: bool) -> Button:
 
 
 static func _style_button(button: Button, highlight: bool) -> void:
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.12, 0.1, 0.95)
-	style.set_corner_radius_all(8)
-	style.set_border_width_all(3 if highlight else 1)
-	style.border_color = COLOR_EQUIPPED if highlight else Color(1, 1, 1, 0.2)
-	var focus := style.duplicate() as StyleBoxFlat
-	focus.border_color = Color.WHITE
-	focus.set_border_width_all(4)
-	focus.bg_color = Color(0.18, 0.21, 0.16, 0.98)
+	# Contorno nero e ombra piena (vedi UiStyle); l'oggetto indossato ha il
+	# bordo dorato, quello selezionato il bordo del colore della scelta.
+	var style := UiStyle.box(UiStyle.SOFT, 14, 3, 3.0, UiStyle.INK)
+	if highlight:
+		style.border_color = COLOR_EQUIPPED
+		style.set_border_width_all(4)
+	var focus := UiStyle.box(UiStyle.PANEL, 14, 4, 5.0, UiStyle.INK)
+	focus.border_color = UiStyle.ACCENT
 	for state: String in ["normal", "pressed", "disabled"]:
 		button.add_theme_stylebox_override(state, style)
 	button.add_theme_stylebox_override("hover", focus)

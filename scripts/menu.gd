@@ -6,12 +6,17 @@ extends Control
 ## (OptionsPanel) o chiude il gioco. Si usa con mouse, touch, tastiera o controller.
 ## In basso a sinistra mostra la versione (per riconoscere a colpo
 ## d'occhio le build scaricate da itch.io) e chi ha fatto il gioco.
+## Lo stile è quello del sito (vedi UiStyle): titolo grande col contorno nero
+## e l'ombra piena, un po' storto come in un fumetto.
 ## Nel browser (sito ufotizio.com) non c'è Esci: il gioco si chiude con la
 ## pagina. Lì, prima di poter giocare, i salvataggi si allineano con
 ## l'account del sito (vedi Cloud) e sotto la versione si dice se sono
 ## sull'account o solo nel browser.
 
 const GAME_SCENE := "res://scenes/game.tscn"
+const TITLE_ANGLE := -4.0
+const TITLE_OUTLINE := 24
+const TITLE_SHADOW := 8
 
 @onready var _continue: Button = %Continue
 @onready var _start: Button = %Start
@@ -20,6 +25,7 @@ const GAME_SCENE := "res://scenes/game.tscn"
 @onready var _tutorial: Button = %Tutorial
 @onready var _options: Button = %Options
 @onready var _info: Label = %Info
+@onready var _title: Label = %Title
 
 var _controls_panel := ControlsPanel.new()
 var _options_panel := OptionsPanel.new()
@@ -28,6 +34,7 @@ var _slot_panel := SlotPanel.new()
 
 
 func _ready() -> void:
+	_style_title()
 	_start.pressed.connect(_on_start_pressed)
 	_continue.pressed.connect(_on_continue_pressed)
 	_quit.pressed.connect(_on_quit_pressed)
@@ -57,6 +64,18 @@ func _ready() -> void:
 		if Cloud.is_syncing():
 			_set_buttons_active(false)
 			_update_info()
+
+
+func _style_title() -> void:
+	_title.add_theme_font_override("font", UiStyle.bold())
+	_title.add_theme_color_override("font_color", UiStyle.TITLE)
+	_title.add_theme_constant_override("outline_size", TITLE_OUTLINE)
+	_title.add_theme_color_override("font_shadow_color", UiStyle.INK)
+	_title.add_theme_constant_override("shadow_offset_x", TITLE_SHADOW)
+	_title.add_theme_constant_override("shadow_offset_y", TITLE_SHADOW)
+	_title.add_theme_constant_override("shadow_outline_size", TITLE_OUTLINE)
+	_title.rotation_degrees = TITLE_ANGLE
+	_title.resized.connect(func() -> void: _title.pivot_offset = _title.size / 2.0)
 
 
 ## Continua c'è solo se c'è almeno un salvataggio (anche dopo averne

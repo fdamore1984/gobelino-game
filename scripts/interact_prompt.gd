@@ -11,14 +11,14 @@ signal activated
 const PANEL_SIZE := Vector2(150, 44)
 const FONT_SIZE := 18
 const KEY_RADIUS := 14.0
-const COLOR_PANEL := Color(0.05, 0.07, 0.05, 0.82)
-const COLOR_BORDER := Color(1, 1, 1, 0.3)
+## Pillola crema col contorno nero, come i pulsanti del sito (vedi UiStyle).
+const COLOR_PANEL := UiStyle.CREAM
 ## Tasto A verde come sui controller, tasto della tastiera grigio.
 const COLOR_BUTTON_A := Color(0.3, 0.72, 0.3)
 const COLOR_KEY := Color(0.82, 0.82, 0.82)
-const COLOR_TEXT := Color(1, 1, 1, 0.95)
+const COLOR_TEXT := UiStyle.INK
 
-var _panel := StyleBoxFlat.new()
+var _panel := UiStyle.pill(COLOR_PANEL, 3, 4.0)
 
 
 func _ready() -> void:
@@ -27,10 +27,6 @@ func _ready() -> void:
 	custom_minimum_size = PANEL_SIZE
 	size = PANEL_SIZE
 	visible = false
-	_panel.bg_color = COLOR_PANEL
-	_panel.border_color = COLOR_BORDER
-	_panel.set_border_width_all(2)
-	_panel.set_corner_radius_all(int(PANEL_SIZE.y / 2.0))
 	pressed.connect(_on_pressed)
 
 
@@ -59,6 +55,7 @@ func _draw() -> void:
 	draw_style_box(_panel, Rect2(Vector2.ZERO, PANEL_SIZE))
 	var controller := not Input.get_connected_joypads().is_empty()
 	var key := Vector2(PANEL_SIZE.y / 2.0 + 2.0, PANEL_SIZE.y / 2.0)
+	Shapes.disc(self, key, KEY_RADIUS + 2.5, UiStyle.INK)
 	Shapes.disc(self, key, KEY_RADIUS, COLOR_BUTTON_A if controller else COLOR_KEY)
 	# Il tasto scelto dal giocatore (vedi Keybinds), non quello predefinito.
 	var letter := Keybinds.primary("interact", "controller" if controller else "keyboard", true)

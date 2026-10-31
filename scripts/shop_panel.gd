@@ -12,7 +12,7 @@ const COLUMNS := 8
 const SELL_ROWS := 2
 const COLOR_TITLE := Color(1.0, 0.85, 0.4)
 const COLOR_TEXT := Color(1, 1, 1, 0.8)
-const COLOR_DIM := Color(0, 0, 0, 0.75)
+const COLOR_DIM := Color(UiStyle.OVERLAY, 0.85)
 ## Gli oggetti che non ci si può permettere sono più spenti.
 const COLOR_TOO_EXPENSIVE := Color(1, 1, 1, 0.45)
 

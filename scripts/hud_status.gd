@@ -4,6 +4,8 @@ extends Control
 ## vita (a segmenti), stamina, mana, esperienza e Frenesia, livelli delle abilità, monete e
 ## nemici sconfitti. Tutto disegnato con forme geometriche. La barra della
 ## Frenesia, piena, pulsa e mostra i tasti dell'attacco speciale (parata + attacco).
+## Stile del sito (vedi UiStyle): contorni neri spessi, barre a pillola,
+## ombra piena.
 
 const PANEL_SIZE := Vector2(460, 168)
 ## Il pannello è disegnato a questa scala, per coprire meno l'area di gioco;
@@ -14,11 +16,8 @@ const BAR_WIDTH := 320.0
 ## Grandezza dei testi nelle unità del pannello (sullo schermo circa 16 e 14 px).
 const FONT_SIZE := 20
 const SMALL_FONT_SIZE := 17
-const OUTLINE_SIZE := 5
-const COLOR_OUTLINE := Color(0, 0, 0, 0.85)
-const COLOR_PANEL := Color(0.04, 0.05, 0.04, 0.84)
-const COLOR_BORDER := Color(1, 1, 1, 0.14)
-const COLOR_BAR_BACK := Color(0, 0, 0, 0.45)
+const OUTLINE_SIZE := 6
+const COLOR_OUTLINE := UiStyle.INK
 const COLOR_HEALTH := Color(0.9, 0.25, 0.25)
 const COLOR_HEALTH_LOW := Color(1.0, 0.45, 0.2)
 const COLOR_STAMINA := Color(0.4, 0.85, 0.35)
@@ -27,8 +26,8 @@ const COLOR_STAMINA_EMPTY := Color(1.0, 0.3, 0.2)
 const COLOR_MANA := Color(0.35, 0.55, 1.0)
 const COLOR_XP := Color(1.0, 0.8, 0.3)
 const COLOR_FRENZY := Player.COLOR_FRENZY
-const COLOR_TEXT := Color(1, 1, 1, 0.92)
-const COLOR_DIM_TEXT := Color(1, 1, 1, 0.82)
+const COLOR_TEXT := UiStyle.CREAM
+const COLOR_DIM_TEXT := UiStyle.CREAM
 ## Il pannello si ridisegna da solo a questo intervallo (mana, monete, nemici
 ## sconfitti); vita ed esperienza lo ridisegnano subito (vedi Hud).
 const REDRAW_INTERVAL := 0.1
@@ -38,7 +37,7 @@ const SKILLS := ["combo", "heavy", "dodge", "jump", "run"]
 var player: Player
 var kills := 0
 
-var _panel := StyleBoxFlat.new()
+var _panel := UiStyle.box(UiStyle.PANEL)
 var _redraw_timer := 0.0
 
 
@@ -47,10 +46,6 @@ func _ready() -> void:
 	position = Vector2(16, 16)
 	size = PANEL_SIZE
 	scale = Vector2(PANEL_SCALE, PANEL_SCALE)
-	_panel.bg_color = COLOR_PANEL
-	_panel.border_color = COLOR_BORDER
-	_panel.set_border_width_all(2)
-	_panel.set_corner_radius_all(14)
 
 
 func _process(delta: float) -> void:
@@ -71,35 +66,35 @@ func _draw() -> void:
 	# Vita: un segmento per punto vita (barre di vita e mana senza numeri).
 	var low := player.health <= maxf(1.0, player.max_health / 3.0)
 	_draw_heart(Vector2(BAR_X + 9, 26), 9.0)
-	_draw_segments(Rect2(BAR_X + 24, 16, BAR_WIDTH - 24, 20), player.health, player.max_health, COLOR_HEALTH_LOW if low else COLOR_HEALTH)
+	_draw_segments(Rect2(BAR_X + 24, 14, BAR_WIDTH - 24, 22), player.health, player.max_health, COLOR_HEALTH_LOW if low else COLOR_HEALTH)
 
 	# Stamina: attaccare, schivare, saltare, parare e correre la consumano.
-	var stamina_rect := Rect2(BAR_X + 24, 41, BAR_WIDTH - 24, 11)
-	_draw_bolt(Vector2(BAR_X + 9, 46))
+	var stamina_rect := Rect2(BAR_X + 24, 40, BAR_WIDTH - 24, 14)
+	_draw_bolt(Vector2(BAR_X + 9, 47))
 	_draw_bar(stamina_rect, player.stamina / player.max_stamina, COLOR_STAMINA)
 	if player.stamina < Player.STAMINA_ATTACK and int(Time.get_ticks_msec() / 150) % 2 == 0:
-		draw_rect(stamina_rect, COLOR_STAMINA_EMPTY, false, 2.0)
+		_draw_ring(stamina_rect, COLOR_STAMINA_EMPTY)
 
 	# Mana.
-	UpgradeIcon.draw_icon(self, Vector2(BAR_X + 9, 63), 18.0, "mana", false)
+	UpgradeIcon.draw_icon(self, Vector2(BAR_X + 9, 64), 18.0, "mana", false)
 	draw_set_transform(Vector2.ZERO)
-	_draw_bar(Rect2(BAR_X + 24, 57, BAR_WIDTH - 24, 13), player.mana / player.max_mana, COLOR_MANA)
+	_draw_bar(Rect2(BAR_X + 24, 57, BAR_WIDTH - 24, 14), player.mana / player.max_mana, COLOR_MANA)
 
 	# Esperienza verso il livello successivo (la curva cresce col livello,
 	# vedi Player.experience_for).
 	var needed := maxi(player.experience_needed(), 1)
-	_draw_bar(Rect2(BAR_X + 24, 76, BAR_WIDTH - 24, 6), clampf(float(player.experience) / needed, 0.0, 1.0), COLOR_XP)
+	_draw_bar(Rect2(BAR_X + 24, 74, BAR_WIDTH - 24, 10), clampf(float(player.experience) / needed, 0.0, 1.0), COLOR_XP)
 
 	# Frenesia: cresce colpendo e cala se si smette di attaccare; piena pulsa
 	# e indica i tasti dell'attacco speciale.
 	UpgradeIcon.draw_icon(self, Vector2(BAR_X + 9, 94), 18.0, "frenzy", false)
 	draw_set_transform(Vector2.ZERO)
-	var frenzy_rect := Rect2(BAR_X + 24, 88, BAR_WIDTH - 24, 12)
+	var frenzy_rect := Rect2(BAR_X + 24, 87, BAR_WIDTH - 24, 14)
 	var full := player.is_frenzy_full()
 	var beat := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.012) if full else 0.0
 	_draw_bar(frenzy_rect, player.frenzy / Player.FRENZY_MAX, COLOR_FRENZY.lightened(0.35 * beat))
 	if full:
-		draw_rect(frenzy_rect.grow(1.0 + beat), Color(1.0, 0.85, 0.4, 0.6 + 0.4 * beat), false, 2.0)
+		_draw_ring(frenzy_rect.grow(1.0 + beat), Color(1.0, 0.85, 0.4, 0.6 + 0.4 * beat))
 		_text(font, tr("HUD_FRENZY_READY") % [Keybinds.primary("parry", "controller", true), Keybinds.primary("attack", "controller", true)],
 				frenzy_rect.get_center() + Vector2(0, 7), SMALL_FONT_SIZE, COLOR_TEXT, HORIZONTAL_ALIGNMENT_CENTER)
 	_text(font, tr("HUD_XP") % [player.experience, needed], Vector2(BAR_X + 24, 121), SMALL_FONT_SIZE, COLOR_DIM_TEXT)
@@ -115,8 +110,8 @@ func _draw() -> void:
 		x += 52.0
 	# Monete e nemici sconfitti, a destra.
 	var coin := Vector2(size.x - 112, 144)
-	draw_circle(coin, 9.0, Items.color("gold").darkened(0.25))
-	draw_circle(coin, 7.0, Items.color("gold"))
+	Shapes.disc(self, coin, 11.0, COLOR_OUTLINE)
+	Shapes.disc(self, coin, 8.0, Items.color("gold"))
 	_text(font, str(player.inventory.gold), coin + Vector2(14, 6), FONT_SIZE, COLOR_TEXT)
 	var sword := Vector2(size.x - 46, 144)
 	BodyParts.draw_sword(self, sword + Vector2(-8, 8), -PI / 4.0, 22.0, 3.0)
@@ -126,16 +121,16 @@ func _draw() -> void:
 ## Ritratto del goblin (forma geometrica) con il livello in un distintivo.
 func _draw_portrait(font: Font) -> void:
 	var center := Vector2(52, 50)
-	draw_circle(center, 34.0, Color(0, 0, 0, 0.35))
-	draw_arc(center, 34.0, 0.0, TAU, 40, Color(1, 1, 1, 0.25), 2.0)
+	Shapes.disc(self, center, 37.0, COLOR_OUTLINE)
+	Shapes.disc(self, center, 33.0, UiStyle.SOFT)
 	draw_circle(center + Vector2(0, 4), 24.0, Player.COLOR_BODY)
 	draw_colored_polygon(PackedVector2Array([center + Vector2(26, 4), center + Vector2(12, -4), center + Vector2(12, 12)]), Player.COLOR_BODY.darkened(0.3))
 	draw_circle(center + Vector2(-6, -2), 3.5, Color(0.1, 0.1, 0.1))
 	draw_circle(center + Vector2(8, -2), 3.5, Color(0.1, 0.1, 0.1))
 	var badge := center + Vector2(26, 28)
-	draw_circle(badge, 15.0, Color(0.2, 0.15, 0.05))
-	draw_circle(badge, 13.0, COLOR_XP)
-	_text(font, str(player.level), badge + Vector2(0, 6), FONT_SIZE, Color(0.15, 0.1, 0.0), HORIZONTAL_ALIGNMENT_CENTER)
+	Shapes.disc(self, badge, 16.0, COLOR_OUTLINE)
+	Shapes.disc(self, badge, 13.0, UiStyle.ACCENT)
+	_text(font, str(player.level), badge + Vector2(0, 7), FONT_SIZE, UiStyle.ACCENT_TEXT, HORIZONTAL_ALIGNMENT_CENTER, 0)
 
 
 ## Fulmine verde accanto alla barra della stamina.
@@ -156,27 +151,32 @@ func _draw_heart(center: Vector2, radius: float) -> void:
 
 
 func _draw_bar(rect: Rect2, ratio: float, color: Color) -> void:
-	draw_rect(rect, COLOR_BAR_BACK)
-	var fill := Rect2(rect.position, Vector2(rect.size.x * clampf(ratio, 0.0, 1.0), rect.size.y))
-	draw_rect(fill, color)
-	draw_rect(Rect2(fill.position, Vector2(fill.size.x, rect.size.y * 0.35)), Color(1, 1, 1, 0.18))
+	UiStyle.draw_bar(self, rect, ratio, color)
 
 
-## Barra a segmenti: uno per ogni punto, pieni fino a value.
+## Bordo colorato attorno a una barra (stamina finita, Frenesia piena).
+func _draw_ring(rect: Rect2, color: Color) -> void:
+	var ring := UiStyle.pill(color, 3)
+	ring.draw_center = false
+	ring.border_color = color
+	draw_style_box(ring, rect.grow(3.0))
+
+
+## Barra a segmenti: uno per ogni punto, pieni fino a value, ognuno col suo
+## contorno nero.
 func _draw_segments(rect: Rect2, value: int, maximum: int, color: Color) -> void:
-	draw_rect(rect, COLOR_BAR_BACK)
 	var gap := 3.0
-	var width := (rect.size.x - gap * (maximum + 1)) / maximum
+	var width := (rect.size.x - gap * (maximum - 1)) / maximum
+	var full := UiStyle.box(color, 6, 3, 0.0)
+	var empty := UiStyle.box(UiStyle.SOFT, 6, 3, 0.0)
 	for i in maximum:
-		var segment := Rect2(rect.position + Vector2(gap + i * (width + gap), gap), Vector2(width, rect.size.y - gap * 2.0))
-		if i < value:
-			draw_rect(segment, color)
-			draw_rect(Rect2(segment.position, Vector2(segment.size.x, segment.size.y * 0.35)), Color(1, 1, 1, 0.2))
-		else:
-			draw_rect(segment, Color(color, 0.15))
+		var segment := Rect2(rect.position + Vector2(i * (width + gap), 0), Vector2(width, rect.size.y))
+		draw_style_box(full if i < value else empty, segment)
+		if i < value and segment.size.x > 12.0:
+			draw_rect(Rect2(segment.position + Vector2(5, 5), Vector2(segment.size.x - 10, 3)), color.lightened(0.4))
 
 
-func _text(font: Font, text: String, at: Vector2, font_size: int, color: Color, align := HORIZONTAL_ALIGNMENT_LEFT) -> void:
+func _text(font: Font, text: String, at: Vector2, font_size: int, color: Color, align := HORIZONTAL_ALIGNMENT_LEFT, outline := OUTLINE_SIZE) -> void:
 	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 	var x := at.x
 	if align == HORIZONTAL_ALIGNMENT_RIGHT:
@@ -187,6 +187,7 @@ func _text(font: Font, text: String, at: Vector2, font_size: int, color: Color, 
 	var screen_size := roundi(font_size * PANEL_SCALE)
 	var at_screen := (Vector2(x, at.y) * PANEL_SCALE).round()
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE / PANEL_SCALE)
-	draw_string_outline(font, at_screen, text, HORIZONTAL_ALIGNMENT_LEFT, -1, screen_size, OUTLINE_SIZE, COLOR_OUTLINE)
+	if outline > 0:
+		draw_string_outline(font, at_screen, text, HORIZONTAL_ALIGNMENT_LEFT, -1, screen_size, outline, COLOR_OUTLINE)
 	draw_string(font, at_screen, text, HORIZONTAL_ALIGNMENT_LEFT, -1, screen_size, color)
 	draw_set_transform(Vector2.ZERO)
