@@ -18,9 +18,11 @@ anche la pagina itch.io (`store/itch/`) mostrata sotto il gioco.
   `index.wasm`, `index.pck` e qualche icona. Si serve così com'è, da un
   qualsiasi hosting statico; il server deve mandare `index.wasm` come
   `application/wasm` (lo fanno tutti gli hosting moderni).
-- Nel browser non ci sono i font del sistema: le frecce della croce e pochi
-  altri simboli dei testi vengono da `assets/fonts/symbols.otf` (sottoinsieme
-  di Inter, licenza OFL in `assets/fonts/OFL.txt`, inclusa nell'export).
+- I testi usano Fredoka (`assets/fonts/fredoka_*.ttf`, il font del sito, vedi
+  `UiStyle`). Nel browser non ci sono i font del sistema: le frecce della
+  croce e pochi altri simboli che Fredoka non ha vengono da
+  `assets/fonts/symbols.otf` (sottoinsieme di Inter). Licenza OFL di tutti e
+  due in `assets/fonts/OFL.txt`, inclusa nell'export.
 
 ## Prestazioni sui telefoni
 

@@ -6,14 +6,13 @@ extends Control
 ## controller scelto dal giocatore (vedi Keybinds),
 ## quante ne restano o la ricarica. Sui dispositivi touch non serve: ci
 ## sono già i pulsanti a schermo.
+## Caselle color crema col contorno nero e l'ombra piena, come i pulsanti
+## del sito (vedi UiStyle); quante ne restano in un distintivo sull'angolo.
 
 const SLOT := 58.0
 const GAP := 8.0
 const FONT_SIZE := 15
-const COLOR_SLOT := Color(0.05, 0.07, 0.05, 0.72)
-const COLOR_BORDER := Color(1, 1, 1, 0.16)
-const COLOR_ACTIVE := Color(1.0, 0.85, 0.4)
-const COLOR_KEY := Color(1, 1, 1, 0.85)
+const COLOR_KEY := UiStyle.CREAM
 ## Azioni: icona e azione dell'Input Map (per il tasto del controller).
 const ACTIONS := [
 	["potion", "potion"], ["mana", "mana_potion"], ["shield", "shield"], ["spell", "spell"],
@@ -22,16 +21,15 @@ const ACTIONS := [
 
 var player: Player
 
-var _style := StyleBoxFlat.new()
+var _style := UiStyle.box(UiStyle.CREAM, 16, 3, 3.0, UiStyle.INK)
+var _active := UiStyle.box(UiStyle.ACCENT, 16, 3, 5.0, UiStyle.INK)
+var _unavailable := UiStyle.box(Color(UiStyle.INK, 0.35), 13, 0, 0.0)
+var _badge := UiStyle.pill(UiStyle.PANEL, 2)
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	size = Vector2(ACTIONS.size() * (SLOT + GAP) - GAP, SLOT + 14)
-	_style.bg_color = COLOR_SLOT
-	_style.border_color = COLOR_BORDER
-	_style.set_border_width_all(2)
-	_style.set_corner_radius_all(10)
 
 
 func _process(_delta: float) -> void:
@@ -48,15 +46,11 @@ func _draw() -> void:
 		var kind: String = ACTIONS[i][0]
 		var available := _is_ready(kind)
 		var highlight := kind == "shield" and player.shield_active
-		var style := _style.duplicate() as StyleBoxFlat
-		if highlight:
-			style.border_color = COLOR_ACTIVE
-			style.set_border_width_all(3)
-		draw_style_box(style, rect)
+		draw_style_box(_active if highlight else _style, rect)
 		UpgradeIcon.draw_icon(self, rect.get_center(), SLOT * 0.62, kind, false)
 		draw_set_transform(Vector2.ZERO)
 		if not available:
-			draw_rect(rect.grow(-2), Color(0, 0, 0, 0.5))
+			draw_style_box(_unavailable, rect.grow(-3))
 		# Ricarica dello scudo: un settore scuro che si svuota, e i secondi.
 		if kind == "shield" and player.shield_cooldown > 0.0 and not player.shield_active:
 			var left := player.shield_cooldown / player.shield_cooldown_max
@@ -64,7 +58,7 @@ func _draw() -> void:
 			_text(font, str(ceili(player.shield_cooldown)), rect.get_center() + Vector2(0, 6), FONT_SIZE, Color.WHITE)
 		var count := _count(kind)
 		if count != "":
-			_text(font, count, rect.position + Vector2(SLOT - 6, SLOT - 6), 13, Color.WHITE, HORIZONTAL_ALIGNMENT_RIGHT)
+			_draw_badge(font, count, rect.position + Vector2(SLOT - 2, 0))
 		# Tasto del controller, sotto lo slot.
 		_text(font, Keybinds.primary(ACTIONS[i][1], "controller", true), rect.position + Vector2(SLOT / 2.0, SLOT + 14), 14, COLOR_KEY)
 
@@ -103,6 +97,14 @@ func _count(kind: String) -> String:
 	return ""
 
 
+## Distintivo a pillola con quante ne restano, centrato sull'angolo in
+## alto a destra della casella.
+func _draw_badge(font: Font, text: String, at: Vector2) -> void:
+	var width := maxf(font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + 12.0, 20.0)
+	draw_style_box(_badge, Rect2(at - Vector2(width / 2.0, 10), Vector2(width, 20)))
+	draw_string(font, at + Vector2(-width / 2.0, 5), text, HORIZONTAL_ALIGNMENT_CENTER, width, 13, UiStyle.CREAM)
+
+
 ## Settore scuro (frazione ratio del cerchio) per la ricarica.
 func _draw_pie(center: Vector2, radius: float, ratio: float) -> void:
 	var points := PackedVector2Array([center])
@@ -116,5 +118,5 @@ func _draw_pie(center: Vector2, radius: float, ratio: float) -> void:
 func _text(font: Font, text: String, at: Vector2, font_size: int, color: Color, align := HORIZONTAL_ALIGNMENT_CENTER) -> void:
 	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 	var x := at.x - (width if align == HORIZONTAL_ALIGNMENT_RIGHT else width / 2.0)
-	draw_string_outline(font, Vector2(x, at.y), text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, 4, Color(0, 0, 0, 0.7))
+	draw_string_outline(font, Vector2(x, at.y), text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, 6, UiStyle.INK)
 	draw_string(font, Vector2(x, at.y), text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)

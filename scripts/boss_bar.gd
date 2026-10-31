@@ -32,9 +32,9 @@ func _draw() -> void:
 	# Ogni boss ha il suo nome ("name" del tipo in data/enemies.json).
 	var title := tr(str(EnemyTypes.get_type(boss.type_id).get("name", "BOSS_NAME")))
 	var width := font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x
-	draw_string_outline(font, Vector2(size.x / 2.0 - width / 2.0, bar.position.y - 8.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 5, Color(0, 0, 0, 0.7))
+	draw_string_outline(font, Vector2(size.x / 2.0 - width / 2.0, bar.position.y - 8.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 7, UiStyle.INK)
 	draw_string(font, Vector2(size.x / 2.0 - width / 2.0, bar.position.y - 8.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(1.0, 0.85, 0.4))
-	draw_rect(bar.grow(3.0), Color(0, 0, 0, 0.6))
+	draw_style_box(UiStyle.pill(UiStyle.SOFT, 3, 4.0), bar.grow(3.0))
 	if boss.is_casting():
 		var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 60.0)
 		draw_rect(bar.grow(4.0), Color(COLOR_CASTING, 0.5 + 0.5 * pulse), false, 2.0)

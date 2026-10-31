@@ -29,11 +29,6 @@ const STEAM_DECK_LAYOUT := "a:b3,b:b4,x:b5,y:b6,leftshoulder:b7,rightshoulder:b8
 ## Tasti e clic tolti dalle azioni mentre sullo Steam Deck c'è un
 ## controller, da rimettere quando il controller sparisce.
 var _removed_desktop_events := {}
-## Frecce della croce e pochi altri simboli dei testi (sottoinsieme di Inter,
-## licenza in assets/fonts/OFL.txt): nel browser non ci sono i font del
-## sistema da cui Godot li prende sul PC.
-const SYMBOLS_FONT := "res://assets/fonts/symbols.otf"
-
 ## Sui PC con schermo touch i controlli a schermo compaiono solo dopo aver
 ## toccato lo schermo e spariscono appena si usa il controller o la tastiera.
 var _touch_active := false
@@ -49,9 +44,8 @@ const TARGET_FPS := 60
 func _ready() -> void:
 	Engine.max_fps = TARGET_FPS
 	is_web = OS.has_feature("web")
-	if is_web:
-		var extra: Array[Font] = [load(SYMBOLS_FONT)]
-		ThemeDB.fallback_font.fallbacks = extra
+	# Font Fredoka e stile fumettoso del sito per tutta l'interfaccia.
+	UiStyle.apply()
 	# Nel browser di telefoni e tablet si gioca col touch, come nelle app.
 	is_mobile = OS.has_feature("android") or OS.has_feature("ios") or OS.has_feature("web_android") or OS.has_feature("web_ios")
 	is_desktop = OS.has_feature("windows") or OS.has_feature("linuxbsd") or OS.has_feature("macos")

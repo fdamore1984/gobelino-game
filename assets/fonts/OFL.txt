@@ -1,6 +1,10 @@
 symbols.otf: sottoinsieme di Inter SemiBold (frecce e pochi simboli).
 Copyright 2016-2023 The Inter Project Authors (https://github.com/rsms/inter)
 
+fredoka_semibold.ttf, fredoka_bold.ttf: Fredoka (pesi 600 e 700), il font
+dell'interfaccia, lo stesso del sito ufotizio.com.
+Copyright 2016 The Fredoka Project Authors (https://github.com/hafontia/Fredoka-One)
+
 SIL OPEN FONT LICENSE Version 1.1
 
 PREAMBLE

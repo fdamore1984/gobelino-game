@@ -20,7 +20,7 @@ const POWER_UPS_FONT_SIZE := 14
 const POWER_UPS_MARGIN := 16.0
 ## Con i controlli touch la riga sta sotto la minimappa.
 const POWER_UPS_TOUCH_TOP := 234.0
-const COLOR_POWER_UPS_PANEL := Color(0.05, 0.07, 0.05, 0.8)
+const COLOR_POWER_UPS_PANEL := UiStyle.PANEL
 ## Per quanto resta il messaggio di fine sfida.
 const CHALLENGE_FLASH_TIME := 3.5
 ## A ogni livello si sceglie tra questi potenziamenti, presi a caso; ogni
@@ -202,8 +202,6 @@ func _update_power_ups() -> void:
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.add_theme_font_size_override("font_size", POWER_UPS_FONT_SIZE)
 		label.add_theme_color_override("font_color", UpgradeIcon.color_of(row[0]).lerp(Color.WHITE, 0.65))
-		label.add_theme_constant_override("outline_size", 4)
-		label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
 		tile.add_child(label)
 		_power_ups.add_child(tile)
 	_fit_power_ups.call_deferred()
@@ -241,11 +239,7 @@ func _fit_power_ups() -> void:
 ## Mette la riga dei potenziamenti attivi su un pannello scuro, perché si
 ## legga su ogni terreno.
 func _build_power_ups_panel() -> void:
-	var style := StyleBoxFlat.new()
-	style.bg_color = COLOR_POWER_UPS_PANEL
-	style.border_color = Color(1, 1, 1, 0.14)
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(8)
+	var style := UiStyle.box(COLOR_POWER_UPS_PANEL, 14, 3, 4.0)
 	style.set_content_margin_all(6)
 	_power_ups_panel.add_theme_stylebox_override("panel", style)
 	_power_ups_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -304,15 +298,10 @@ func _build_card(button: Button, upgrade: String) -> void:
 	button.text = ""
 	var color := UpgradeIcon.color_of(upgrade)
 	for style_name: String in ["normal", "hover", "pressed", "focus", "disabled"]:
-		var style := StyleBoxFlat.new()
-		style.bg_color = Color(0.08, 0.1, 0.08, 0.9)
-		style.set_corner_radius_all(10)
-		style.set_border_width_all(2)
-		style.border_color = Color(color, 0.25)
+		var style := UiStyle.box(UiStyle.PANEL, 18, UiStyle.BORDER, 6.0)
 		if style_name in ["hover", "focus"]:
-			style.bg_color = Color(0.14, 0.17, 0.13, 0.95)
-			style.border_color = color
-			style.set_border_width_all(4)
+			# Scheda scelta: si colora del potenziamento e l'ombra si allunga.
+			style = UiStyle.box(UiStyle.PANEL.lerp(color, 0.35), 18, UiStyle.BORDER + 1, 10.0, UiStyle.INK)
 		button.add_theme_stylebox_override(style_name, style)
 	var box := VBoxContainer.new()
 	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 10)

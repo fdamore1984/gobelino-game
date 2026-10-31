@@ -677,13 +677,19 @@ func _capture_cover(language: String) -> void:
 	var layer := CanvasLayer.new()
 	_game.add_child(layer)
 	var band := ColorRect.new()
-	band.color = Color(0.07, 0.09, 0.06, 0.55)
+	band.color = Color(UiStyle.OVERLAY, 0.6)
 	band.size = Vector2(2000, 300)
 	layer.add_child(band)
 	var width := get_viewport().get_visible_rect().size.x
-	var title := _label(tr("GAME_TITLE"), 150, Color(0.85, 0.75, 0.4), width, 30.0)
-	title.add_theme_constant_override("outline_size", 18)
-	title.add_theme_color_override("font_outline_color", Color(0.08, 0.06, 0.03))
+	var title := _label(tr("GAME_TITLE"), 150, UiStyle.TITLE, width, 30.0)
+	# Titolo come nel menù iniziale: Fredoka grassetto, contorno nero e ombra piena.
+	title.add_theme_font_override("font", UiStyle.bold())
+	title.add_theme_constant_override("outline_size", 26)
+	title.add_theme_color_override("font_outline_color", UiStyle.INK)
+	title.add_theme_color_override("font_shadow_color", UiStyle.INK)
+	title.add_theme_constant_override("shadow_offset_x", 10)
+	title.add_theme_constant_override("shadow_offset_y", 10)
+	title.add_theme_constant_override("shadow_outline_size", 26)
 	layer.add_child(title)
 	layer.add_child(_label(SUBTITLE[language], 44, Color(1, 1, 1, 0.85), width, 205.0))
 
