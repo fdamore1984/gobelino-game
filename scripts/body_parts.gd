@@ -29,8 +29,10 @@ static func draw_legs(canvas: CanvasItem, hip_y: float, foot_y: float, spacing: 
 		var swing := direction * sin(phase + (PI if side > 0.0 else 0.0)) * stride
 		var hip := Vector2(side * spacing, hip_y)
 		var foot := Vector2(side * spacing, foot_y) + Vector2(swing.x, swing.y * 0.5)
+		# Contorno a inchiostro sotto la gamba e il piede (stile fumetto).
+		canvas.draw_line(hip, foot, Color(Shapes.INK, color.a), width + Shapes.INK_WIDTH * 1.5)
+		Shapes.ink_disc(canvas, foot, width * 0.6, color.darkened(0.25), Shapes.INK_WIDTH * 0.75)
 		canvas.draw_line(hip, foot, color, width)
-		Shapes.disc(canvas, foot, width * 0.6, color.darkened(0.25))
 
 
 ## Spada che parte da origin con l'angolo dato: impugnatura, guardia e lama
@@ -45,6 +47,15 @@ static func draw_sword(canvas: CanvasItem, origin: Vector2, angle: float, length
 	# Lama: un quadrilatero che si assottiglia e la punta (primitive, che
 	# costano meno dei poligoni da ridisegnare a ogni frame).
 	var shoulder := tip - direction * width * 1.2
+	# Contorno a inchiostro: impugnatura, guardia e lama un po' più grandi, sotto.
+	var ink := Shapes.INK_WIDTH * 0.7
+	var inks := PackedColorArray([Color(Shapes.INK, tint.a)])
+	canvas.draw_line(origin - direction * ink, grip_end, inks[0], width * 0.8 + ink * 2.0)
+	canvas.draw_line(grip_end - side * (width * 1.4 + ink), grip_end + side * (width * 1.4 + ink), inks[0], width * 0.7 + ink * 2.0)
+	canvas.draw_primitive(PackedVector2Array([grip_end + side * (width * 0.55 + ink), shoulder + side * (width * 0.4 + ink),
+			shoulder - side * (width * 0.4 + ink), grip_end - side * (width * 0.55 + ink)]), inks, PackedVector2Array())
+	canvas.draw_primitive(PackedVector2Array([shoulder + side * (width * 0.4 + ink), tip + direction * ink * 1.8,
+			shoulder - side * (width * 0.4 + ink)]), inks, PackedVector2Array())
 	var colors := PackedColorArray([COLOR_BLADE * tint])
 	canvas.draw_primitive(PackedVector2Array([grip_end + side * width * 0.55, shoulder + side * width * 0.4,
 			shoulder - side * width * 0.4, grip_end - side * width * 0.55]), colors, PackedVector2Array())

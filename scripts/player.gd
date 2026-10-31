@@ -69,6 +69,8 @@ signal special_finished
 enum State { NORMAL, ATTACK, PARRY, DODGE, SLIDE, HURT, DEAD, SLAM, FALL, RECOIL, DRINK, SPECIAL }
 
 const RADIUS := 22.0
+## Grandezza degli occhi rispetto al corpo.
+const EYE_SIZE := 0.24
 const START_HEALTH := 5
 ## Vita massima in più ogni tanti livelli, oltre ai potenziamenti: tiene
 ## il passo con il danno dei nemici, che cresce con il livello.
@@ -2661,7 +2663,7 @@ func _draw() -> void:
 	# L'ombra resta a terra e si rimpicciolisce durante il salto; tutto il
 	# resto sale con il personaggio. In scivolata il corpo si schiaccia.
 	var shadow_scale := clampf(1.0 - _height / 160.0, 0.5, 1.0)
-	Shapes.disc(self, Vector2(0, RADIUS * 0.8 - ground_elevation), RADIUS * 0.9 * shadow_scale, Color(0, 0, 0, 0.25))
+	Shapes.disc(self, Vector2(0, RADIUS * 0.8 - ground_elevation), RADIUS * 0.9 * shadow_scale, Shapes.SHADOW)
 	var body_scale := Vector2(1.2, 0.6) if _state == State.SLIDE else Vector2.ONE
 	var lift := -altitude() + (RADIUS * 0.4 if _state == State.SLIDE else 0.0)
 	# Caricando lo slam aereo si ondeggia piano a mezz'aria.
@@ -2726,7 +2728,7 @@ func _draw() -> void:
 	var behind := BodyParts.gear_behind(facing)
 	if behind:
 		_draw_gear(body)
-	Shapes.disc(self, Vector2.ZERO, RADIUS, body)
+	Shapes.ink_disc(self, Vector2.ZERO, RADIUS, body)
 	_blood.draw(self, RADIUS, body.a)
 	_wounds.draw(self, RADIUS, body.a)
 	if not behind:
@@ -2755,13 +2757,17 @@ func _draw_h_bomb() -> void:
 	HBombBlast.draw_bomb(self, H_BOMB_HELD, H_BOMB_LENGTH, glow, facing.x < 0.0)
 
 
-## "Naso" che indica la direzione e, da vivo, la spada, la fiaschetta in
-## uso e la lanterna.
+## "Naso" che indica la direzione, gli occhi grandi da fumetto e, da vivo,
+## la spada, la fiaschetta in uso e la lanterna.
 func _draw_gear(body: Color) -> void:
 	var tip := facing * (RADIUS + 12.0)
 	var side := facing.orthogonal() * 9.0
+	var ink := facing.orthogonal() * (9.0 + Shapes.INK_WIDTH)
+	draw_primitive(PackedVector2Array([tip + facing * Shapes.INK_WIDTH * 1.6, facing * RADIUS * 0.5 + ink, facing * RADIUS * 0.5 - ink]),
+			PackedColorArray([Color(Shapes.INK, body.a)]), PackedVector2Array())
 	draw_primitive(PackedVector2Array([tip, facing * RADIUS * 0.6 + side, facing * RADIUS * 0.6 - side]), PackedColorArray([body.darkened(0.3)]), PackedVector2Array())
 	if _state != State.DEAD:
+		Shapes.eyes(self, facing * RADIUS * 0.25 + Vector2(0, -RADIUS * 0.2), RADIUS * EYE_SIZE, facing, false, body.a)
 		_draw_sword()
 		if _state == State.DRINK:
 			_draw_flask()

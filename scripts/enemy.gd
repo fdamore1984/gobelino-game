@@ -337,6 +337,8 @@ var _trail_time := 0.0
 ## Mesh del corpo e del suo contorno (vedi Shapes), preparate una volta per raggio.
 var _body_mesh: ArrayMesh
 var _outline_mesh: ArrayMesh
+## Contorno a inchiostro sotto il corpo (stile fumetto, vedi Shapes.ink_mesh).
+var _ink_mesh: ArrayMesh
 var _shape_radius := -1.0
 
 ## Sagoma che si vede quando il nemico è dietro a un muro (vedi Silhouette):
@@ -1451,7 +1453,7 @@ func _draw() -> void:
 	# Ombra, gambe, corpo con la forma del tipo sopra le gambe e un
 	# "occhio" che indica la direzione.
 	var lift := _air + _height
-	Shapes.disc(self, Vector2(0, radius * 0.8), radius * 0.9 * (1.0 - minf(lift, 150.0) / 200.0), Color(0, 0, 0, 0.25))
+	Shapes.disc(self, Vector2(0, radius * 0.8), radius * 0.9 * (1.0 - minf(lift, 150.0) / 200.0), Shapes.SHADOW)
 	var leg := radius * LEG_FACTOR
 	# I salti (attacco speciale, gradini) sollevano tutto tranne l'ombra.
 	draw_set_transform(Vector2(0, -ground_elevation - lift))
@@ -1467,6 +1469,7 @@ func _draw() -> void:
 	var behind := BodyParts.gear_behind(_facing)
 	if behind:
 		_draw_gear()
+	draw_mesh(_ink_mesh, null, Transform2D.IDENTITY, Shapes.INK)
 	draw_mesh(_body_mesh, null, Transform2D.IDENTITY, body)
 	_blood.draw(self, radius, 1.0)
 	_wounds.draw(self, radius, 1.0)
@@ -1488,7 +1491,7 @@ func _draw() -> void:
 	if health < max_health and _state != State.DEAD:
 		var width := maxf(40.0, radius * 1.8)
 		var origin := Vector2(-width / 2.0, -radius * 1.2 - 14.0)
-		draw_rect(Rect2(origin - Vector2(1, 1), Vector2(width + 2, 8)), Color(0, 0, 0, 0.5))
+		draw_rect(Rect2(origin - Vector2(2, 2), Vector2(width + 4, 10)), Color(Shapes.INK, 0.85))
 		var gap := 1.5 if max_health <= 10 else 0.0
 		var segment := (width - gap * (max_health - 1)) / max_health
 		for k in health:
@@ -1503,7 +1506,8 @@ func _draw_gear() -> void:
 	if is_mutant():
 		_draw_ghoul()
 		return
-	Shapes.disc(self, _facing * radius * 0.5, maxf(radius * 0.2, 4.0), Color(0.1, 0.05, 0.1))
+	# Occhi grandi e arrabbiati che guardano dove va il nemico.
+	Shapes.eyes(self, _facing * radius * 0.3 + Vector2(0, -radius * 0.15), maxf(radius * 0.2, 4.0), _facing, true)
 	if is_casting():
 		_draw_magic()
 	if _is_ranged():
@@ -1618,6 +1622,7 @@ func _prepare_meshes() -> void:
 		var key := "%s:%s" % [_type["shape"], radius]
 		_body_mesh = Shapes.polygon_mesh(key, _shape_points())
 		_outline_mesh = Shapes.outline_mesh(key + ":outline", _shape_points(), 2.0)
+		_ink_mesh = Shapes.ink_mesh(key + ":ink", _shape_points(), Shapes.INK_WIDTH)
 
 
 ## Dietro al corpo: bagliore rosso della carica e copie rosse del corpo

@@ -16,6 +16,52 @@ static var _disc: ImageTexture
 static var _meshes := {}
 
 
+## Tratto a inchiostro del mondo (stile fumetto del sito, vedi UiStyle):
+## colore e spessore dei contorni di personaggi, nemici e oggetti.
+const INK := UiStyle.INK
+const INK_WIDTH := 3.0
+## Ombre a terra: inchiostro trasparente, piene e senza sfumatura.
+const SHADOW := Color(0.05, 0.06, 0.06, 0.32)
+
+
+## Disco pieno col contorno a inchiostro (un disco nero un po' più grande sotto).
+static func ink_disc(canvas: CanvasItem, center: Vector2, radius: float, color: Color, width := INK_WIDTH) -> void:
+	disc(canvas, center, radius + width, Color(INK, color.a))
+	disc(canvas, center, radius, color)
+
+
+## Ovale pieno (raggi diversi in orizzontale e in verticale), come disc.
+static func oval(canvas: CanvasItem, center: Vector2, radii: Vector2, color: Color) -> void:
+	if radii.x <= 0.0 or radii.y <= 0.0:
+		return
+	canvas.draw_texture_rect(disc_texture(), Rect2(center - radii, radii * 2.0), false, color)
+
+
+## Occhi grandi da fumetto, come quelli di Ufotizio: due ovali bianchi col
+## contorno nero e le pupille che guardano verso look. size è il raggio
+## orizzontale di un occhio; arrabbiati con le sopracciglia storte.
+static func eyes(canvas: CanvasItem, center: Vector2, size: float, look: Vector2, angry := false, alpha := 1.0) -> void:
+	var spacing := size * 1.25 * (1.0 - 0.3 * absf(look.x))
+	var radii := Vector2(size, size * 1.25)
+	var ink := Color(INK, alpha)
+	for side: float in [-1.0, 1.0]:
+		var eye := center + Vector2(side * spacing, 0)
+		oval(canvas, eye, radii + Vector2(2.0, 2.0), ink)
+		oval(canvas, eye, radii, Color(1, 1, 1, alpha))
+		disc(canvas, eye + look * size * 0.45 + Vector2(0, size * 0.15), size * 0.5, ink)
+		if angry:
+			canvas.draw_line(eye + Vector2(side * size * 1.1, -radii.y * 1.25), eye + Vector2(-side * size * 0.6, -radii.y * 0.75), ink, maxf(2.0, size * 0.4))
+
+
+## Mesh del poligono allargato di width a spigoli tondi: disegnata sotto il
+## poligono fa da contorno a inchiostro (ricordata con la chiave data).
+static func ink_mesh(key: Variant, points: PackedVector2Array, width := INK_WIDTH) -> ArrayMesh:
+	if not _meshes.has(key):
+		var grown := Geometry2D.offset_polygon(points, width, Geometry2D.JOIN_ROUND)
+		_meshes[key] = polygon_mesh([key, "ink"], grown[0] if not grown.is_empty() else points)
+	return _meshes[key]
+
+
 ## Disco pieno, come draw_circle.
 static func disc(canvas: CanvasItem, center: Vector2, radius: float, color: Color) -> void:
 	if radius <= 0.0:

@@ -73,7 +73,7 @@ func focus_spot() -> Vector3:
 
 func _draw() -> void:
 	var center := _center()
-	Shapes.disc(self, Vector2(0, -_lift + 4.0), 9.0, Color(0, 0, 0, 0.25))
+	Shapes.disc(self, Vector2(0, -_lift + 4.0), 9.0, Shapes.SHADOW)
 	if LowHealthVignette.focus_held():
 		var pulse := 0.5 + 0.5 * sin(_age * 5.0)
 		Shapes.glow(self, center, SIZE * FOCUS_SCALE * FOCUS_AURA * (0.9 + 0.1 * pulse), COLOR_AURA)
