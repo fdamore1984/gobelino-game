@@ -64,6 +64,19 @@ const CELL := 64.0
 ## Un pezzo di mondo è un quadrato di CHUNK_CELLS x CHUNK_CELLS rombi.
 const CHUNK_CELLS := 8
 const MAINTAIN_INTERVAL := 0.15
+## Blocchi tra i personaggi e ostacoli dei pezzi appena mostrati: si
+## aggiungono al più tanti per frame, così il loro primo disegno (che
+## prepara le mesh) non si accumula tutto nello stesso frame insieme al
+## pavimento del pezzo. Nel browser dei telefoni un pezzo intero in un
+## frame solo faceva scattare il gioco.
+const NODES_PER_FRAME := 5
+const PENDING_CATCH_UP := 40
+## La regione successiva si genera in sottofondo mentre si gioca, a poco a
+## poco (al più REGION_BACKGROUND_USEC per frame), quando ci si avvicina al
+## bordo di REGION_PREFETCH pezzi più del necessario: così la schermata di
+## caricamento ai bordi (vedi near_region_edge) non compare quasi mai.
+const REGION_PREFETCH := 4
+const REGION_BACKGROUND_USEC := 1500
 ## I pezzi vengono creati quando arrivano a questa distanza dallo schermo
 ## e tolti quando se ne allontanano di altri KEEP_MARGIN.
 const PREFETCH_MARGIN := 380.0
@@ -358,12 +371,63 @@ func _process(delta: float) -> void:
 	if _maintain_timer <= 0.0:
 		_maintain_timer = MAINTAIN_INTERVAL
 		_update_chunks()
-	# Un pezzo nuovo per frame, il più vicino: niente scatti.
+	# Un pezzo nuovo per frame, il più vicino, e pochi dei suoi blocchi e
+	# ostacoli: niente scatti.
 	if not _view_queue.is_empty():
 		var chunk: Vector2i = _view_queue.pop_back()
 		if not _chunk_views.has(chunk):
 			_show_chunk(chunk)
+	# Se se ne accumulano tanti (correndo veloci) se ne aggiungono di più.
+	_add_pending_nodes(NODES_PER_FRAME + _pending_nodes.size() / PENDING_CATCH_UP)
+	_update_background_region()
 	_update_reveal(delta)
+
+
+## Blocchi e ostacoli dei pezzi mostrati ancora da aggiungere (vedi
+## NODES_PER_FRAME): [voce del pezzo in _chunk_views, dati].
+var _pending_nodes: Array = []
+
+
+func _add_pending_nodes(count: int) -> void:
+	while count > 0 and not _pending_nodes.is_empty():
+		var item: Array = _pending_nodes.pop_front()
+		var entry: Dictionary = item[0]
+		var chunk: Vector2i = entry["chunk"]
+		# Il pezzo nel frattempo è stato tolto (o tolto e rimesso): niente.
+		if not is_same(_chunk_views.get(chunk), entry):
+			continue
+		count -= 1
+		var data: Variant = item[1]
+		if data is Vector2i:
+			var block := TerrainBlock.new()
+			block.world = self
+			block.cell = data
+			# Ordinato poco dopo il suo vertice più arretrato: a pari
+			# altezza sullo schermo il blocco copre chi gli sta dietro.
+			block.position = cell_corners(data)[0] + Vector2(0, BLOCK_SORT_BIAS)
+			block.material = LightShaders.ground()
+			entities.add_child(block)
+			entry["nodes"].append(block)
+			_index_cover(block, true)
+		else:
+			entry["nodes"].append(_make_obstacle_node(data))
+
+
+## Regione successiva in sottofondo (vedi REGION_PREFETCH): i dati del
+## terreno si generano comunque quando servono, qui si prepara in anticipo.
+func _update_background_region() -> void:
+	# Prima della prima regione (vedi Game._prepare_region) non c'è niente da fare.
+	if dungeon or entities == null or region.size.x <= 2 * (int(_terrain["pregen_edge"]) + REGION_PREFETCH):
+		return
+	if not is_region_ready():
+		generate_region(REGION_BACKGROUND_USEC)
+		return
+	var camera := get_viewport().get_camera_2d()
+	if camera == null:
+		return
+	var at := camera.get_screen_center_position()
+	if not region.grow(-int(_terrain["pregen_edge"]) - REGION_PREFETCH).has_point(_chunk_of(cell_at(at))):
+		begin_region(at)
 
 
 ## Il punto (sullo schermo, già alzato dell'altezza a cui è disegnato) è
@@ -1343,6 +1407,7 @@ func refresh_now() -> void:
 		var chunk: Vector2i = _view_queue.pop_back()
 		if not _chunk_views.has(chunk):
 			_show_chunk(chunk)
+	_add_pending_nodes(_pending_nodes.size())
 
 
 ## Pezzi da mostrare: quelli sullo schermo più un margine, così sono pronti
@@ -1408,24 +1473,18 @@ func _show_chunk(chunk: Vector2i) -> void:
 	var occluders := _add_occluders(view, chunk)
 	add_child(view)
 	var nodes: Array[Node] = []
+	var entry := {"view": view, "nodes": nodes, "occluders": occluders, "chunk": chunk}
+	_chunk_views[chunk] = entry
 	if entities:
-		for data: Dictionary in _obstacles_of(chunk):
-			nodes.append(_make_obstacle_node(data))
+		# Prima i blocchi (coprono chi passa dietro), poi gli ostacoli: si
+		# aggiungono a poco a poco (vedi _add_pending_nodes).
 		for i in CHUNK_CELLS:
 			for j in CHUNK_CELLS:
 				var cell := chunk * CHUNK_CELLS + Vector2i(i, j)
 				if _covers_behind(cell):
-					var block := TerrainBlock.new()
-					block.world = self
-					block.cell = cell
-					# Ordinato poco dopo il suo vertice più arretrato: a pari
-					# altezza sullo schermo il blocco copre chi gli sta dietro.
-					block.position = cell_corners(cell)[0] + Vector2(0, BLOCK_SORT_BIAS)
-					block.material = LightShaders.ground()
-					entities.add_child(block)
-					nodes.append(block)
-					_index_cover(block, true)
-	_chunk_views[chunk] = {"view": view, "nodes": nodes, "occluders": occluders}
+					_pending_nodes.append([entry, cell])
+		for data: Dictionary in _obstacles_of(chunk):
+			_pending_nodes.append([entry, data])
 
 
 func _hide_chunk(chunk: Vector2i) -> void:

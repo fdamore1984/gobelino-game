@@ -31,12 +31,21 @@ var _controls_panel := ControlsPanel.new()
 var _options_panel := OptionsPanel.new()
 var _tutorial_panel := TutorialPanel.new()
 var _slot_panel := SlotPanel.new()
+## Carica partita: sceglie a mano uno degli slot salvati (Continua parte
+## dal più recente).
+var _load := Button.new()
 
 
 func _ready() -> void:
 	_style_title()
 	_start.pressed.connect(_on_start_pressed)
 	_continue.pressed.connect(_on_continue_pressed)
+	_load.text = "MENU_LOAD"
+	_load.custom_minimum_size = _start.custom_minimum_size
+	_load.size_flags_horizontal = _start.size_flags_horizontal
+	_load.add_theme_font_size_override("font_size", 36)
+	_continue.add_sibling(_load)
+	_load.pressed.connect(_on_load_pressed)
 	_quit.pressed.connect(_on_quit_pressed)
 	_controls.pressed.connect(_on_controls_pressed)
 	add_child(_controls_panel)
@@ -56,7 +65,7 @@ func _ready() -> void:
 	_controls.visible = not Platform.touch_mode
 	_update_continue()
 
-	for button: Button in [_continue, _start, _controls, _tutorial, _options, _quit]:
+	for button: Button in [_continue, _load, _start, _controls, _tutorial, _options, _quit]:
 		button.focus_entered.connect(Sfx.play_ui.bind("ui_move"))
 	(_continue if _continue.visible else _start).grab_focus()
 	_update_info()
@@ -85,6 +94,7 @@ func _style_title() -> void:
 ## al primo e viceversa.
 func _update_continue() -> void:
 	_continue.visible = SaveGame.any_exists()
+	_load.visible = _continue.visible
 	var first := _continue if _continue.visible else _start
 	var last := _quit if _quit.visible else _options
 	last.focus_neighbor_bottom = first.get_path()
@@ -148,24 +158,24 @@ func _on_start_pressed() -> void:
 ## Continua: niente scelta dello slot, si carica direttamente il
 ## salvataggio più recente. Se non si riesce a leggerlo (file rovinato) si
 ## sceglie lo slot come prima.
+## Continua: gli slot, con già selezionato il più recente (non si carica
+## da solo, così si vede quale partita si riprende).
 func _on_continue_pressed() -> void:
 	Sfx.play_ui("ui_confirm")
-	var latest := SaveGame.latest()
-	var save := SaveGame.read(latest) if latest > 0 else {}
-	if save.is_empty():
-		_set_buttons_active(false)
-		_slot_panel.open(false)
-		return
-	SaveGame.slot = latest
-	Game.pending_save = save
 	_set_buttons_active(false)
-	get_tree().change_scene_to_file(GAME_SCENE)
+	_slot_panel.open(false, SaveGame.latest())
+
+
+func _on_load_pressed() -> void:
+	Sfx.play_ui("ui_confirm")
+	_set_buttons_active(false)
+	_slot_panel.open(false)
 
 
 ## Con un pannello aperto i pulsanti del menù sotto non si possono
 ## selezionare né premere: la navigazione resta dentro il pannello.
 func _set_buttons_active(active: bool) -> void:
-	for button: Button in [_continue, _start, _controls, _tutorial, _options, _quit]:
+	for button: Button in [_continue, _load, _start, _controls, _tutorial, _options, _quit]:
 		button.focus_mode = Control.FOCUS_ALL if active else Control.FOCUS_NONE
 		button.disabled = not active
 

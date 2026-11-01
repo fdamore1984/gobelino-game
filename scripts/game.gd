@@ -46,6 +46,7 @@ const START_SPAWN_RANGE := Vector2(450.0, 1300.0)
 const SPAWN_RANGE := Vector2(850.0, 1400.0)
 const DESPAWN_DISTANCE := 2000.0
 const MAINTAIN_INTERVAL := 1.0
+const MAX_SPAWNS_PER_TICK := 2
 const GAME_OVER_DELAY := 2.5
 const COLOR_XP := Color(0.6, 0.9, 1.0)
 const CHALLENGE := preload("res://data/challenge.json")
@@ -139,6 +140,7 @@ func _ready() -> void:
 	_hud.set_kills(_kills)
 	_hud.pause_menu.save_requested.connect(_on_save_requested)
 	_hud.pause_menu.quit_requested.connect(_back_to_menu)
+	_hud.pause_menu.load_requested.connect(_on_load_requested)
 	var save := pending_save
 	pending_save = {}
 	if not save.is_empty():
@@ -187,7 +189,9 @@ func _maintain_enemies() -> void:
 			enemy.queue_free()
 		elif not enemy.is_horde():
 			alive += 1
-	for i in EnemyTypes.population(_player.level) - alive:
+	# Al più MAX_SPAWNS_PER_TICK alla volta: gli altri al giro successivo,
+	# così le comparse non si accumulano in un frame.
+	for i in mini(EnemyTypes.population(_player.level) - alive, MAX_SPAWNS_PER_TICK):
 		_spawn_enemy(EnemyTypes.pick_random(_player.level), _random_position(SPAWN_RANGE), _player.level)
 
 
@@ -369,10 +373,14 @@ func _prepare_region(text: String, setup := Callable()) -> void:
 	if setup.is_valid():
 		setup.call()
 		await get_tree().process_frame
+	var warm := _prewarm_start()
 	_world.begin_region(_player.position)
 	while not _world.is_region_ready():
 		_hud.show_loading(text, _world.generate_region(REGION_STEP_USEC))
 		await get_tree().process_frame
+	for i in PREWARM_FRAMES:
+		await get_tree().process_frame
+	_prewarm_end(warm)
 	_hud.show_loading(text, 1.0)
 	await get_tree().process_frame
 	_world.refresh_now()
@@ -381,6 +389,50 @@ func _prepare_region(text: String, setup := Callable()) -> void:
 	_hud.hide_loading()
 	get_tree().paused = false
 	loading = false
+
+
+## Frame di caricamento in cui restano i puntini di _prewarm_start.
+const PREWARM_FRAMES := 2
+## Shader già preparati in questa sessione (vedi _prewarm_start).
+static var _prewarmed := false
+
+
+## Nel browser ogni shader (e ogni combinazione con le luci) si prepara la
+## prima volta che si vede, e il gioco si ferma un attimo: per esempio la
+## prima volta che un muro diventa trasparente, che la vita è bassa o che
+## si accende la torcia. Durante la prima schermata di caricamento si
+## disegnano dei puntini quasi invisibili con questi materiali (sotto la
+## schermata) e si accende per un attimo la torcia, così è tutto pronto.
+func _prewarm_start() -> Array[Node]:
+	var nodes: Array[Node] = []
+	if _prewarmed:
+		return nodes
+	_prewarmed = true
+	for warm_material: Material in [LightShaders.ground(), LightShaders.feet(), LightShaders.cutout(), Enemy._unshaded_material()]:
+		var dot := ColorRect.new()
+		dot.size = Vector2(4, 4)
+		dot.position = _player.position
+		dot.color = Color(1, 1, 1, 0.02)
+		dot.material = warm_material
+		_entities.add_child(dot)
+		nodes.append(dot)
+	var vignette := ColorRect.new()
+	vignette.size = Vector2(4, 4)
+	vignette.color = Color(1, 1, 1, 0.02)
+	vignette.material = _hud.vignette_material()
+	_hud.add_child(vignette)
+	_hud.move_child(vignette, 0)
+	nodes.append(vignette)
+	_player.warm_torch(true)
+	return nodes
+
+
+func _prewarm_end(nodes: Array[Node]) -> void:
+	if nodes.is_empty():
+		return
+	for node in nodes:
+		node.queue_free()
+	_player.warm_torch(false)
 
 
 ## Suggerimento vicino a un ingresso (chiave del testo, "" se nessuno).
@@ -811,6 +863,19 @@ func _exit_tree() -> void:
 	HitFeedback.reset()
 	# I nemici della prossima partita non devono restare fermi.
 	Enemy.frozen = false
+
+
+## Carica partita dal menù di pausa: si riparte dalla scena con lo slot scelto.
+func _on_load_requested(slot: int) -> void:
+	var save := SaveGame.read(slot)
+	if save.is_empty():
+		return
+	SaveGame.slot = slot
+	pending_save = save
+	get_tree().paused = false
+	HitFeedback.reset()
+	Enemy.frozen = false
+	get_tree().change_scene_to_file(scene_file_path)
 
 
 func _back_to_menu() -> void:

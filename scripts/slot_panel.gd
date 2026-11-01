@@ -38,6 +38,9 @@ var _lines: Array[Array] = []
 var _back := Button.new()
 ## true: nuova partita; false: continua.
 var new_game := true
+## Dal menù di pausa (Carica partita): anche caricare va confermato con una
+## seconda pressione, perché i progressi non salvati si perdono.
+var confirm_load := false
 ## Slot già usato in attesa della seconda pressione (0: nessuno).
 var _confirming := 0
 ## Slot da eliminare in attesa della seconda pressione (0: nessuno).
@@ -141,14 +144,19 @@ func _make_card(button: Button) -> Array[Label]:
 	return labels
 
 
-func open(for_new_game: bool) -> void:
+## focus_slot: slot selezionato all'apertura (0: il primo disponibile),
+## per esempio il più recente per Continua.
+func open(for_new_game: bool, focus_slot := 0) -> void:
 	new_game = for_new_game
 	_confirming = 0
 	_deleting = 0
 	_title.text = tr("SLOTS_NEW_TITLE") if for_new_game else tr("SLOTS_LOAD_TITLE")
 	_refresh()
 	visible = true
-	_first().grab_focus.call_deferred()
+	var focused := _first()
+	if focus_slot > 0 and focus_slot <= _buttons.size() and not _buttons[focus_slot - 1].disabled:
+		focused = _buttons[focus_slot - 1]
+	focused.grab_focus.call_deferred()
 
 
 func close() -> void:
@@ -181,7 +189,7 @@ func _refresh() -> void:
 				texts.append(tr("SLOT_DELETE_CONFIRM"))
 				colors.append(COLOR_CONFIRM)
 			elif _confirming == index:
-				texts.append(tr("SLOT_OVERWRITE"))
+				texts.append(tr("SLOT_OVERWRITE") if new_game else tr("SLOT_LOAD_CONFIRM"))
 				colors.append(COLOR_CONFIRM)
 			else:
 				var depth: int = info["depth"]
@@ -233,8 +241,9 @@ func _first() -> Control:
 
 
 func _on_slot_pressed(index: int) -> void:
-	if new_game and SaveGame.exists(index) and _confirming != index:
-		# Slot già usato: la seconda pressione conferma che va sostituito.
+	if (new_game or confirm_load) and SaveGame.exists(index) and _confirming != index:
+		# Slot già usato: la seconda pressione conferma che va sostituito
+		# (o, dalla pausa, che si lascia la partita in corso).
 		_confirming = index
 		Sfx.play_ui("ui_move")
 		_refresh()

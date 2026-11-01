@@ -31,6 +31,18 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
 	_texture = ImageTexture.create_from_image(_image)
+	# Per il touch e il mouse: col controller e la tastiera chiudono B, Esc e M.
+	var close_button := Button.new()
+	close_button.text = "PANEL_CLOSE"
+	close_button.focus_mode = Control.FOCUS_NONE
+	close_button.add_theme_font_size_override("font_size", 22)
+	close_button.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	close_button.offset_left = -216
+	close_button.offset_right = -16
+	close_button.offset_top = 16
+	close_button.offset_bottom = 64
+	close_button.pressed.connect(close)
+	add_child(close_button)
 
 
 func is_open() -> bool:
