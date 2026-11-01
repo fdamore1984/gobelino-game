@@ -80,10 +80,15 @@ func _ready() -> void:
 	box.add_child(_hint)
 	# Per chi gioca col touch o col mouse.
 	_close.text = "SHOP_CLOSE"
-	_close.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_close.custom_minimum_size = Vector2(180, 40)
+	# In alto a destra, come in inventario e mappa: resta sempre sullo schermo.
+	_close.add_theme_font_size_override("font_size", 22)
+	_close.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	_close.offset_left = -216
+	_close.offset_right = -16
+	_close.offset_top = 16
+	_close.offset_bottom = 64
 	_close.pressed.connect(close)
-	box.add_child(_close)
+	add_child(_close)
 
 
 func _label(text: String, font_size: int, color: Color) -> Label:

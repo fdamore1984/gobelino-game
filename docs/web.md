@@ -70,8 +70,9 @@ la Modalità Touch non esiste: niente controlli a schermo né automazioni.
 - **Controlli a schermo** (`scripts/touch_controls.gd`): in alto a sinistra,
   sotto lo stato, Menù, Zaino e Mappa; in basso a sinistra la levetta; in
   basso a destra Attacco (tasto unico) e Schivata, più i tasti colorati
-  Runa e Frenesia, che compaiono solo quando si possono usare. Nessun
-  altro tasto.
+  Runa e Frenesia, che compaiono solo quando si possono usare, e il tasto verde
+  Interagisci, solo vicino a qualcosa con cui interagire (il suggerimento
+  sopra l'oggetto dice solo "Interagisci", senza tasto). Nessun altro tasto.
 - **Automazioni** (`scripts/touch_assist.gd`, chiamato da
   `Player._physics_process`; preme e rilascia le azioni dell'Input Map):
   salto davanti ai dislivelli superabili con i salti rimasti; pozioni di mana e vigore bevute da sole

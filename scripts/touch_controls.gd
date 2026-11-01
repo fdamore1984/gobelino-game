@@ -31,6 +31,8 @@ const BUTTONS := [
 	{"action": "dodge", "label": "TOUCH_DODGE", "offset": Vector2(-270, -80), "radius": 50.0},
 	{"special": "h_bomb", "label": "TOUCH_H_BOMB", "offset": Vector2(-280, -220), "radius": 46.0, "color": Color(1.0, 0.55, 0.15, 0.55)},
 	{"special": "frenzy", "label": "TOUCH_FRENZY", "offset": Vector2(-120, -300), "radius": 46.0, "color": Color(1.0, 0.18, 0.12, 0.6)},
+	# Interagisci: solo vicino a qualcosa con cui interagire (vedi Player.can_interact).
+	{"action": "interact", "label": "INTERACT", "offset": Vector2(-420, -100), "radius": 54.0, "color": Color(0.25, 0.75, 0.35, 0.6)},
 ]
 
 var _stick_touch := -1
@@ -140,6 +142,8 @@ func _shown(button: Dictionary) -> bool:
 	var special: String = button.get("special", "")
 	if special == "h_bomb" or special == "frenzy":
 		return TouchAssist.special_ready(special)
+	if button.get("action", "") == "interact":
+		return TouchAssist.special_ready("interact")
 	return true
 
 
