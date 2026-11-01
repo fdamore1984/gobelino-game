@@ -97,15 +97,19 @@ func _ready() -> void:
 	box.add_child(_details)
 	_hint = _label("", 16, Color(1, 1, 1, 0.55))
 	box.add_child(_hint)
-	# Per il touch e il mouse: col controller e la tastiera chiudono B, Esc e I.
+	# Per il touch e il mouse: col controller e la tastiera chiudono B, Esc e
+	# I. In alto a destra, così resta sempre sullo schermo.
 	var close_button := Button.new()
 	close_button.text = "PANEL_CLOSE"
 	close_button.focus_mode = Control.FOCUS_NONE
-	close_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	close_button.custom_minimum_size = Vector2(200, 48)
 	close_button.add_theme_font_size_override("font_size", 22)
+	close_button.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	close_button.offset_left = -216
+	close_button.offset_right = -16
+	close_button.offset_top = 16
+	close_button.offset_bottom = 64
 	close_button.pressed.connect(close)
-	box.add_child(close_button)
+	add_child(close_button)
 
 
 func _label(text: String, font_size: int, color: Color) -> Label:

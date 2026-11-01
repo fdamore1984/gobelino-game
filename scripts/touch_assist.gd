@@ -56,6 +56,8 @@ static func special_ready(kind: String) -> bool:
 		return false
 	if kind == "h_bomb":
 		return player.h_bombs > 0
+	if kind == "interact":
+		return player.can_interact
 	return player.is_frenzy_full()
 
 
