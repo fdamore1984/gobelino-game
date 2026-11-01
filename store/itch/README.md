@@ -31,9 +31,9 @@ L'ultimo comando rigenera le immagini del tutorial del gioco (`assets/tutorial/`
 | Tags | vedi sotto |
 | AI generation disclosure | Sì: codice, testi e grafica provvisoria sono stati prodotti con l'aiuto di un'IA (Claude) |
 | Languages | English, Italian |
-| Inputs | Keyboard, Mouse, Xbox controller, Playstation controller, Touchscreen |
+| Inputs | Keyboard, Mouse, Xbox controller, Playstation controller |
 | Cover image | `cover_en.png` (630×500; `cover_it.png` è la versione italiana) |
-| Screenshots | `en_1_combat.png`, `en_2_parry.png`, `en_5_challenge.png`, `en_6_inventory.png`, `en_17_frenzy.png`, `en_16_rune.png`, `en_9_slam.png`, `en_14_air_charge.png`, `en_11_cave.png`, `en_13_map.png`, `en_12_dungeon.png`, `en_18_metro.png`, `en_19_horde.png`, `en_7_merchant.png`, `en_8_shop.png`, `en_3_level_up.png`, `en_4_menu.png`, `en_10_controls.png`, `en_15_options.png` (in inglese, la lingua della pagina; quelle `it_*` sono le stesse in italiano) |
+| Screenshots | `en_1_combat.png`, `en_2_parry.png`, `en_5_challenge.png`, `en_6_inventory.png`, `en_17_frenzy.png`, `en_16_rune.png`, `en_9_slam.png`, `en_14_air_charge.png`, `en_11_cave.png`, `en_13_map.png`, `en_12_dungeon.png`, `en_18_metro.png`, `en_19_horde.png`, `en_20_touch.png`, `en_7_merchant.png`, `en_8_shop.png`, `en_3_level_up.png`, `en_4_menu.png`, `en_10_controls.png`, `en_15_options.png` (in inglese, la lingua della pagina; quelle `it_*` sono le stesse in italiano) |
 
 ### Tags
 
@@ -63,7 +63,7 @@ Gobelino is a 2D medieval fantasy action RPG with an isometric view: a feral gob
 
 Fast, deadly Souls-like combat: combos, parries, dodges, jumps and the Frenzy special attack. Comic-style look, like ufotizio.com: thick ink outlines, big cartoon eyes and a matching interface. Prototype with placeholder graphics and sounds.
 
-Controller, keyboard and mouse or touch. English and Italian. Windows, Linux and Steam Deck.
+Controller or keyboard and mouse. In the browser on phones and tablets: Touch Mode, with simple on-screen controls and automatic jumping, parrying, potions and torch. English and Italian. Windows, Linux and Steam Deck.
 
 Play it right in your browser, with your saves on every device: https://ufotizio.com/en/gobelino
 ```
@@ -98,7 +98,7 @@ HOW TO INSTALL
 
 Linux / Steam Deck: download the Linux file, extract it and run Gobelino.x86_64 (if needed, make it executable first: right click → Properties → Allow executing, or chmod +x Gobelino.x86_64). On Steam Deck the game always starts in fullscreen, in Desktop Mode too. Do this in Desktop Mode, then add it to Steam as a non-Steam game (Steam → Games → Add a Non-Steam Game) and always launch it from Steam: this way the built-in controller works as a gamepad, both in Game Mode and in Desktop Mode. If you launch it from the itch.io app in Desktop Mode instead, hold the Menu (Start) button for 1 second to switch the built-in controls to controller mode: while a controller is connected the game ignores the keys Steam's desktop layout keeps sending. The main menu shows the detected controller and whether its buttons are recognized.
 
-Windows / MSI Claw 8: download the Windows file, extract it and run Gobelino.exe (if Windows SmartScreen warns you, click More info → Run anyway). On handheld gaming PCs like the MSI Claw 8 the game starts in fullscreen; play with the built-in controller (XInput mode) or touch the screen to show the on-screen controls. You can also add it to Steam as a non-Steam game.
+Windows / MSI Claw 8: download the Windows file, extract it and run Gobelino.exe (if Windows SmartScreen warns you, click More info → Run anyway). On handheld gaming PCs like the MSI Claw 8 the game starts in fullscreen; play with the built-in controller (XInput mode). You can also add it to Steam as a non-Steam game.
 
 Tip: with the itch.io app (https://itch.io/app) the game updates automatically to the latest build.
 ```

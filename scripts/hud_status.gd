@@ -95,7 +95,7 @@ func _draw() -> void:
 	_draw_bar(frenzy_rect, player.frenzy / Player.FRENZY_MAX, COLOR_FRENZY.lightened(0.35 * beat))
 	if full:
 		_draw_ring(frenzy_rect.grow(1.0 + beat), Color(1.0, 0.85, 0.4, 0.6 + 0.4 * beat))
-		_text(font, tr("HUD_FRENZY_READY") % [Keybinds.primary("parry", "controller", true), Keybinds.primary("attack", "controller", true)],
+		_text(font, (tr("HUD_FRENZY_READY_TOUCH") if Platform.touch_mode else tr("HUD_FRENZY_READY") % [Keybinds.primary("parry", "controller", true), Keybinds.primary("attack", "controller", true)]),
 				frenzy_rect.get_center() + Vector2(0, 7), SMALL_FONT_SIZE, COLOR_TEXT, HORIZONTAL_ALIGNMENT_CENTER)
 	_text(font, tr("HUD_XP") % [player.experience, needed], Vector2(BAR_X + 24, 121), SMALL_FONT_SIZE, COLOR_DIM_TEXT)
 

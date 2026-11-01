@@ -671,6 +671,8 @@ var _special_zoom := Vector2.ONE
 var _zoom_tween: Tween
 ## Altezza del terreno sotto il personaggio (vedi World.elevation_at).
 var ground_elevation := 0.0
+## Automazioni della Modalità Touch (solo versione web, vedi TouchAssist).
+var _touch_assist: TouchAssist = TouchAssist.new() if Platform.touch_mode else null
 
 
 func _ready() -> void:
@@ -705,6 +707,8 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if _touch_assist:
+		_touch_assist.update(self)
 	_state_time += delta
 	_dodge_cooldown = maxf(_dodge_cooldown - delta, 0.0)
 	_dodge_chain_grace = maxf(_dodge_chain_grace - delta, 0.0)
@@ -1167,6 +1171,11 @@ func receive_hit(from: Vector2, damage: int, projectile := false) -> String:
 		return "ignored"
 
 	var to_attacker := (from - global_position).normalized()
+	# Modalità Touch: la parata è automatica quando non si attacca (non
+	# perfetta: la parata perfetta resta a chi para col tempo giusto).
+	if _touch_assist and _state == State.NORMAL and not Platform.touch_attack and stamina > 0.0:
+		_start_parry(to_attacker)
+		_state_time = PERFECT_PARRY_WINDOW + 0.01
 	if _state == State.PARRY and absf(facing.angle_to(to_attacker)) <= PARRY_ARC / 2.0:
 		_block_flash = 0.2
 		if _state_time <= PERFECT_PARRY_WINDOW:
@@ -1201,6 +1210,12 @@ func receive_hit(from: Vector2, damage: int, projectile := false) -> String:
 	_charge = 0.0
 	GroundFx.bleed(global_position, altitude() + LEG_LENGTH + RADIUS * 0.5, -to_attacker, BLEED_DROPS)
 	_wound(to_attacker)
+	if health == 0 and _touch_assist and potions > 0:
+		# Modalità Touch: a vita zero una pozione si beve da sola.
+		potions -= 1
+		health = mini(potion_heal(), max_health)
+		health_changed.emit(health, max_health)
+		Sfx.play("potion", global_position)
 	if health == 0:
 		_die()
 	else:
@@ -1269,6 +1284,62 @@ func laugh() -> void:
 ## salta e interagisce insieme (A) serve a interagire (vedi Game).
 func _jump_pressed() -> bool:
 	return UiNav.game_pressed("jump") and not (can_interact and UiNav.game_pressed("interact"))
+
+
+## Per TouchAssist: fermi a terra senza fare altro (si può bere).
+func can_drink() -> bool:
+	return _state == State.NORMAL and not is_airborne()
+
+
+## Per TouchAssist: si può saltare da soli (camminando o scendendo da un salto).
+func can_auto_jump() -> bool:
+	return _state == State.NORMAL and stamina > 0.0
+
+
+func jumps_used() -> int:
+	return _jumps_used
+
+
+## In aria e già in discesa.
+func is_descending() -> bool:
+	return is_airborne() and _height_velocity <= 0.0
+
+
+## Libero di iniziare un'azione.
+func is_idle() -> bool:
+	return _state == State.NORMAL
+
+
+## Combo di colpi normali arrivata all'ultimo colpo.
+func combo_complete() -> bool:
+	return _state == State.ATTACK and not _attack_heavy and _combo_step >= max_combo_hits
+
+
+func is_heavy_attack() -> bool:
+	return _state == State.ATTACK and _attack_heavy
+
+
+## Si gira subito verso direction (se non si è agganciati a un nemico).
+func face(direction: Vector2) -> void:
+	if direction == Vector2.ZERO or lock_target:
+		return
+	_target_facing = direction.normalized()
+	facing = _target_facing
+
+
+## Nemico vivo più vicino entro max_distance, alla stessa quota (o null).
+func nearest_enemy(max_distance: float) -> Enemy:
+	var nearest: Enemy = null
+	var best := max_distance
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as Enemy
+		if enemy == null or enemy.is_dead() or absf(enemy.ground_elevation - ground_elevation) > HIT_HEIGHT_REACH:
+			continue
+		var distance := enemy.position.distance_to(position)
+		if distance <= best:
+			best = distance
+			nearest = enemy
+	return nearest
 
 
 ## Sta precipitando in un burrone.

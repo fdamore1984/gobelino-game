@@ -20,7 +20,7 @@ const COVER_SIZE := Vector2i(630, 500)
 const TUTORIAL_OUTPUT := "res://assets/tutorial/"
 const TUTORIAL_SIZE := Vector2i(640, 360)
 const TUTORIAL_IMAGES := {
-	"move.png": "move.png", "1_combat.png": "combo.png", "2_parry.png": "parry.png",
+	"touch.png": "touch.png", "move.png": "move.png", "1_combat.png": "combo.png", "2_parry.png": "parry.png",
 	"dodge.png": "dodge.png", "frenzy_bar.png": "frenzy_bar.png", "17_frenzy.png": "frenzy_special.png",
 	"supplies.png": "supplies.png", "16_rune.png": "arsenal.png", "enemies.png": "enemies.png",
 	"6_inventory.png": "loot.png", "13_map.png": "world.png", "12_dungeon.png": "buildings.png",
@@ -51,7 +51,7 @@ func _ready() -> void:
 		elif mode == "tutorial":
 			_tutorial = true
 			DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(TUTORIAL_OUTPUT))
-			for capture: Callable in [_capture_move, _capture_combat, _capture_parry, _capture_dodge, _capture_frenzy_bar,
+			for capture: Callable in [_capture_touch, _capture_move, _capture_combat, _capture_parry, _capture_dodge, _capture_frenzy_bar,
 					_capture_frenzy, _capture_supplies, _capture_h_bomb, _capture_enemies, _capture_inventory, _capture_cave,
 					_capture_dungeon, _capture_metro, _capture_level_up]:
 				await capture.call(language)
@@ -71,6 +71,7 @@ func _ready() -> void:
 			await _capture_dungeon(language)
 			await _capture_metro(language)
 			await _capture_horde(language)
+			await _capture_touch(language)
 	get_tree().quit()
 
 
@@ -428,6 +429,23 @@ func _capture_move(language: String) -> void:
 	_enemy("scout", _player.position + Vector2(330, 60), Enemy.State.CHASE, 0.0)
 	await _save("%s_move.png" % language)
 	_end_game()
+
+
+## Modalità Touch (versione web): controlli a schermo ridotti, con i tasti
+## speciali Runa e Frenesia pronti.
+func _capture_touch(language: String) -> void:
+	Platform.touch_mode = true
+	await _start_game(Vector2(0, 0), 1.2)
+	TouchAssist.player = _player
+	_player.level = 4
+	_hud_stats()
+	_player.frenzy = Player.FRENZY_MAX
+	_player.facing = Vector2(1, -0.1).normalized()
+	_enemy("warrior", _player.position + Vector2(150, -20), Enemy.State.CHASE, 0.0)
+	_enemy("caster", _player.position + Vector2(-260, 120), Enemy.State.WINDUP, 0.4)
+	await _save(("%s_touch.png" if _tutorial else "%s_20_touch.png") % language)
+	_end_game()
+	Platform.touch_mode = false
 
 
 ## Tutorial: capriola sotto il colpo di un bruto.
