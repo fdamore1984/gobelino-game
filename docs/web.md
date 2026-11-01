@@ -82,9 +82,21 @@ la Modalità Touch non esiste: niente controlli a schermo né automazioni.
   colpo potente → salto e slam, finché regge il vigore; da lontano
   la palla di fuoco, mai con un nemico vicino. La parata è automatica (in
   `Player.receive_hit`, non perfetta) tranne mentre si tiene Attacco.
+- **Pannelli**: inventario, mappa, negozio, pausa, opzioni, tutorial e
+  slot hanno un pulsante da toccare per uscire (Chiudi, Indietro,
+  Riprendi): quando sono aperti coprono i tasti a schermo.
 - **Menù e tutorial**: il pulsante Comandi sparisce (menù iniziale e di
   pausa); il tutorial ha un percorso a parte (`TutorialPanel.TOUCH_PAGES`)
   che spiega controlli e automazioni.
+
+## Scatti nel browser
+
+Nel browser (senza thread) tutto quello che si prepara la prima volta pesa
+sul frame in cui succede. Per questo: la regione successiva del terreno si
+genera in sottofondo poco per volta, i blocchi e gli ostacoli dei pezzi
+nuovi si aggiungono pochi per frame, i nemici compaiono al più due alla
+volta e durante la prima schermata di caricamento si preparano gli shader
+usati solo in certi momenti (vedi README, *Prestazioni*).
 
 ## Salvataggi sull'account (`scripts/cloud.gd`)
 

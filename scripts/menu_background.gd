@@ -54,11 +54,13 @@ func _draw_goblin(center: Vector2, radius: float, angle: float) -> void:
 	draw_set_transform(Vector2.ZERO)
 
 
-## Demone rosso a rombo, arrabbiato.
+## Goblin nemico rosso, arrabbiato, con le zanne (come i nemici del gioco,
+## vedi GoblinLook).
 func _draw_demon(center: Vector2, radius: float, angle: float) -> void:
 	draw_set_transform(center, angle)
-	_ink_polygon(PackedVector2Array([Vector2(0, -radius), Vector2(radius * 0.8, 0), Vector2(0, radius), Vector2(-radius * 0.8, 0)]), COLOR_DEMON)
-	_draw_eyes(Vector2(0, -radius * 0.08), radius / 48.0, true)
+	GoblinLook.ears(self, radius, COLOR_DEMON.darkened(0.12), 1.15, 0.2, 1.0)
+	GoblinLook.head(self, radius, COLOR_DEMON)
+	GoblinLook.face(self, radius, Vector2(0.3, 0.6).normalized(), 0.22, true, "fang", 1.0, {"scar": true})
 	draw_set_transform(Vector2.ZERO)
 
 

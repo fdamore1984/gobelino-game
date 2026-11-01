@@ -166,7 +166,7 @@ const HOP_BLOCKED_SHARE := 0.5
 
 ## Gambe: altezza rispetto al raggio del corpo e passo; corte e larghe,
 ## distanti LEG_SPACING (rispetto al raggio) dal centro e spesse LEG_WIDTH (rispetto al raggio, almeno 4,5 pixel).
-const LEG_FACTOR := 0.4
+const LEG_FACTOR := 0.275
 const LEG_SPACING := 0.38
 const LEG_WIDTH := 0.25
 const WALK_CYCLE := 0.08
@@ -253,6 +253,8 @@ var _type: Dictionary
 var _color := Color.WHITE
 ## Seme dell'aspetto (vedi _apply_look), copricapo scelto e il suo colore.
 var _look_seed := 0
+## Varianti del goblin (orecchie, occhi, bocca, cicatrici: vedi GoblinLook.variant).
+var _goblin := {}
 var _headwear := ""
 var _headwear_color := Color.WHITE
 var _speed := 125.0
@@ -438,6 +440,7 @@ func _apply_look(look_seed: int) -> void:
 			clampf(base.s * rng.randf_range(0.85, 1.15), 0.0, 1.0), clampf(base.v * rng.randf_range(0.88, 1.1), 0.0, 1.0))
 	_headwear = "" if is_boss() or is_horde() or is_mutant() else HEADWEARS[rng.randi() % HEADWEARS.size()]
 	_headwear_color = GEAR_COLORS[rng.randi() % GEAR_COLORS.size()]
+	_goblin = GoblinLook.variant(look_seed)
 	_shape_radius = -1.0
 
 
@@ -1448,8 +1451,8 @@ func _draw() -> void:
 		_draw_falling(_color.lerp(_corpse_color(), minf(_state_time / DEATH_FALL_TIME, 1.0)) if _hit_flash <= 0.0 else body)
 		return
 
-	# Ombra, gambe, corpo con la forma del tipo sopra le gambe e un
-	# "occhio" che indica la direzione.
+	# Ombra, gambe e il goblin sopra le gambe: orecchie, testa, arma e per
+	# ultima la faccia, con gli occhi che guardano dove va.
 	var lift := _air + _height
 	Shapes.disc(self, Vector2(0, radius * 0.8), radius * 0.9 * (1.0 - minf(lift, 150.0) / 200.0), Shapes.SHADOW)
 	var leg := radius * LEG_FACTOR
@@ -1462,11 +1465,12 @@ func _draw() -> void:
 	_prepare_meshes()
 	if _hit_flash <= 0.0:
 		body = _blood.tint(body)
-	# Guardando verso nord "occhio" e arma sono dietro al corpo, che li
-	# copre (vedi BodyParts.gear_behind); la corona resta sempre in cima.
+	# Guardando verso nord l'arma è dietro al corpo, che la copre (vedi
+	# BodyParts.gear_behind); la faccia e la corona restano sempre in cima.
 	var behind := BodyParts.gear_behind(_facing)
 	if behind:
 		_draw_gear()
+	GoblinLook.ears(self, radius, body.darkened(0.12), _goblin.get("ear_length", 1.0), _goblin.get("ear_droop", 0.0), _goblin.get("torn", 0.0))
 	draw_mesh(_ink_mesh, null, Transform2D.IDENTITY, Shapes.INK)
 	draw_mesh(_body_mesh, null, Transform2D.IDENTITY, body)
 	_blood.draw(self, radius, 1.0)
@@ -1474,6 +1478,8 @@ func _draw() -> void:
 	draw_mesh(_outline_mesh, null, Transform2D.IDENTITY, body.darkened(0.35))
 	if not behind:
 		_draw_gear()
+	if not is_horde() and not is_mutant():
+		GoblinLook.face(self, radius, _facing, _goblin.get("eye_size", 0.2), true, _goblin.get("mouth", "grin"), 1.0, _goblin)
 	_draw_headwear()
 	if is_mutant():
 		_draw_growths(body)
@@ -1504,8 +1510,6 @@ func _draw_gear() -> void:
 	if is_mutant():
 		_draw_ghoul()
 		return
-	# Occhi grandi e arrabbiati che guardano dove va il nemico.
-	Shapes.eyes(self, _facing * radius * 0.3 + Vector2(0, -radius * 0.15), maxf(radius * 0.2, 4.0), _facing, true)
 	if is_casting():
 		_draw_magic()
 	if _is_ranged():
@@ -1592,7 +1596,7 @@ func _draw_undead() -> void:
 	var eyes := _facing * radius * 0.45 + Vector2(0, -radius * 0.15)
 	for side: float in [-1.0, 1.0]:
 		Shapes.disc(self, eyes + across * radius * 0.25 * side, maxf(radius * 0.1, 2.0), COLOR_ZOMBIE_EYES)
-	var reach := _facing * radius * 1.3
+	var reach := _facing * radius * 0.95
 	for side: float in [-1.0, 1.0]:
 		var hand := reach + across * radius * 0.4 * side
 		draw_line(across * radius * 0.6 * side, hand, _color.darkened(0.3), maxf(2.5, radius * 0.16))
@@ -1617,7 +1621,7 @@ func _body_offset() -> Vector2:
 func _prepare_meshes() -> void:
 	if _shape_radius != radius:
 		_shape_radius = radius
-		var key := "%s:%s" % [_type["shape"], radius]
+		var key := "goblin:%s" % radius
 		_body_mesh = Shapes.polygon_mesh(key, _shape_points())
 		_outline_mesh = Shapes.outline_mesh(key + ":outline", _shape_points(), 2.0)
 		_ink_mesh = Shapes.ink_mesh(key + ":ink", _shape_points(), Shapes.INK_WIDTH)
@@ -1781,26 +1785,6 @@ func _polygon(sides: int, scale: float, inner := 1.0) -> PackedVector2Array:
 	return points
 
 
+## Testa tonda del goblin (anche per la caduta alla morte e le scie).
 func _shape_points() -> PackedVector2Array:
-	match _type["shape"]:
-		"pentagon":
-			return _polygon(5, 1.15)
-		"octagon":
-			return _polygon(8, 1.08)
-		"star":
-			return _polygon(5, 1.3, 0.5)
-		"cross":
-			var a := radius * 0.4
-			var b := radius * 1.1
-			return PackedVector2Array([Vector2(-a, -b), Vector2(a, -b), Vector2(a, -a), Vector2(b, -a), Vector2(b, a), Vector2(a, a),
-					Vector2(a, b), Vector2(-a, b), Vector2(-a, a), Vector2(-b, a), Vector2(-b, -a), Vector2(-a, -a)])
-		"triangle":
-			return PackedVector2Array([Vector2(0, -radius * 1.3), Vector2(radius, radius * 0.8), Vector2(-radius, radius * 0.8)])
-		"square":
-			return PackedVector2Array([Vector2(-radius, -radius), Vector2(radius, -radius), Vector2(radius, radius), Vector2(-radius, radius)])
-		"hexagon":
-			var points := PackedVector2Array()
-			for i in 6:
-				points.append(Vector2.from_angle(TAU * i / 6.0) * radius * 1.1)
-			return points
-	return PackedVector2Array([Vector2(0, -radius * 1.2), Vector2(radius, 0), Vector2(0, radius * 1.2), Vector2(-radius, 0)])
+	return _polygon(20, 1.0)

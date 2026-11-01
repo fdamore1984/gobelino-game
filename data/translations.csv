@@ -145,7 +145,7 @@ CONTROLS_TOUCH,On touch screens use the on-screen buttons,Sugli schermi touch us
 CONTROLS_BACK,Back,Indietro
 MENU_CONTINUE,Continue,Continua
 SLOTS_NEW_TITLE,New game: choose a save slot,Nuova partita: scegli uno slot
-SLOTS_LOAD_TITLE,Continue: choose a save slot,Continua: scegli uno slot
+SLOTS_LOAD_TITLE,Load game: choose a save slot,Carica partita: scegli uno slot
 SLOT_NAME,Slot %d,Slot %d
 SLOT_EMPTY,Empty,Vuoto
 SLOT_EMPTY_NEW,Start a new adventure here,Inizia qui una nuova avventura
@@ -365,3 +365,7 @@ TUTORIAL_TOUCH_SUPPLIES_TEXT,"Potions are drunk by themselves: when health drops
 TUTORIAL_TOUCH_SPECIALS_TITLE,Rune and Frenzy,Runa e Frenesia
 TUTORIAL_TOUCH_SPECIALS_TEXT,"Two colored buttons appear above Attack only when you can use them. Rune (orange), with a Cataclysm rune in your belt: the goblin jumps and lifts it; hold the button to widen the blast, let go to smash it on the ground and kill the enemies around. Frenzy (red), with the red bar full: time stops and the goblin strikes the nearest enemies in a flurry.","Due tasti colorati compaiono sopra Attacco solo quando puoi usarli. Runa (arancione), con una runa del Cataclisma nella cintura: il goblin salta e la solleva; tieni premuto il tasto per allargare l'esplosione, lascialo per spaccarla a terra e uccidere i nemici attorno. Frenesia (rossa), con la barra rossa piena: il tempo si ferma e il goblin colpisce a raffica i nemici più vicini."
 HUD_FRENZY_READY_TOUCH,FRENZY! Tap Frenzy,FRENESIA! Tocca Frenesia
+PANEL_CLOSE,Close,Chiudi
+MENU_LOAD,Load game,Carica partita
+PAUSE_LOAD,Load game,Carica partita
+SLOT_LOAD_CONFIRM,Press again to load it: unsaved progress will be lost,Premi di nuovo per caricarla: i progressi non salvati si perdono

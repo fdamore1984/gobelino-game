@@ -425,6 +425,11 @@ func show_message(text: String) -> void:
 	_message.visible = true
 
 
+## Materiale della vignetta (vedi Game._prewarm_start).
+func vignette_material() -> Material:
+	return _vignette.material
+
+
 func show_level_up(level: int, damage_before: int, damage_after: int) -> void:
 	_level_up_title.text = tr("LEVELUP_TITLE") % level
 	_level_up_damage.text = tr("LEVELUP_DAMAGE") % [damage_before, damage_after]

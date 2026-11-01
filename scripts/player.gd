@@ -456,7 +456,7 @@ const INVULNERABLE_ALPHA := 0.35
 
 ## Gambe: il corpo sta sopra di LEG_LENGTH; i passi seguono la velocità.
 ## Corte e larghe: le gambe sono distanti LEG_SPACING dal centro e spesse LEG_WIDTH.
-const LEG_LENGTH := 11.0
+const LEG_LENGTH := 7.0
 const LEG_SPACING := 9.0
 const LEG_WIDTH := 7.0
 const WALK_CYCLE := 0.08
@@ -2628,6 +2628,12 @@ func update_torch_light() -> void:
 		material = wanted
 
 
+## Torcia accesa per un attimo durante il caricamento (vedi
+## Game._prewarm_start), poi di nuovo com'era.
+func warm_torch(on: bool) -> void:
+	_torch.enabled = on or torch_on
+
+
 func set_torch(on: bool) -> void:
 	if on == torch_on:
 		return
@@ -2787,7 +2793,8 @@ func _draw() -> void:
 	squash *= pose[1]
 	draw_set_transform(Vector2(0, body_lift), rotation_angle, body_scale * squash)
 
-	# Aura del potenziamento, corpo e "naso" che indica la direzione.
+	# Aura del potenziamento, poi il goblin (vedi GoblinLook): orecchie,
+	# testa, spada e per ultima la faccia, che indica dove si guarda.
 	if is_empowered() and _state != State.DEAD:
 		var pulse := 0.5 + 0.5 * sin(_empowered_time * 10.0)
 		Shapes.disc(self, Vector2.ZERO, RADIUS + 8.0 + pulse * 4.0, Color(COLOR_EMPOWERED, 0.25))
@@ -2802,16 +2809,20 @@ func _draw() -> void:
 		body = _blood.tint(body)
 		if soot > 0.0:
 			body = Color(body.lerp(COLOR_SOOT, soot * SOOT_STRENGTH), body.a)
-	# Guardando verso nord il "naso", la spada, la torcia e le fiaschette
-	# sono dietro al corpo, che li copre (vedi BodyParts.gear_behind).
+	# Guardando verso nord la spada, la torcia e le fiaschette sono dietro
+	# al corpo, che li copre (vedi BodyParts.gear_behind); gli occhi vanno
+	# sempre sopra a tutto, così restano visibili.
 	var behind := BodyParts.gear_behind(facing)
 	if behind:
 		_draw_gear(body)
-	Shapes.ink_disc(self, Vector2.ZERO, RADIUS, body)
+	GoblinLook.ears(self, RADIUS, Color(body.darkened(0.12), body.a))
+	GoblinLook.head(self, RADIUS, body)
 	_blood.draw(self, RADIUS, body.a)
 	_wounds.draw(self, RADIUS, body.a)
 	if not behind:
 		_draw_gear(body)
+	if _state != State.DEAD:
+		GoblinLook.face(self, RADIUS, facing, EYE_SIZE, false, "smile", body.a)
 
 	# Scudo attivo: una bolla attorno al personaggio.
 	if shield_active and _state != State.DEAD:
@@ -2836,17 +2847,10 @@ func _draw_h_bomb() -> void:
 	HBombBlast.draw_bomb(self, H_BOMB_HELD, H_BOMB_LENGTH, glow, facing.x < 0.0)
 
 
-## "Naso" che indica la direzione, gli occhi grandi da fumetto e, da vivo,
-## la spada, la fiaschetta in uso e la lanterna.
-func _draw_gear(body: Color) -> void:
-	var tip := facing * (RADIUS + 12.0)
-	var side := facing.orthogonal() * 9.0
-	var ink := facing.orthogonal() * (9.0 + Shapes.INK_WIDTH)
-	draw_primitive(PackedVector2Array([tip + facing * Shapes.INK_WIDTH * 1.6, facing * RADIUS * 0.5 + ink, facing * RADIUS * 0.5 - ink]),
-			PackedColorArray([Color(Shapes.INK, body.a)]), PackedVector2Array())
-	draw_primitive(PackedVector2Array([tip, facing * RADIUS * 0.6 + side, facing * RADIUS * 0.6 - side]), PackedColorArray([body.darkened(0.3)]), PackedVector2Array())
+## Da vivo la spada, la fiaschetta in uso e la lanterna (la faccia va
+## sopra, vedi _draw).
+func _draw_gear(_body: Color) -> void:
 	if _state != State.DEAD:
-		Shapes.eyes(self, facing * RADIUS * 0.25 + Vector2(0, -RADIUS * 0.2), RADIUS * EYE_SIZE, facing, false, body.a)
 		_draw_sword()
 		if _state == State.DRINK:
 			_draw_flask()
