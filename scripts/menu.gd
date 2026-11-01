@@ -52,6 +52,8 @@ func _ready() -> void:
 	_slot_panel.closed.connect(_on_slot_panel_closed)
 	_slot_panel.deleted.connect(_update_continue.unbind(1))
 	_quit.visible = not Platform.is_web
+	# Modalità Touch: i comandi non si rimappano, li spiega il tutorial.
+	_controls.visible = not Platform.touch_mode
 	_update_continue()
 
 	for button: Button in [_continue, _start, _controls, _tutorial, _options, _quit]:

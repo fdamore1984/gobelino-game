@@ -67,6 +67,8 @@ func _ready() -> void:
 	_resume.pressed.connect(close)
 	_save.pressed.connect(func() -> void: save_requested.emit())
 	_controls.pressed.connect(_open_controls)
+	# Modalità Touch: i comandi non si rimappano, li spiega il tutorial.
+	_controls.visible = not Platform.touch_mode
 	_tutorial.pressed.connect(_open_tutorial)
 	_quit.pressed.connect(_open_confirm)
 	add_child(_controls_panel)

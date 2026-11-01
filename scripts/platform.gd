@@ -29,9 +29,17 @@ const STEAM_DECK_LAYOUT := "a:b3,b:b4,x:b5,y:b6,leftshoulder:b7,rightshoulder:b8
 ## Tasti e clic tolti dalle azioni mentre sullo Steam Deck c'è un
 ## controller, da rimettere quando il controller sparisce.
 var _removed_desktop_events := {}
-## Sui PC con schermo touch i controlli a schermo compaiono solo dopo aver
-## toccato lo schermo e spariscono appena si usa il controller o la tastiera.
-var _touch_active := false
+## Modalità Touch: solo nella versione web, decisa all'avvio. Se nel browser
+## non c'è un controller né la coppia tastiera e mouse, si gioca col touch:
+## controlli a schermo ridotti (vedi TouchControls) e automazioni di salto,
+## pozioni, scudo, torcia, attacco e parata (vedi TouchAssist). Nelle
+## versioni per PC (Windows, Linux) non esiste.
+var touch_mode := false
+## Tasti speciali dei controlli touch, letti da TouchAssist: attacco tenuto
+## premuto, bomba H e Frenesia.
+var touch_attack := false
+var touch_h_bomb := false
+var touch_frenzy := false
 
 
 ## Frame al secondo: fissi a 60 (anche sullo Steam Deck in modalità gioco,
@@ -66,6 +74,19 @@ func _ready() -> void:
 	for device in Input.get_connected_joypads():
 		_fix_joypad_mapping(device)
 	_update_desktop_events()
+	touch_mode = is_web and _detect_touch_only()
+
+
+## All'avvio nel browser: niente controller e niente puntatore preciso con
+## hover (il mouse, che sui PC va con la tastiera) vuol dire telefono o
+## tablet, quindi Modalità Touch.
+func _detect_touch_only() -> bool:
+	if not Input.get_connected_joypads().is_empty():
+		return false
+	if OS.has_feature("web_android") or OS.has_feature("web_ios"):
+		return true
+	var mouse: Variant = JavaScriptBridge.eval("window.matchMedia('(pointer: fine)').matches && window.matchMedia('(hover: hover)').matches", true)
+	return not bool(mouse)
 
 
 func _on_joy_connection_changed(device: int, connected: bool) -> void:
@@ -166,18 +187,7 @@ func _read_first_line(path: String) -> String:
 	return file.get_line().strip_edges()
 
 
-func _input(event: InputEvent) -> void:
-	if is_mobile:
-		return
-	if event is InputEventScreenTouch:
-		_touch_active = true
-	elif event is InputEventJoypadButton or event is InputEventKey \
-			or (event is InputEventJoypadMotion and absf((event as InputEventJoypadMotion).axis_value) > 0.5):
-		_touch_active = false
-
-
-## True se vanno mostrati i controlli touch a schermo: sempre sui telefoni
-## (anche nel browser), sui PC con schermo touch solo dopo averlo toccato
-## (vedi _input).
+## True se vanno mostrati i controlli touch a schermo: solo in Modalità
+## Touch (versione web, vedi touch_mode).
 func use_touch_controls() -> bool:
-	return is_mobile or (_touch_active and DisplayServer.is_touchscreen_available())
+	return touch_mode

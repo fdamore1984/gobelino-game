@@ -33,6 +33,23 @@ const PAGES := [
 	["metro.png", "TUTORIAL_METRO_TITLE", "TUTORIAL_METRO_TEXT"],
 	["progress.png", "TUTORIAL_PROGRESS_TITLE", "TUTORIAL_PROGRESS_TEXT"],
 ]
+## Modalità Touch (versione web, vedi Platform.touch_mode): un percorso a
+## parte, che spiega i controlli a schermo e le automazioni (TouchAssist),
+## poi le pagine su nemici, bottino e mondo uguali per tutti.
+const TOUCH_PAGES := [
+	["touch.png", "TUTORIAL_TOUCH_CONTROLS_TITLE", "TUTORIAL_TOUCH_CONTROLS_TEXT"],
+	["combo.png", "TUTORIAL_TOUCH_ATTACK_TITLE", "TUTORIAL_TOUCH_ATTACK_TEXT"],
+	["parry.png", "TUTORIAL_TOUCH_DEFENSE_TITLE", "TUTORIAL_TOUCH_DEFENSE_TEXT"],
+	["dodge.png", "TUTORIAL_TOUCH_DODGE_TITLE", "TUTORIAL_TOUCH_DODGE_TEXT"],
+	["world.png", "TUTORIAL_TOUCH_JUMP_TITLE", "TUTORIAL_TOUCH_JUMP_TEXT"],
+	["supplies.png", "TUTORIAL_TOUCH_SUPPLIES_TITLE", "TUTORIAL_TOUCH_SUPPLIES_TEXT"],
+	["frenzy_special.png", "TUTORIAL_TOUCH_SPECIALS_TITLE", "TUTORIAL_TOUCH_SPECIALS_TEXT"],
+	["enemies.png", "TUTORIAL_ENEMIES_TITLE", "TUTORIAL_ENEMIES_TEXT"],
+	["loot.png", "TUTORIAL_LOOT_TITLE", "TUTORIAL_LOOT_TEXT"],
+	["buildings.png", "TUTORIAL_BUILDINGS_TITLE", "TUTORIAL_BUILDINGS_TEXT"],
+	["metro.png", "TUTORIAL_METRO_TITLE", "TUTORIAL_METRO_TEXT"],
+	["progress.png", "TUTORIAL_PROGRESS_TITLE", "TUTORIAL_PROGRESS_TEXT"],
+]
 const IMAGE_SIZE := Vector2(600, 338)
 const TEXT_WIDTH := 500.0
 const COLOR_TITLE := Color(0.85, 0.75, 0.4)
@@ -43,6 +60,7 @@ const COLOR_DOT := Color(1, 1, 1, 0.25)
 const COLOR_DOT_CURRENT := Color(1.0, 0.55, 0.74)
 
 var _page := 0
+var _pages: Array = TOUCH_PAGES if Platform.touch_mode else PAGES
 var _image := TextureRect.new()
 var _page_title := Label.new()
 var _text := Label.new()
@@ -107,7 +125,7 @@ func _ready() -> void:
 	_dots.add_theme_constant_override("separation", 8)
 	_dots.alignment = BoxContainer.ALIGNMENT_CENTER
 	status.add_child(_dots)
-	for k in PAGES.size():
+	for k in _pages.size():
 		var dot := ColorRect.new()
 		dot.custom_minimum_size = Vector2(12, 12)
 		dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -177,12 +195,12 @@ func page() -> int:
 
 
 func page_count() -> int:
-	return PAGES.size()
+	return _pages.size()
 
 
 ## Pagina precedente (step -1) o successiva (+1), se c'è.
 func _turn(step: int) -> void:
-	var target := clampi(_page + step, 0, PAGES.size() - 1)
+	var target := clampi(_page + step, 0, _pages.size() - 1)
 	if target == _page:
 		return
 	Sfx.play_ui("ui_confirm")
@@ -191,7 +209,7 @@ func _turn(step: int) -> void:
 
 func _show_page(index: int) -> void:
 	_page = index
-	var entry: Array = PAGES[index]
+	var entry: Array = _pages[index]
 	var path: String = IMAGE_DIR % Settings.language + entry[0]
 	if not ResourceLoader.exists(path):
 		path = IMAGE_DIR % IMAGE_FALLBACK_LANGUAGE + entry[0]
@@ -199,15 +217,18 @@ func _show_page(index: int) -> void:
 	_image.texture = load(path) as Texture2D if ResourceLoader.exists(path) else null
 	_page_title.text = tr(entry[1])
 	_text.text = _with_keys(tr(entry[2]))
-	_counter.text = tr("TUTORIAL_PAGE") % [index + 1, PAGES.size()]
+	_counter.text = tr("TUTORIAL_PAGE") % [index + 1, _pages.size()]
 	for k in _dots.get_child_count():
 		(_dots.get_child(k) as ColorRect).color = COLOR_DOT_CURRENT if k == index else COLOR_DOT
-	_hint.text = tr("TUTORIAL_HINT") % [Keybinds.hint("parry"), Keybinds.hint("attack"), Keybinds.hint("ui_cancel")]
+	if Platform.touch_mode:
+		_hint.text = tr("TUTORIAL_TOUCH_HINT")
+	else:
+		_hint.text = tr("TUTORIAL_HINT") % [Keybinds.hint("parry"), Keybinds.hint("attack"), Keybinds.hint("ui_cancel")]
 	# Prima e ultima pagina: il pulsante che non serve si spegne e il focus
 	# passa all'altro.
 	var focused := get_viewport().gui_get_focus_owner() if is_inside_tree() else null
 	for button: Button in [_prev, _next]:
-		var off := (button == _prev and index == 0) or (button == _next and index == PAGES.size() - 1)
+		var off := (button == _prev and index == 0) or (button == _next and index == _pages.size() - 1)
 		button.disabled = off
 		button.focus_mode = Control.FOCUS_NONE if off else Control.FOCUS_ALL
 	if focused is Button and (focused as Button).disabled:

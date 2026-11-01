@@ -49,9 +49,7 @@ anche la pagina itch.io (`store/itch/`) mostrata sotto il gioco.
 - **Comandi**: tastiera e mouse come sul PC; controller con l'API Gamepad del
   browser (Chrome, Edge, Firefox; il controller si "sveglia" premendo un tasto
   dopo aver aperto la pagina); touch con i controlli a schermo
-  (`scripts/touch_controls.gd`). Sui telefoni e tablet (`web_android`,
-  `web_ios`) i controlli touch ci sono sempre; sui PC con schermo touch
-  compaiono dopo aver toccato lo schermo.
+  in Modalità Touch (vedi sotto).
 - I clic emulati dai tocchi non premono le azioni del mouse (vedi
   `Keybinds._apply`): toccare la levetta non attacca.
 - Il browser fa partire l'audio solo dopo il primo clic, tocco o tasto.
@@ -59,6 +57,34 @@ anche la pagina itch.io (`store/itch/`) mostrata sotto il gioco.
   schermo intero. La pagina del sito può evitarlo con la Keyboard Lock API
   (vedi sotto); la pausa resta comunque su Start del controller e sul pulsante
   Menu del touch.
+
+## Modalità Touch (solo nel browser)
+
+All'avvio della versione web `Platform._detect_touch_only` guarda se c'è un
+controller o la coppia tastiera e mouse (`(pointer: fine)` e
+`(hover: hover)` del browser): se non c'è nessuno dei due (telefoni e
+tablet, `web_android` / `web_ios` sempre) parte la **Modalità Touch**
+(`Platform.touch_mode`). Nelle versioni per PC (Windows, Linux / SteamOS)
+la Modalità Touch non esiste: niente controlli a schermo né automazioni.
+
+- **Controlli a schermo** (`scripts/touch_controls.gd`): in alto a sinistra,
+  sotto lo stato, Menù, Zaino e Mappa; in basso a sinistra la levetta; in
+  basso a destra Attacco (tasto unico) e Schivata, più i tasti colorati
+  Runa e Frenesia, che compaiono solo quando si possono usare. Nessun
+  altro tasto.
+- **Automazioni** (`scripts/touch_assist.gd`, chiamato da
+  `Player._physics_process`; preme e rilascia le azioni dell'Input Map):
+  salto davanti ai dislivelli superabili con i salti rimasti; pozioni di mana e vigore bevute da sole
+  quando mana o vigore finiscono (a vita zero, in `Player.receive_hit`, si
+  consuma subito una pozione della vita); scudo alzato appena è carico; torcia accesa e
+  spenta secondo il buio (`DayNight.darkness`).
+- **Combattimento**: Attacco tenuto premuto fa da solo combo normale →
+  colpo potente → salto e slam, finché regge il vigore; da lontano
+  la palla di fuoco, mai con un nemico vicino. La parata è automatica (in
+  `Player.receive_hit`, non perfetta) tranne mentre si tiene Attacco.
+- **Menù e tutorial**: il pulsante Comandi sparisce (menù iniziale e di
+  pausa); il tutorial ha un percorso a parte (`TutorialPanel.TOUCH_PAGES`)
+  che spiega controlli e automazioni.
 
 ## Salvataggi sull'account (`scripts/cloud.gd`)
 
