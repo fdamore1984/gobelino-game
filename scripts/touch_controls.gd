@@ -2,11 +2,14 @@ extends Control
 ## Controlli a schermo della Modalità Touch (solo versione web, vedi
 ## Platform.touch_mode): in alto a sinistra, sotto lo stato, Menu,
 ## Inventario e Mappa; in basso a sinistra la levetta virtuale; in basso a
-## destra Attacco (tasto unico, vedi TouchAssist) e Schivata, più i tasti
-## speciali colorati Bomba H e Frenesia, che compaiono solo quando si
-## possono usare. Salto, pozioni, scudo, torcia, parata e palla di fuoco
-## sono automatici (TouchAssist). Menu, Inventario, Mappa e Schivata
-## premono le stesse azioni dell'Input Map di tastiera e controller.
+## destra Attacco (tasto unico, vedi TouchAssist), Schivata e Slam (salto e
+## colpo potente a terra, grigio senza mana o vigore), più i tasti
+## speciali colorati Runa (id "h_bomb") e Frenesia, che compaiono solo
+## quando si possono usare; in basso al centro le pozioni (vita, mana e
+## vigore) con quante ne restano: toccandole si bevono. Salto, pozioni
+## finite, scudo, torcia, parata e palla di fuoco sono automatici
+## (TouchAssist). Menu, Inventario, Mappa, Schivata e le pozioni premono le
+## stesse azioni dell'Input Map di tastiera e controller.
 
 const STICK_RADIUS := 90.0
 const COLOR_BASE := Color(1, 1, 1, 0.15)
@@ -29,12 +32,29 @@ const TOP_BUTTONS := [
 const BUTTONS := [
 	{"special": "attack", "label": "TOUCH_ATTACK", "offset": Vector2(-120, -140), "radius": 70.0},
 	{"action": "dodge", "label": "TOUCH_DODGE", "offset": Vector2(-270, -80), "radius": 50.0},
+	# Slam: salto e colpo potente a terra (vedi TouchAssist), sempre visibile.
+	{"special": "slam", "label": "TOUCH_SLAM", "offset": Vector2(-270, -360), "radius": 46.0, "color": Color(0.2, 0.55, 1.0, 0.55)},
 	{"special": "h_bomb", "label": "TOUCH_H_BOMB", "offset": Vector2(-280, -220), "radius": 46.0, "color": Color(1.0, 0.55, 0.15, 0.55)},
 	{"special": "frenzy", "label": "TOUCH_FRENZY", "offset": Vector2(-120, -300), "radius": 46.0, "color": Color(1.0, 0.18, 0.12, 0.6)},
 	# Interagisci: solo vicino a qualcosa con cui interagire (vedi Player.can_interact).
 	{"action": "interact", "label": "INTERACT", "offset": Vector2(-420, -100), "radius": 54.0, "color": Color(0.25, 0.75, 0.35, 0.6)},
 ]
 
+## Pozioni in basso al centro: azione e icona (vedi HudActions).
+const ITEMS := [
+	{"action": "potion", "icon": "potion"},
+	{"action": "mana_potion", "icon": "mana"},
+	{"action": "stamina_potion", "icon": "stamina_potion"},
+]
+const ITEM_SLOT := 74.0
+const ITEM_GAP := 16.0
+const ITEM_BOTTOM := 16.0
+const ITEM_BADGE_FONT := 17
+
+var _item_style := UiStyle.box(UiStyle.CREAM, 18, 3, 4.0, UiStyle.INK)
+var _item_pressed := UiStyle.box(UiStyle.ACCENT, 18, 3, 4.0, UiStyle.INK)
+var _item_unavailable := UiStyle.box(Color(UiStyle.INK, 0.35), 15, 0, 0.0)
+var _item_badge := UiStyle.pill(UiStyle.PANEL, 2)
 var _stick_touch := -1
 var _stick_origin := Vector2.ZERO
 var _stick_position := Vector2.ZERO
@@ -124,6 +144,9 @@ func _set_axis(negative: String, positive: String, value: float) -> void:
 
 
 func _key_at(point: Vector2) -> String:
+	for k in ITEMS.size():
+		if _item_rect(k).grow(ITEM_GAP / 2.0).has_point(point):
+			return ITEMS[k]["action"]
 	for k in TOP_BUTTONS.size():
 		if point.distance_to(_top_center(k)) <= TOP_RADIUS:
 			return TOP_BUTTONS[k]["action"]
@@ -133,11 +156,19 @@ func _key_at(point: Vector2) -> String:
 	return ""
 
 
+## Casella della scorta index, in basso al centro.
+func _item_rect(index: int) -> Rect2:
+	var width := ITEMS.size() * (ITEM_SLOT + ITEM_GAP) - ITEM_GAP
+	var origin := Vector2((size.x - width) / 2.0 + index * (ITEM_SLOT + ITEM_GAP), size.y - ITEM_BOTTOM - ITEM_SLOT)
+	return Rect2(origin, Vector2(ITEM_SLOT, ITEM_SLOT))
+
+
 func _top_center(index: int) -> Vector2:
 	return Vector2(16 + TOP_RADIUS + index * (TOP_RADIUS * 2 + 12), TOP_Y)
 
 
-## Bomba H e Frenesia solo quando si possono usare (vedi TouchAssist).
+## Runa e Frenesia solo quando si possono usare (vedi TouchAssist); lo
+## Slam sempre (grigio quando non si può fare, vedi _draw).
 func _shown(button: Dictionary) -> bool:
 	var special: String = button.get("special", "")
 	if special == "h_bomb" or special == "frenzy":
@@ -169,13 +200,35 @@ func _draw() -> void:
 		var color: Color = button.get("color", COLOR_BASE)
 		if _is_down(button):
 			color = COLOR_ACTIVE if not button.has("color") else color.lightened(0.3)
+		if button.get("special", "") == "slam" and not TouchAssist.special_ready("slam"):
+			color = COLOR_BASE
 		draw_circle(center, button["radius"], color)
 		_draw_centered_text(font, center, tr(button["label"]))
+
+	_draw_items(font)
 
 	for k in TOP_BUTTONS.size():
 		var top: Dictionary = TOP_BUTTONS[k]
 		draw_circle(_top_center(k), TOP_RADIUS, COLOR_ACTIVE if Input.is_action_pressed(top["action"]) else COLOR_MENU)
 		_draw_centered_text(font, _top_center(k), tr(top["label"]))
+
+
+## Scorte in basso al centro, come la barra del PC (HudActions): icona,
+## distintivo con quante ne restano, grigie quando non servono o sono finite.
+func _draw_items(font: Font) -> void:
+	var player := TouchAssist.player
+	if player == null or not is_instance_valid(player):
+		return
+	for k in ITEMS.size():
+		var item: Dictionary = ITEMS[k]
+		var rect := _item_rect(k)
+		var kind: String = item["icon"]
+		draw_style_box(_item_pressed if Input.is_action_pressed(item["action"]) else _item_style, rect)
+		UpgradeIcon.draw_icon(self, rect.get_center(), ITEM_SLOT * 0.62, kind, false)
+		draw_set_transform(Vector2.ZERO)
+		if not HudActions.is_ready(player, kind):
+			draw_style_box(_item_unavailable, rect.grow(-3))
+		HudActions.draw_badge(self, font, HudActions.count_text(player, kind), rect.position + Vector2(ITEM_SLOT - 4, 2), _item_badge, ITEM_BADGE_FONT)
 
 
 func _draw_centered_text(font: Font, center: Vector2, text: String) -> void:

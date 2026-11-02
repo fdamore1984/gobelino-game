@@ -16,6 +16,8 @@ signal load_requested(slot: int)
 
 var _resume := Button.new()
 var _save := Button.new()
+## Si sta giocando il tutorial (vedi set_tutorial).
+var _tutorial_run := false
 var _load := Button.new()
 var _slot_panel := SlotPanel.new()
 var _controls := Button.new()
@@ -147,6 +149,9 @@ func _build_confirm() -> void:
 
 
 func _open_confirm() -> void:
+	if _tutorial_run:
+		quit_requested.emit()
+		return
 	Sfx.play_ui("ui_confirm")
 	_confirm.visible = true
 	_main.visible = false
@@ -163,6 +168,15 @@ func _close_confirm() -> void:
 	_quit.grab_focus()
 
 
+## Tutorial giocabile (vedi Game.tutorial_mode): niente Salva né Carica, ed
+## Esci torna al menù iniziale senza chiedere (non c'è niente da perdere).
+func set_tutorial() -> void:
+	_tutorial_run = true
+	_save.visible = false
+	_load.visible = false
+	_quit.text = "PAUSE_QUIT_TUTORIAL"
+
+
 func is_open() -> bool:
 	return visible
 
@@ -174,7 +188,7 @@ func open(blocked: String) -> void:
 	_save.disabled = blocked != ""
 	_save.focus_mode = Control.FOCUS_NONE if _save.disabled else Control.FOCUS_ALL
 	_reason.text = blocked
-	_reason.visible = blocked != ""
+	_reason.visible = blocked != "" and not _tutorial_run
 	Sfx.play_ui("ui_confirm")
 	_load.disabled = not SaveGame.any_exists()
 	_load.focus_mode = Control.FOCUS_NONE if _load.disabled else Control.FOCUS_ALL

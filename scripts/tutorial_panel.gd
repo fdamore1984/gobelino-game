@@ -9,8 +9,16 @@ extends Control
 ## pulsante Chiudi o Start chiudono.
 ## Nei testi i tasti sono scritti come {azione} e si leggono dall'Input Map
 ## (vedi Keybinds): per esempio {attack} diventa R1.
+## Dal menù iniziale (playable) c'è anche Inizia il tutorial giocabile, che
+## avvia una partita a parte che spiega le meccaniche giocando (vedi
+## TutorialRun); dal menù di pausa no, perché si lascerebbe la partita.
 
 signal closed
+## Inizia il tutorial giocabile (vedi playable).
+signal play_requested
+
+## Mostra il pulsante del tutorial giocabile (solo dal menù iniziale).
+var playable := false
 
 ## Cartella delle immagini di una lingua; se manca un'immagine si usa
 ## quella di IMAGE_FALLBACK_LANGUAGE.
@@ -58,9 +66,13 @@ const COLOR_TEXT := Color(1, 1, 1, 0.88)
 const COLOR_HINT := Color(1, 1, 1, 0.55)
 const COLOR_DOT := Color(1, 1, 1, 0.25)
 const COLOR_DOT_CURRENT := Color(1.0, 0.55, 0.74)
+## Pulsante del tutorial giocabile (vedi playable).
+const COLOR_PLAY := Color(1.0, 0.82, 0.2)
 
 var _page := 0
-var _pages: Array = TOUCH_PAGES if Platform.touch_mode else PAGES
+## Pagine del percorso giusto, scelte in _ready: il menù iniziale crea il
+## pannello prima che Platform sappia se si gioca col touch.
+var _pages: Array = PAGES
 var _image := TextureRect.new()
 var _page_title := Label.new()
 var _text := Label.new()
@@ -70,11 +82,13 @@ var _dots := HBoxContainer.new()
 var _prev := Button.new()
 var _next := Button.new()
 var _close := Button.new()
+var _play := Button.new()
 ## Testo dei tasti tra graffe: {azione} -> nome del tasto.
 var _key_pattern := RegEx.create_from_string("\\{(\\w+)\\}")
 
 
 func _ready() -> void:
+	_pages = TOUCH_PAGES if Platform.touch_mode else PAGES
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	visible = false
 	var dim := ColorRect.new()
@@ -138,6 +152,19 @@ func _ready() -> void:
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 18)
 	box.add_child(row)
+	# Tutorial giocabile: un pulsante più largo, giallo (rosso quando è
+	# selezionato, come gli altri), prima degli altri.
+	_play.text = "TUTORIAL_PLAY"
+	_play.custom_minimum_size = Vector2(300, 52)
+	_play.add_theme_font_size_override("font_size", 22)
+	_play.add_theme_stylebox_override("normal", UiStyle.box(COLOR_PLAY, 20, UiStyle.BORDER, 6.0))
+	_play.add_theme_stylebox_override("hover", UiStyle.box(COLOR_PLAY.lightened(0.3), 20, UiStyle.BORDER, 6.0))
+	_play.add_theme_color_override("font_color", UiStyle.INK)
+	_play.add_theme_color_override("font_hover_color", UiStyle.INK)
+	_play.visible = playable
+	_play.focus_entered.connect(Sfx.play_ui.bind("ui_move"))
+	_play.pressed.connect(_on_play_pressed)
+	row.add_child(_play)
 	for pair: Array in [[_prev, "TUTORIAL_PREV"], [_next, "TUTORIAL_NEXT"], [_close, "TUTORIAL_CLOSE"]]:
 		var button: Button = pair[0]
 		button.text = pair[1]
@@ -147,6 +174,8 @@ func _ready() -> void:
 		row.add_child(button)
 	# Su e giù restano sul pulsante; destra e sinistra girano sulla riga.
 	var buttons: Array[Button] = [_prev, _next, _close]
+	if playable:
+		buttons.push_front(_play)
 	for k in buttons.size():
 		buttons[k].focus_neighbor_left = buttons[(k + buttons.size() - 1) % buttons.size()].get_path()
 		buttons[k].focus_neighbor_right = buttons[(k + 1) % buttons.size()].get_path()
@@ -180,6 +209,12 @@ func open() -> void:
 	visible = true
 	_show_page(0)
 	_next.grab_focus.call_deferred()
+
+
+func _on_play_pressed() -> void:
+	Sfx.play_ui("ui_confirm")
+	visible = false
+	play_requested.emit()
 
 
 func close() -> void:

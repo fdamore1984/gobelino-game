@@ -53,6 +53,10 @@
 		],
 		"halo": {"range": 150, "energy": 0.7}
 	},
+	"camera": {
+		"phone_zoom": 1.35,
+		"tablet_zoom": 1.15
+	},
 	"map": {
 		"reveal_radius": 700,
 		"reveal_interval": 0.2,
