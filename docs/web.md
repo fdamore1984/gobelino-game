@@ -38,6 +38,11 @@ anche la pagina itch.io (`store/itch/`) mostrata sotto il gioco.
   leggibili. Su PC non cambia nulla.
 - Le orde di non morti sono più piccole su telefoni e tablet, anche nel
   browser (`count_mobile` in `data/world.json`, vedi `Platform.is_mobile`).
+- Sui telefoni e sui tablet la telecamera è più vicina
+  (`Platform.screen_kind`: puntatore impreciso, e lato corto dello schermo
+  sotto i 600 pixel CSS per i telefoni; `phone_zoom` e `tablet_zoom` della
+  voce `camera` di `data/world.json`), perché il gioco ci entra intero e
+  altrimenti tutto sarebbe minuscolo.
 
 ## Cosa cambia nel browser
 
@@ -69,10 +74,14 @@ la Modalità Touch non esiste: niente controlli a schermo né automazioni.
 
 - **Controlli a schermo** (`scripts/touch_controls.gd`): in alto a sinistra,
   sotto lo stato, Menù, Zaino e Mappa; in basso a sinistra la levetta; in
-  basso a destra Attacco (tasto unico) e Schivata, più i tasti colorati
-  Runa e Frenesia, che compaiono solo quando si possono usare, e il tasto verde
-  Interagisci, solo vicino a qualcosa con cui interagire (il suggerimento
-  sopra l'oggetto dice solo "Interagisci", senza tasto). Nessun altro tasto.
+  basso a destra Attacco (tasto unico), Schivata e il tasto blu Slam (salto
+  e colpo potente a terra, grigio senza mana o vigore), più i tasti colorati
+  Runa e Frenesia, che compaiono solo quando si possono usare, e il tasto
+  verde Interagisci, solo vicino a qualcosa con cui interagire (il
+  suggerimento sopra l'oggetto dice solo "Interagisci", senza tasto); in
+  basso al centro le pozioni di vita, mana e vigore con quante ne restano,
+  da toccare per berle (grigie quando non servono o sono finite). Nessun
+  altro tasto.
 - **Automazioni** (`scripts/touch_assist.gd`, chiamato da
   `Player._physics_process`; preme e rilascia le azioni dell'Input Map):
   salto davanti ai dislivelli superabili con i salti rimasti; pozioni di mana e vigore bevute da sole
@@ -88,7 +97,8 @@ la Modalità Touch non esiste: niente controlli a schermo né automazioni.
   Riprendi): quando sono aperti coprono i tasti a schermo.
 - **Menù e tutorial**: il pulsante Comandi sparisce (menù iniziale e di
   pausa); il tutorial ha un percorso a parte (`TutorialPanel.TOUCH_PAGES`)
-  che spiega controlli e automazioni.
+  che spiega controlli e automazioni, e anche il tutorial giocabile ha i
+  suoi passi touch (`touch` in `data/tutorial.json`, vedi `TutorialRun`).
 
 ## Scatti nel browser
 
@@ -97,7 +107,13 @@ sul frame in cui succede. Per questo: la regione successiva del terreno si
 genera in sottofondo poco per volta, i blocchi e gli ostacoli dei pezzi
 nuovi si aggiungono pochi per frame, i nemici compaiono al più due alla
 volta e durante la prima schermata di caricamento si preparano gli shader
-usati solo in certi momenti (vedi README, *Prestazioni*).
+usati solo in certi momenti (vedi README, *Prestazioni*). Fra questi le
+luci senza ombre della palla di fuoco e delle esplosioni
+(`Game._prewarm_lights`): la prima volta che illuminavano il terreno e i
+personaggi il gioco si fermava (circa due decimi di secondo al lancio,
+misurati nel Chromium senza GPU del container); i suoni passano subito al
+browser come campioni (`Sfx.register_samples`), invece che alla prima
+volta che suonano.
 
 ## Salvataggi sull'account (`scripts/cloud.gd`)
 

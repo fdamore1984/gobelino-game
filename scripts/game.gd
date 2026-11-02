@@ -76,6 +76,11 @@ static var pending_save := {}
 ## Gli strumenti (per esempio la cattura delle immagini per lo store) spengono
 ## i salvataggi, così non toccano gli slot del giocatore.
 static var saving_enabled := true
+## Tutorial giocabile (lo avvia il menù iniziale, vedi TutorialRun): una
+## partita che non si salva, senza nemici a caso né orde, sempre sullo
+## stesso mondo (TUTORIAL_SEED). Si spegne uscendo dalla scena.
+static var tutorial_mode := false
+const TUTORIAL_SEED := 1234
 
 @onready var _world: World = $World
 @onready var _entities: Node2D = $Entities
@@ -118,6 +123,11 @@ var _boss: Enemy
 var loading := false
 
 
+func _enter_tree() -> void:
+	if tutorial_mode:
+		($World as World).seed_value = TUTORIAL_SEED
+
+
 func _ready() -> void:
 	_world.entities = _entities
 	# Effetti a terra (sangue, corpi, onde d'urto) tra il terreno e i personaggi.
@@ -143,6 +153,11 @@ func _ready() -> void:
 	_hud.pause_menu.load_requested.connect(_on_load_requested)
 	var save := pending_save
 	pending_save = {}
+	if tutorial_mode:
+		_hud.pause_menu.set_tutorial()
+		await _prepare_region(tr("LOADING_LANDS"))
+		_start_tutorial()
+		return
 	if not save.is_empty():
 		_load(save)
 		return
@@ -167,6 +182,9 @@ func _process(delta: float) -> void:
 		return
 	_update_challenge(delta)
 	_update_interaction()
+	# Nel tutorial niente salvataggi, nemici a caso né orde (vedi TutorialRun).
+	if tutorial_mode:
+		return
 	_update_autosave(delta)
 	# Nel sotterraneo i nemici sono quelli del piano: non ne arrivano altri.
 	_maintain_timer -= delta
@@ -380,12 +398,14 @@ func _prepare_region(text: String, setup := Callable()) -> void:
 		await get_tree().process_frame
 	for i in PREWARM_FRAMES:
 		await get_tree().process_frame
-	_prewarm_end(warm)
 	_hud.show_loading(text, 1.0)
 	await get_tree().process_frame
 	_world.refresh_now()
 	_minimap.call("reset")
 	await get_tree().process_frame
+	# Le luci della palla di fuoco si preparano con il terreno già al suo posto.
+	await _prewarm_lights(warm)
+	_prewarm_end(warm)
 	_hud.hide_loading()
 	get_tree().paused = false
 	loading = false
@@ -393,6 +413,8 @@ func _prepare_region(text: String, setup := Callable()) -> void:
 
 ## Frame di caricamento in cui restano i puntini di _prewarm_start.
 const PREWARM_FRAMES := 2
+## Frame di caricamento per ciascuna combinazione di luci (vedi _prewarm_lights).
+const PREWARM_LIGHT_FRAMES := 2
 ## Shader già preparati in questa sessione (vedi _prewarm_start).
 static var _prewarmed := false
 
@@ -403,6 +425,8 @@ static var _prewarmed := false
 ## si accende la torcia. Durante la prima schermata di caricamento si
 ## disegnano dei puntini quasi invisibili con questi materiali (sotto la
 ## schermata) e si accende per un attimo la torcia, così è tutto pronto.
+## I suoni si passano subito al browser (vedi Sfx.register_samples) e le
+## luci senza ombre si preparano alla fine (vedi _prewarm_lights).
 func _prewarm_start() -> Array[Node]:
 	var nodes: Array[Node] = []
 	if _prewarmed:
@@ -424,7 +448,41 @@ func _prewarm_start() -> Array[Node]:
 	_hud.move_child(vignette, 0)
 	nodes.append(vignette)
 	_player.warm_torch(true)
+	Sfx.register_samples()
 	return nodes
+
+
+## La palla di fuoco fermava il gioco la prima volta che si lanciava: la sua
+## luce è la prima senza ombre (quelle della torcia le hanno) e nel
+## browser ogni cosa che illumina (terreno, blocchi, personaggi, puntini
+## dei materiali) va preparata di nuovo per quel tipo di luce, la prima
+## volta che succede. Qui, sotto la schermata di caricamento e con il
+## terreno già mostrato, una palla di fuoco in volo e una che esplode, la runa
+## che esplode e un'onda d'urto restano fermi accanto al giocatore (il
+## gioco è in pausa, niente suoni né danni): prima con la torcia spenta,
+## poi accesa, perché le due cose insieme sono un'altra combinazione.
+func _prewarm_lights(nodes: Array[Node]) -> void:
+	if nodes.is_empty():
+		return
+	for exploding: bool in [false, true]:
+		var fireball := Fireball.new()
+		fireball.altitude = _player.ground_elevation
+		fireball.position = _player.position + Vector2(70.0 if exploding else -70.0, 0)
+		_entities.add_child(fireball)
+		fireball.warm_up(exploding)
+		nodes.append(fireball)
+	var blast := HBombBlast.new()
+	blast.radius = Player.H_BOMB_MIN_RADIUS
+	blast.altitude = _player.ground_elevation
+	blast.position = _player.position + Vector2(0, 40)
+	_entities.add_child(blast)
+	blast.show_fire()
+	nodes.append(blast)
+	GroundFx.warm_shockwave(_player.position, _player.ground_elevation, Player.SLAM_RADIUS["air"])
+	for torch: bool in [false, true]:
+		_player.warm_torch(torch)
+		for i in PREWARM_LIGHT_FRAMES:
+			await get_tree().process_frame
 
 
 func _prewarm_end(nodes: Array[Node]) -> void:
@@ -433,6 +491,7 @@ func _prewarm_end(nodes: Array[Node]) -> void:
 	for node in nodes:
 		node.queue_free()
 	_player.warm_torch(false)
+	GroundFx.clear_waves()
 
 
 ## Suggerimento vicino a un ingresso (chiave del testo, "" se nessuno).
@@ -625,6 +684,8 @@ func _can_autosave() -> bool:
 
 
 func _save(message: String) -> void:
+	if tutorial_mode:
+		return
 	_autosave_timer = AUTOSAVE_INTERVAL
 	_autosave_pending = false
 	if saving_enabled and SaveGame.write(_save_data()):
@@ -810,6 +871,9 @@ func _on_summon_requested(summoner: Enemy, type_id: String, positions: Array[Vec
 func _on_enemy_died(enemy: Enemy) -> void:
 	_kills += 1
 	_hud.set_kills(_kills)
+	# Nel tutorial i nemici non danno esperienza né bottino.
+	if tutorial_mode:
+		return
 	Sfx.play("xp", enemy.global_position)
 	_player.add_experience(enemy.xp_reward)
 	_player.stain_with_blood()
@@ -860,6 +924,7 @@ func _on_player_died() -> void:
 
 
 func _exit_tree() -> void:
+	tutorial_mode = false
 	HitFeedback.reset()
 	# I nemici della prossima partita non devono restare fermi.
 	Enemy.frozen = false
@@ -876,6 +941,27 @@ func _on_load_requested(slot: int) -> void:
 	HitFeedback.reset()
 	Enemy.frozen = false
 	get_tree().change_scene_to_file(scene_file_path)
+
+
+## Tutorial giocabile: il riquadro coi passi va nell'HUD, sotto il menù di
+## pausa e gli altri pannelli; finito, si torna al menù.
+func _start_tutorial() -> void:
+	var run := TutorialRun.new()
+	run.game = self
+	run.player = _player
+	run.day_night = _day_night
+	add_child(run)
+	_hud.add_overlay(run.panel())
+	run.finished.connect(_back_to_menu)
+
+
+## Nemico di un passo del tutorial: viene subito verso il giocatore e non
+## lascia niente.
+func spawn_tutorial_enemy(type_id: String, at: Vector2) -> Enemy:
+	var enemy := _spawn_enemy(type_id, at, 1)
+	enemy.drops_loot = false
+	enemy.alert()
+	return enemy
 
 
 func _back_to_menu() -> void:

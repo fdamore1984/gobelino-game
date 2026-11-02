@@ -34,8 +34,9 @@ extends Node2D
 ## combo di colpi normali (combo mista) è un colpo potente con un bonus ai
 ## danni. Attacchi a terra, che colpiscono tutti i nemici attorno: il colpo
 ## potente in aria, premuto e lasciato, fa piombare a terra con uno slam
-## (costa mana e vigore); tenuto premuto, con una runa del cataclisma nella
-## cintura, è la runa. Durante uno scatto in aria è un colpo più ampio.
+## (costa mana e vigore); con una runa del cataclisma nella cintura, L2 + R2
+## insieme in aria (colpo potente e focus) sono la runa. Durante uno
+## scatto in aria è un colpo più ampio.
 ## Durante gli attacchi a terra si passa
 ## attraverso i nemici; all'impatto quelli attorno (non i boss) vengono
 ## respinti lontano.
@@ -65,6 +66,11 @@ signal frenzy_changed(current: float, maximum: float)
 ## Inizio e fine dell'attacco speciale della Frenesia.
 signal special_started
 signal special_finished
+## Un'azione è riuscita (per il tutorial giocabile, vedi TutorialRun):
+## "jump", "attack", "heavy", "parry", "dodge", "missile" (la palla di
+## fuoco), "slam", "h_bomb" (la runa),
+## "special", "shield", "lock", "drink_<scorta>".
+signal action_done(kind: String)
 
 enum State { NORMAL, ATTACK, PARRY, DODGE, SLIDE, HURT, DEAD, SLAM, FALL, RECOIL, DRINK, SPECIAL }
 
@@ -151,12 +157,13 @@ const SLAM_RECOVERY := 0.32
 ## Se per qualche motivo non si tocca terra, l'impatto arriva comunque.
 const SLAM_MAX_TIME := 2.0
 const SLAM_RADIUS := {"dash": 165.0, "air": 135.0}
-## Runa del cataclisma: il colpo potente in aria tenuto premuto, con una runa nella
-## cintura (se ne portano START_H_BOMB_CAPACITY, una in più per ogni
-## potenziamento "h_bomb"); senza, in aria il colpo potente non parte. La
-## spada sparisce e il goblin alza sopra la testa una grossa runa del
-## cataclisma (id "h_bomb");
-## tenendo premuto si fluttua salendo piano (AIR_SLAM_RISE_SPEED, sempre più
+## Runa del cataclisma: L2 + R2 insieme in aria (colpo potente e focus, in
+## qualsiasi ordine), con una runa nella cintura (se ne portano
+## START_H_BOMB_CAPACITY, una in più per ogni potenziamento "h_bomb"); se il
+## colpo potente arriva per primo, lo slam appena partito (entro
+## H_BOMB_CHORD_GRACE secondi) diventa la runa e restituisce quello che è
+## costato. La spada sparisce e il goblin alza sopra la testa una grossa runa
+## del cataclisma (id "h_bomb"); tenendo premuto uno dei due tasti si fluttua salendo piano (AIR_SLAM_RISE_SPEED, sempre più
 ## piano con la carica, con un leggero ondeggiare di AIR_SLAM_BOB pixel)
 ## fino a HEAVY_CHARGE_TIME, poi parte da sola; intanto si è esposti a dardi
 ## e frecce dei nemici (vedi receive_hit). Al rilascio (o con un tocco
@@ -170,6 +177,7 @@ const START_H_BOMB_CAPACITY := 3
 const H_BOMB_MIN_RADIUS := 190.0
 const H_BOMB_MAX_RADIUS := 280.0
 const H_BOMB_BOSS_DAMAGE := 0.5
+const H_BOMB_CHORD_GRACE := 0.15
 const AIR_SLAM_RISE_SPEED := 45.0
 const AIR_SLAM_BOB := 3.0
 ## Fuliggine dell'esplosione: il corpo si annerisce (fino a SOOT_STRENGTH
@@ -181,12 +189,10 @@ const COLOR_SOOT := Color(0.13, 0.12, 0.11)
 const H_BOMB_HELD := Vector2(0, -RADIUS - 20.0)
 const H_BOMB_LENGTH := 74.0
 const DASH_SLAM_DAMAGE_FACTOR := 2.4
-## Colpo potente in aria: se lo si lascia entro AIR_HEAVY_HOLD_TIME è lo
-## slam ("air"), che costa AIR_SLAM_MANA di mana e STAMINA_HEAVY di
-## vigore (senza, non parte) e fa AIR_SLAM_DAMAGE_FACTOR volte il danno
-## base; tenuto premuto più a lungo, con una runa, è la runa. Intanto
-## si resta sospesi ("pending", vedi _update_slam).
-const AIR_HEAVY_HOLD_TIME := 0.15
+## Colpo potente in aria: sempre lo slam ("air"), subito, che costa
+## AIR_SLAM_MANA di mana e BATTERY_HEAVY di vigore (senza, non
+## parte) e fa AIR_SLAM_DAMAGE_FACTOR volte il danno base. La runa si fa
+## con L2 + R2 (vedi H_BOMB_CHORD_GRACE).
 const AIR_SLAM_MANA := 10.0
 const AIR_SLAM_DAMAGE_FACTOR := 2.0
 ## Aggancio del bersaglio (vedi _update_lock). Automatico: il nemico vivo
@@ -511,6 +517,10 @@ var mana_potions := START_MANA_POTIONS
 var stamina_potions := START_STAMINA_POTIONS
 ## Rune del cataclisma (h_bomb) nella cintura (vedi h_bomb_capacity).
 var h_bombs := 0
+## Nel tutorial giocabile non si muore: la vita non scende sotto 1.
+var immortal := false
+## Nel tutorial giocabile la Frenesia piena non cala da sola (vedi TutorialRun).
+var keep_frenzy := false
 ## Fuliggine sul corpo dopo l'esplosione di una runa (da 0 a 1).
 var soot := 0.0
 ## Bonus alla potenza della magia dai potenziamenti (0.2 = +20%).
@@ -604,6 +614,9 @@ var _spell_cooldown := 0.0
 var _air_dash := false
 ## Attacco a terra in corso: "plunge" o "dash", e se ha già toccato terra.
 var _slam_kind := ""
+## Risorse pagate dall'attacco a terra in corso (x: mana, y: vigore):
+## tornano se diventa la runa (vedi _start_h_bomb).
+var _slam_paid := Vector2.ZERO
 var _slam_landed := false
 ## Altezza da cui parte la picchiata e se lo slam aereo è stato caricato.
 ## Da quanto si tiene premuto L3 (-1: tasto non premuto o già usato).
@@ -704,6 +717,10 @@ func _ready() -> void:
 		_camera.position_smoothing_enabled = true
 		_camera.position_smoothing_speed = CAMERA_SMOOTHING
 		_camera.reset_smoothing()
+		# Sui telefoni e sui tablet, nel browser, tutto più vicino: lo schermo
+		# è piccolo e il gioco ci entra intero (vedi Platform.screen_kind).
+		if Platform.screen_kind != "":
+			_camera.zoom *= float(World.DATA.data["camera"].get(Platform.screen_kind + "_zoom", 1.0))
 
 
 func _physics_process(delta: float) -> void:
@@ -722,8 +739,9 @@ func _physics_process(delta: float) -> void:
 	if _stamina_delay == 0.0 and not _running and _state != State.DEAD:
 		var regen := STAMINA_REGEN * (STAMINA_PARRY_REGEN_FACTOR if _state == State.PARRY else 1.0)
 		stamina = minf(stamina + regen * delta, max_stamina)
-	# Senza attaccare per un po' la Frenesia cala.
-	if _state != State.SPECIAL:
+	# Senza attaccare per un po' la Frenesia cala (non mentre il tutorial
+	# insegna l'attacco speciale, vedi keep_frenzy).
+	if _state != State.SPECIAL and not keep_frenzy:
 		_frenzy_idle += delta
 		if _frenzy_idle >= FRENZY_DECAY_DELAY and frenzy > 0.0:
 			_set_frenzy(frenzy - FRENZY_DECAY * delta)
@@ -761,9 +779,12 @@ func _physics_process(delta: float) -> void:
 		_update_passage_z()
 		_update_run_button(delta)
 
+	# Runa del Cataclisma: L2 + R2 insieme in aria (colpo potente e focus, in qualsiasi ordine).
+	if UiNav.game_chord("heavy_attack", "focus") and _can_start_h_bomb():
+		_start_h_bomb(attack_input)
 	# Frenesia piena: L1 + R1 insieme (parata e attacco, in qualsiasi ordine)
 	# scatenano l'attacco speciale, annullando l'azione in corso.
-	if UiNav.game_chord("parry", "attack") and _can_start_special():
+	elif UiNav.game_chord("parry", "attack") and _can_start_special():
 		_start_special()
 	# La parata è istantanea: annulla subito attacchi (anche in carica),
 	# schivate, scivolate, attacchi a terra, rinculo e il bere.
@@ -1045,7 +1066,7 @@ func _update_height(delta: float) -> void:
 		gravity *= AIR_ATTACK_GRAVITY_FACTOR
 	if _state == State.SLAM and not _slam_landed:
 		# Mentre si carica lo slam aereo si fluttua (vedi _update_slam).
-		gravity = 0.0 if _charging or _slam_kind == "pending" or _state_time < SLAM_HANG else SLAM_GRAVITY
+		gravity = 0.0 if _charging or _state_time < SLAM_HANG else SLAM_GRAVITY
 	_height_velocity -= gravity * delta
 	_height += _height_velocity * delta
 	if _height <= 0.0:
@@ -1203,7 +1224,7 @@ func receive_hit(from: Vector2, damage: int, projectile := false) -> String:
 		Sfx.play("shield_break", global_position)
 		return "shielded"
 
-	health = maxi(health - damage, 0)
+	health = maxi(health - damage, 1 if immortal else 0)
 	health_changed.emit(health, max_health)
 	# Colpiti si perde la carica (per esempio dello slam aereo: si cade giù).
 	_charging = false
@@ -1389,7 +1410,7 @@ func _fall_into_ravine() -> void:
 func _climb_out_of_ravine() -> void:
 	teleport(_safe_position)
 	var data: Dictionary = World.DATA.data["terrain"]
-	health = maxi(health - int(data["ravine_damage"]), 0)
+	health = maxi(health - int(data["ravine_damage"]), 1 if immortal else 0)
 	health_changed.emit(health, max_health)
 	GroundFx.bleed(global_position, ground_elevation + LEG_LENGTH + RADIUS * 0.5, Vector2.from_angle(randf() * TAU), BLEED_DROPS)
 	_wound(Vector2(randf_range(-1.0, 1.0), 1.0))
@@ -1458,6 +1479,7 @@ func _lock_manually() -> void:
 		return
 	_set_lock_target(nearest)
 	lock_manual = true
+	action_done.emit("lock")
 	Sfx.play_ui("ui_move")
 
 
@@ -1791,15 +1813,15 @@ func _start_attack(step: int, input: Vector2) -> void:
 	_heavy_step = 0
 	_attack_heavy = false
 	_begin_attack(input)
+	action_done.emit("attack")
 	Sfx.play("swing", global_position, 1.0 + 0.12 * (_combo_step - 1))
 
 
 ## held: concatenato tenendo premuto il tasto (non si carica).
 func _start_heavy(input: Vector2, held := false) -> void:
-	# In aria il colpo potente è lo slam o la runa del cataclisma: si decide
-	# da quanto si tiene premuto (vedi _resolve_air_heavy).
+	# In aria il colpo potente è lo slam (la runa è L2 + R2, vedi _start_h_bomb).
 	if is_airborne():
-		_start_slam("pending", input)
+		_start_air_slam(input)
 		return
 	if not _use_stamina(STAMINA_HEAVY):
 		return
@@ -1819,6 +1841,7 @@ func _start_heavy(input: Vector2, held := false) -> void:
 	_attack_heavy = true
 	_begin_attack(input)
 	_charging = not held
+	action_done.emit("heavy")
 
 
 func _begin_attack(input: Vector2) -> void:
@@ -1860,13 +1883,17 @@ func _next_combo_step() -> int:
 	return _combo_step + 1 if continues else 1
 
 
-## Inizia un attacco a terra: sosta in aria prima di piombare giù (pending,
-## che diventa air o plunge, e dash).
+## Inizia un attacco a terra: sosta in aria prima di piombare giù (air,
+## plunge e dash).
 func _start_slam(kind: String, input: Vector2) -> void:
-	# Il colpo dallo scatto in aria paga qui, lo slam in _resolve_air_heavy
+	# Il colpo dallo scatto in aria paga qui, lo slam in _start_air_slam
 	# (la runa costa la runa).
-	if kind == "dash" and not _use_stamina(STAMINA_HEAVY):
-		return
+	_slam_paid = Vector2.ZERO
+	if kind == "dash":
+		var before := stamina
+		if not _use_stamina(STAMINA_HEAVY):
+			return
+		_slam_paid.y = before - stamina
 	_slam_kind = kind
 	_slam_landed = false
 	_attack_heavy = false
@@ -1891,24 +1918,47 @@ func _start_slam(kind: String, input: Vector2) -> void:
 	_change_state(State.SLAM)
 
 
-## Colpo potente in aria deciso: lasciato subito (o senza rune) è lo slam,
-## che costa mana e vigore; tenuto premuto, con una runa del cataclisma, la
-## runa, che continua a caricarsi a mezz'aria finché la si tiene.
-func _resolve_air_heavy(held: bool) -> void:
-	if held and h_bombs > 0:
-		_slam_kind = "plunge"
-		_charging = true
-		_state_time = 0.0
-		Sfx.play("h_bomb_lift", global_position)
+## Slam (colpo potente in aria): costa mana e vigore; senza, non
+## parte.
+func _start_air_slam(input: Vector2) -> void:
+	if mana < AIR_SLAM_MANA or stamina <= 0.0:
 		return
-	if mana < AIR_SLAM_MANA or not _use_stamina(STAMINA_HEAVY):
-		# Senza mana o vigore non parte: si ricade e basta.
-		_change_state(State.NORMAL)
-		return
+	var before := stamina
+	_use_stamina(STAMINA_HEAVY)
 	mana -= AIR_SLAM_MANA
-	_slam_kind = "air"
-	_state_time = SLAM_HANG
+	_start_slam("air", input)
+	action_done.emit("slam")
+	_slam_paid = Vector2(AIR_SLAM_MANA, before - stamina)
 	Sfx.play("heavy_swing", global_position, 0.85)
+
+
+## La runa si può usare: in aria, con una runa nella cintura, liberi o
+## appena partiti con lo slam (entro H_BOMB_CHORD_GRACE, vedi _start_h_bomb).
+func _can_start_h_bomb() -> bool:
+	if h_bombs <= 0 or not is_airborne():
+		return false
+	if _state == State.SLAM:
+		return _slam_kind in ["air", "dash"] and not _slam_landed and _state_time < H_BOMB_CHORD_GRACE
+	return _state in [State.NORMAL, State.ATTACK, State.PARRY, State.DODGE]
+
+
+## Runa del Cataclisma (L2 + R2 in aria): il goblin solleva la runa e fluttua caricandola
+## finché si tiene premuto uno dei due tasti; lo slam appena partito
+## restituisce quello che è costato.
+func _start_h_bomb(input: Vector2) -> void:
+	if _state == State.SLAM:
+		mana = minf(mana + _slam_paid.x, max_mana)
+		stamina = minf(stamina + _slam_paid.y, max_stamina)
+	_interrupt_action()
+	_start_slam("plunge", input)
+	_charging = true
+	_state_time = 0.0
+	Sfx.play("h_bomb_lift", global_position)
+
+
+## Si tiene premuto almeno uno dei due tasti della runa (L2 o R2).
+func _h_bomb_held() -> bool:
+	return UiNav.game_held("heavy_attack") or UiNav.game_held("focus")
 
 
 ## Attacco a terra: sosta in aria, discesa e, toccato terra, l'impatto
@@ -1916,14 +1966,6 @@ func _resolve_air_heavy(held: bool) -> void:
 ## aim: direzione verso cui girarsi in carica (il cursore se lo slam è
 ## partito col mouse).
 func _update_slam(input: Vector2, aim: Vector2, delta: float) -> void:
-	if _slam_kind == "pending":
-		# Sospesi un attimo, finché non si capisce se il tasto è tenuto premuto.
-		_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * delta)
-		if not UiNav.game_held("heavy_attack"):
-			_resolve_air_heavy(false)
-		elif _state_time >= AIR_HEAVY_HOLD_TIME:
-			_resolve_air_heavy(true)
-		return
 	if _charging:
 		# A mezz'aria si fluttua salendo piano (sempre più piano con la carica):
 		# ci si gira con la levetta (o verso il bersaglio, o il cursore) finché
@@ -1935,7 +1977,7 @@ func _update_slam(input: Vector2, aim: Vector2, delta: float) -> void:
 		_face_lock()
 		_state_time = 0.0
 		_charge_time += delta
-		if not UiNav.game_held("heavy_attack"):
+		if not _h_bomb_held():
 			_charging = false
 		else:
 			_charge = minf(_charge + delta / HEAVY_CHARGE_TIME, 1.0)
@@ -2005,6 +2047,7 @@ func _slam_impact() -> void:
 ## La runa del cataclisma si spacca sul terreno: i nemici attorno muoiono
 ## (il boss perde una parte della vita), il goblin resta intatto ma annerito.
 func _h_bomb_impact() -> void:
+	action_done.emit("h_bomb")
 	h_bombs = maxi(h_bombs - 1, 0)
 	var radius := _slam_radius()
 	for node in get_tree().get_nodes_in_group("enemies"):
@@ -2096,6 +2139,7 @@ func _can_start_special() -> bool:
 ## normale prima dei colpi, lo zoom resta fino alla fine (vedi _finish_special).
 func _start_special() -> void:
 	_interrupt_action()
+	action_done.emit("special")
 	_queued_attack = ""
 	_velocity = Vector2.ZERO
 	_special_hits = 0
@@ -2248,6 +2292,7 @@ func _jump() -> void:
 	_jumps_used += 1
 	_height_velocity = JUMP_SPEED
 	Sfx.play("jump", global_position, 1.0 + 0.15 * (_jumps_used - 1))
+	action_done.emit("jump")
 
 
 ## La scivolata parte almeno alla velocità di corsa, così funziona anche
@@ -2260,6 +2305,7 @@ func _start_slide(input: Vector2) -> void:
 	_target_facing = _slide_direction
 	Sfx.play("slide", global_position)
 	_change_state(State.SLIDE)
+	action_done.emit("dodge")
 
 
 func _start_dodge(input: Vector2) -> void:
@@ -2274,6 +2320,7 @@ func _start_dodge(input: Vector2) -> void:
 	_heavy_step = 0
 	Sfx.play("dodge", global_position)
 	_change_state(State.DODGE)
+	action_done.emit("dodge")
 
 
 ## Parata istantanea: annulla l'azione in corso (combo, carica, schivata,
@@ -2285,6 +2332,7 @@ func _start_parry(input: Vector2) -> void:
 	if _state in [State.DODGE, State.SLIDE]:
 		_dodge_cooldown = DODGE_COOLDOWN
 	_interrupt_action()
+	action_done.emit("parry")
 	_velocity = _velocity.limit_length(walk_speed() * PARRY_SPEED_FACTOR)
 	if input != Vector2.ZERO:
 		_target_facing = input.normalized()
@@ -2343,6 +2391,7 @@ func _start_drink(kind: String) -> void:
 			return
 		mana_potions -= 1
 	_drinking = kind
+	action_done.emit("drink_" + kind)
 	_end_combo()
 	_change_state(State.DRINK)
 	_apply_drink()
@@ -2472,6 +2521,7 @@ func _cast_fireball(input: Vector2) -> void:
 	fireball.position = position + fireball.direction * RADIUS
 	get_parent().add_child(fireball)
 	Sfx.play("fireball", global_position)
+	action_done.emit("missile")
 
 
 ## Bombe H che si possono portare (vedi START_H_BOMB_CAPACITY).
@@ -2648,6 +2698,7 @@ func _raise_shield() -> void:
 	if shield_active or shield_cooldown > 0.0:
 		return
 	shield_active = true
+	action_done.emit("shield")
 	shield_cooldown = shield_cooldown_max
 	Sfx.play("shield_up", global_position)
 

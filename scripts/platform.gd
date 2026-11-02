@@ -36,10 +36,19 @@ var _removed_desktop_events := {}
 ## versioni per PC (Windows, Linux) non esiste.
 var touch_mode := false
 ## Tasti speciali dei controlli touch, letti da TouchAssist: attacco tenuto
-## premuto, bomba H e Frenesia.
+## premuto, runa (h_bomb), Frenesia e Slam.
 var touch_attack := false
 var touch_h_bomb := false
 var touch_frenzy := false
+var touch_slam := false
+## Nel browser di un telefono o di un tablet ("phone" o "tablet", "" sugli
+## altri dispositivi): lo schermo è piccolo e il gioco ci entra intero,
+## quindi la telecamera si avvicina (camera.phone_zoom e tablet_zoom di
+## data/world.json, vedi Player._update_zoom). Si riconosce dal puntatore
+## impreciso (il dito) e dal lato corto dello schermo, in pixel CSS.
+var screen_kind := ""
+## Sotto questo lato corto dello schermo (pixel CSS) è un telefono.
+const PHONE_SCREEN_MAX := 600.0
 
 
 ## Frame al secondo: fissi a 60 (anche sullo Steam Deck in modalità gioco,
@@ -75,6 +84,7 @@ func _ready() -> void:
 		_fix_joypad_mapping(device)
 	_update_desktop_events()
 	touch_mode = is_web and _detect_touch_only()
+	screen_kind = _detect_screen_kind() if is_web else ""
 
 
 ## All'avvio nel browser: niente controller e niente puntatore preciso con
@@ -87,6 +97,18 @@ func _detect_touch_only() -> bool:
 		return true
 	var mouse: Variant = JavaScriptBridge.eval("window.matchMedia('(pointer: fine)').matches && window.matchMedia('(hover: hover)').matches", true)
 	return not bool(mouse)
+
+
+## Telefono, tablet o niente dei due (vedi screen_kind): anche con un
+## controller collegato al telefono la telecamera resta più vicina.
+func _detect_screen_kind() -> String:
+	var mobile := touch_mode or OS.has_feature("web_android") or OS.has_feature("web_ios")
+	var short_side := float(JavaScriptBridge.eval("Math.min(screen.width, screen.height)", true))
+	if not mobile:
+		mobile = bool(JavaScriptBridge.eval("window.matchMedia('(pointer: coarse)').matches", true))
+	if not mobile or short_side <= 0.0:
+		return ""
+	return "phone" if short_side < PHONE_SCREEN_MAX else "tablet"
 
 
 func _on_joy_connection_changed(device: int, connected: bool) -> void:

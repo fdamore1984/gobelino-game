@@ -22,6 +22,8 @@ const ROWS := [
 	["CONTROLS_MAP", [["map"]]], ["CONTROLS_LOCK", [["lock_on"]]], ["CONTROLS_MENU", [["menu"]]],
 ]
 const MOVE_ACTIONS := ["move_up", "move_left", "move_down", "move_right"]
+## Attacchi speciali con due tasti insieme: testo -> le due azioni.
+const CHORDS := {"CONTROLS_SPECIAL_FRENZY": ["parry", "attack"], "CONTROLS_SPECIAL_PLUNGE": ["heavy_attack", "focus"]}
 const SPECIALS := ["CONTROLS_SPECIAL_FRENZY", "CONTROLS_SPECIAL_MIXED", "CONTROLS_SPECIAL_CHARGED", "CONTROLS_SPECIAL_AIR", "CONTROLS_SPECIAL_PLUNGE", "CONTROLS_SPECIAL_DASH"]
 const COLOR_TITLE := Color(0.85, 0.75, 0.4)
 const COLOR_HEADER := Color(1.0, 0.85, 0.4)
@@ -43,8 +45,9 @@ var _edit := Button.new()
 var _grid := GridContainer.new()
 var _scroll := ScrollContainer.new()
 var _keybinds := KeybindsPanel.new()
-## Riga dell'attacco speciale della Frenesia, coi tasti scelti dal giocatore.
-var _frenzy: Label
+## Righe degli attacchi a due tasti insieme (vedi CHORDS), coi tasti
+## scelti dal giocatore.
+var _chord_labels := {}
 
 
 func _ready() -> void:
@@ -80,10 +83,11 @@ func _ready() -> void:
 	content.add_child(specials)
 	for key: String in SPECIALS:
 		var label := _wrapped(_label(key, 17, COLOR_TEXT, true), WIDTH)
-		if key == "CONTROLS_SPECIAL_FRENZY":
-			# L'attacco speciale è parata + attacco insieme: tasti dall'Input
-			# Map, scritti a ogni apertura (vedi _fill).
-			_frenzy = label
+		if key in CHORDS:
+			# L'attacco speciale (parata + attacco) e la bomba H (colpo
+			# potente + focus) sono due tasti insieme: tasti dall'Input Map,
+			# scritti a ogni apertura (vedi _fill).
+			_chord_labels[key] = label
 			label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 		specials.add_child(label)
 	if Platform.use_touch_controls():
@@ -114,7 +118,8 @@ func _fit() -> void:
 
 ## Riempie la tabella con i tasti attuali, nella lingua attuale.
 func _fill() -> void:
-	_frenzy.text = tr("CONTROLS_SPECIAL_FRENZY") % [Keybinds.hint("parry"), Keybinds.hint("attack")]
+	for key: String in CHORDS:
+		(_chord_labels[key] as Label).text = tr(key) % [Keybinds.hint(CHORDS[key][0]), Keybinds.hint(CHORDS[key][1])]
 	for child in _grid.get_children():
 		_grid.remove_child(child)
 		child.queue_free()

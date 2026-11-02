@@ -61,9 +61,9 @@ spiega il tutorial del gioco.
 ```
 Gobelino is a 2D medieval fantasy action RPG with an isometric view: a feral goblin with a sword and a fireball explores boundless lands, caves and catacombs full of monsters and undead.
 
-Fast, deadly Souls-like combat: combos, parries, dodges, jumps and the Frenzy special attack. Comic-style look, like ufotizio.com: thick ink outlines, big cartoon eyes and a matching interface. Prototype with placeholder graphics and sounds.
+Fast, deadly Souls-like combat: combos, parries, dodges, jumps, slams, Cataclysm runes and the Frenzy special attack, with a playable tutorial that teaches you everything step by step. Comic-style look, like ufotizio.com: thick ink outlines, big cartoon eyes and a matching interface. Prototype with placeholder graphics and sounds.
 
-Controller or keyboard and mouse. In the browser on phones and tablets: Touch Mode, with simple on-screen controls and automatic jumping, parrying, potions and torch. English and Italian. Windows, Linux and Steam Deck.
+Controller or keyboard and mouse. In the browser on phones and tablets: Touch Mode, with simple on-screen controls (Slam button, potions you tap to drink), a closer camera and automatic jumping, parrying and torch. English and Italian. Windows, Linux and Steam Deck.
 
 Play it right in your browser, with your saves on every device: https://ufotizio.com/en/gobelino
 ```

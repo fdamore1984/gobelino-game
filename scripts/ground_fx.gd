@@ -126,6 +126,21 @@ static func shockwave(at: Vector2, elevation: float, radius: float) -> void:
 		current._waves.append({"position": at, "elevation": elevation, "radius": radius, "age": 0.0, "seed": randi()})
 
 
+## Onda d'urto ferma, disegnata subito anche a gioco in pausa: per
+## preparare il disegno durante la schermata di caricamento (vedi
+## Game._prewarm_lights), poi la toglie clear_waves.
+static func warm_shockwave(at: Vector2, elevation: float, radius: float) -> void:
+	if current:
+		current._waves.append({"position": at, "elevation": elevation, "radius": radius, "age": WAVE_TIME * 0.3, "seed": randi()})
+		current._wave_layer.queue_redraw()
+
+
+static func clear_waves() -> void:
+	if current:
+		current._waves.clear()
+		current._wave_layer.queue_redraw()
+
+
 ## Zona d'impatto di un attacco a terra che sta per arrivare (salto dei
 ## nemici): un bagliore rosso ovale, steso a terra nella prospettiva
 ## isometrica (largo il doppio che alto), largo quanto la zona colpita

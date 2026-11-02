@@ -43,6 +43,13 @@ func _ready() -> void:
 	add_child(_light)
 
 
+## Ferma a metà della palla di fuoco: per preparare il disegno durante la
+## schermata di caricamento (vedi Game._prewarm_lights).
+func show_fire() -> void:
+	_age = FIRE_TIME * 0.5
+	queue_redraw()
+
+
 func _process(delta: float) -> void:
 	_age += delta
 	_light.energy = 3.0 * pow(maxf(1.0 - _age / LIFETIME, 0.0), 2.0)

@@ -390,6 +390,13 @@ func show_boss(boss: Enemy) -> void:
 	_boss_bar.boss = boss
 
 
+## Riquadro sopra il gioco e sotto i pannelli (inventario, mappa, negozio,
+## pausa): per esempio quello del tutorial giocabile (vedi TutorialRun).
+func add_overlay(control: Control) -> void:
+	add_child(control)
+	move_child(control, _inventory_panel.get_index())
+
+
 func is_menu_open() -> bool:
 	return pause_menu.is_open() or _inventory_panel.is_open() or _shop_panel.is_open() or _world_map.is_open()
 

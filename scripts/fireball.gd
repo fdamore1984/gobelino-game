@@ -22,6 +22,8 @@ const FLIGHT_HEIGHT := 30.0
 ## Colpisce solo nemici più o meno alla sua altezza.
 const HIT_HEIGHT_REACH := 70.0
 const EXPLOSION_TIME := 0.3
+## Luce allargata a tutto lo schermo per la preparazione (vedi warm_up).
+const WARM_LIGHT_SCALE := 6.0
 const COLOR_CORE := Color(1.0, 0.95, 0.6)
 const COLOR_FLAME := Color(1.0, 0.45, 0.1)
 
@@ -119,6 +121,18 @@ func _find_target() -> Enemy:
 			best = enemy
 			best_distance = distance
 	return best
+
+
+## Per preparare disegno e luce durante la schermata di caricamento (vedi
+## Game._prewarm_lights): ferma, senza suono né danni, con la luce allargata
+## a tutto lo schermo, così prepara tutto quello che potrà illuminare;
+## exploding: già a metà dell'esplosione.
+func warm_up(exploding: bool) -> void:
+	if exploding:
+		_exploding = EXPLOSION_TIME * 0.3
+	_light.energy = 1.0
+	_light.texture_scale = WARM_LIGHT_SCALE
+	queue_redraw()
 
 
 ## crashed: si è schiantata contro un ostacolo o una parete (si sente forte).

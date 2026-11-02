@@ -2,7 +2,8 @@ extends Control
 ## Menù iniziale: Continua riprende subito la partita salvata più di
 ## recente (se ce n'è), Nuova partita ne avvia una scegliendo uno dei tre
 ## slot (SlotPanel); mostra i comandi (ControlsPanel, da cui si rimappano i
-## tasti), il tutorial a pagine (TutorialPanel), le opzioni con la lingua
+## tasti), il tutorial a pagine (TutorialPanel, da cui parte anche il
+## tutorial giocabile, vedi TutorialRun), le opzioni con la lingua
 ## (OptionsPanel) o chiude il gioco. Si usa con mouse, touch, tastiera o controller.
 ## In basso a sinistra mostra la versione (per riconoscere a colpo
 ## d'occhio le build scaricate da itch.io) e chi ha fatto il gioco.
@@ -14,6 +15,8 @@ extends Control
 ## sull'account o solo nel browser.
 
 const GAME_SCENE := "res://scenes/game.tscn"
+## Attesa prima di avviare il tutorial giocabile (vedi _on_tutorial_play).
+const PLAY_DELAY := 0.15
 const TITLE_ANGLE := -4.0
 const TITLE_OUTLINE := 24
 const TITLE_SHADOW := 8
@@ -51,8 +54,10 @@ func _ready() -> void:
 	add_child(_controls_panel)
 	_controls_panel.closed.connect(_on_controls_closed)
 	_tutorial.pressed.connect(_on_tutorial_pressed)
+	_tutorial_panel.playable = true
 	add_child(_tutorial_panel)
 	_tutorial_panel.closed.connect(_on_tutorial_closed)
+	_tutorial_panel.play_requested.connect(_on_tutorial_play)
 	_options.pressed.connect(_on_options_pressed)
 	add_child(_options_panel)
 	_options_panel.closed.connect(_on_options_closed)
@@ -219,6 +224,15 @@ func _on_tutorial_pressed() -> void:
 	Sfx.play_ui("ui_confirm")
 	_set_buttons_active(false)
 	_tutorial_panel.open()
+
+
+## Tutorial giocabile: una partita a parte, che non si salva (vedi TutorialRun).
+## Si parte un attimo dopo: nel browser, dopo il tocco, arrivano ancora i
+## clic emulati, che non devono trovare il menù già tolto.
+func _on_tutorial_play() -> void:
+	Game.tutorial_mode = true
+	_set_buttons_active(false)
+	get_tree().create_timer(PLAY_DELAY).timeout.connect(get_tree().change_scene_to_file.bind(GAME_SCENE))
 
 
 func _on_tutorial_closed() -> void:
