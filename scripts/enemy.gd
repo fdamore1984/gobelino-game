@@ -1702,7 +1702,10 @@ func _draw_sword() -> void:
 ## Alla morte il corpo cade a terra: si inclina, si abbassa e si stende.
 func _draw_falling(color: Color) -> void:
 	var points := _corpse_points(ease(minf(_state_time / DEATH_FALL_TIME, 1.0), 0.5))
-	draw_colored_polygon(points, color)
+	# A metà caduta la sagoma schiacciata e girata può incrociarsi su sé
+	# stessa e non si riempie (errore "triangulation failed"): resta il contorno.
+	if not Geometry2D.triangulate_polygon(points).is_empty():
+		draw_colored_polygon(points, color)
 	draw_polyline(_closed(points), color.darkened(0.35), 2.0)
 
 

@@ -23,10 +23,19 @@
   automazioni di `scripts/touch_assist.gd`, vedi `docs/web.md`), mai nelle
   versioni per PC.
 - **Versione web**: il preset "Web" è per il sito ufotizio.com (vedi
-  `docs/web.md`): si pubblica sul sito caricando l'export nel bucket R2
-  (`tools/carica-giochi.sh` del repo ufotizio-site), mai su itch.io; a ogni
-  modifica che tocca la versione web va ricaricato, insieme a
-  `store/itch/`, che il sito mostra sotto il gioco. I
+  `docs/web.md`): si pubblica sul sito caricandola nel bucket R2, mai su
+  itch.io. **Il caricamento è automatico**: dopo ogni merge su `main` che
+  tocca il gioco, quando il build di `main` è verde, scarica l'artefatto
+  `web` di quella run (non un export locale, così la versione è quella
+  della CI) e caricalo da solo con
+  `tools/carica-giochi.sh gobelino <cartella-dell-artefatto> <questo-repo>`
+  del repo ufotizio-site, che carica anche `store/itch/` (la pagina che il
+  sito mostra sotto il gioco). Serve `CLOUDFLARE_API_TOKEN` (con
+  `CLOUDFLARE_ACCOUNT_ID`) nell'ambiente: se manca, dillo all'utente invece
+  di saltare il passo. Poi verifica che `https://ufotizio.com/games/gobelino/index.pck`
+  sia identico a quello caricato, e solo dopo fai il merge della PR di
+  ufotizio-site con devlog e copertine, così il sito non annuncia novità
+  che la versione web non ha ancora. I
   salvataggi nel browser passano da `scripts/cloud.gd`: ogni nuovo file del
   giocatore in `user://` va aggiunto a `Cloud.files()` e caricato con
   `Cloud.push` / `Cloud.remove`.
