@@ -1,5 +1,5 @@
 {
-	"_info": "Tutorial giocabile (vedi scripts/tutorial_run.gd): passi del percorso con controller o tastiera e mouse (desktop) e di quello touch (Modalità Touch del browser). Ogni passo: testo (chiave di traduzione, i tasti tra graffe), obiettivo (goal: un'azione del giocatore, vedi Player.action_done; kill: abbattere i nemici del passo; move: camminare per amount pixel; info: si va avanti col tasto Avanti), quante volte (amount), nemici da far comparire (spawn: tipo, quanti, distanza) e cosa preparare prima (setup: mana e vigore pieni, rune del cataclisma con l'id h_bomb, Frenesia piena, vita tolta).",
+	"_info": "Tutorial giocabile (vedi scripts/tutorial_run.gd): passi del percorso con controller o tastiera e mouse (desktop) e di quello touch (Modalità Touch del browser). Ogni passo: testo (chiave di traduzione, i tasti tra graffe), obiettivo (goal: un'azione del giocatore, vedi Player.action_done; kill: abbattere i nemici del passo; move: camminare per amount pixel; info: si va avanti col tasto Avanti), quante volte (amount), nemici da far comparire (spawn: tipo di data/enemies.json, quanti, distanza; mai i non morti delle orde, che corrono addosso e si spappolano subito) e cosa preparare prima (setup: mana e vigore pieni, rune del cataclisma con l'id h_bomb, Frenesia piena, vita tolta).",
 	"desktop": [
 		{"text": "TUTORIAL_PLAY_WELCOME", "goal": "info"},
 		{"text": "TUTORIAL_PLAY_MOVE", "goal": "move", "amount": 400},
@@ -8,7 +8,7 @@
 		{"text": "TUTORIAL_PLAY_HEAVY", "goal": "heavy", "amount": 1, "setup": {"mana": true, "stamina": true}},
 		{"text": "TUTORIAL_PLAY_PARRY", "goal": "parry", "amount": 2},
 		{"text": "TUTORIAL_PLAY_DODGE", "goal": "dodge", "amount": 2, "setup": {"stamina": true}},
-		{"text": "TUTORIAL_PLAY_FIGHT", "goal": "kill", "spawn": {"type": "scout", "count": 3, "distance": 300}, "setup": {"stamina": true}},
+		{"text": "TUTORIAL_PLAY_FIGHT", "goal": "kill", "spawn": {"type": "warrior", "count": 3, "distance": 300}, "setup": {"stamina": true}},
 		{"text": "TUTORIAL_PLAY_MISSILE", "goal": "missile", "spawn": {"type": "scout", "count": 1, "distance": 480}, "setup": {"mana": true}},
 		{"text": "TUTORIAL_PLAY_SLAM", "goal": "slam", "setup": {"mana": true, "stamina": true}},
 		{"text": "TUTORIAL_PLAY_H_BOMB", "goal": "h_bomb", "spawn": {"type": "scout", "count": 4, "distance": 280}, "setup": {"h_bombs": 1, "stamina": true}},
@@ -22,7 +22,7 @@
 	"touch": [
 		{"text": "TUTORIAL_PLAY_WELCOME_TOUCH", "goal": "info"},
 		{"text": "TUTORIAL_PLAY_MOVE_TOUCH", "goal": "move", "amount": 400},
-		{"text": "TUTORIAL_PLAY_ATTACK_TOUCH", "goal": "kill", "spawn": {"type": "scout", "count": 3, "distance": 300}, "setup": {"stamina": true, "mana": true}},
+		{"text": "TUTORIAL_PLAY_ATTACK_TOUCH", "goal": "kill", "spawn": {"type": "warrior", "count": 3, "distance": 300}, "setup": {"stamina": true, "mana": true}},
 		{"text": "TUTORIAL_PLAY_DODGE_TOUCH", "goal": "dodge", "amount": 2, "setup": {"stamina": true}},
 		{"text": "TUTORIAL_PLAY_SLAM_TOUCH", "goal": "slam", "setup": {"mana": true, "stamina": true}},
 		{"text": "TUTORIAL_PLAY_SUPPLIES_TOUCH", "goal": "drink_potion", "setup": {"potions": 1, "hurt": 2}},

@@ -114,7 +114,9 @@ static func pool(at: Vector2, size: float) -> void:
 static func corpse(at: Vector2, elevation: float, points: PackedVector2Array, color: Color) -> void:
 	if current == null:
 		return
-	current._corpses.append({"position": at, "elevation": elevation, "points": points, "color": color, "age": 0.0})
+	# Una sagoma che si incrocia su sé stessa non si riempie: resta il contorno.
+	var fill := not Geometry2D.triangulate_polygon(points).is_empty()
+	current._corpses.append({"position": at, "elevation": elevation, "points": points, "color": color, "age": 0.0, "fill": fill})
 	if current._corpses.size() > MAX_CORPSES:
 		current._corpses.pop_front()
 	current._dirty = true
@@ -270,7 +272,8 @@ func _draw() -> void:
 		var alpha := _fade(body["age"], CORPSE_TIME)
 		var color: Color = body["color"]
 		draw_set_transform(at)
-		draw_colored_polygon(body["points"], Color(color, alpha))
+		if body["fill"]:
+			draw_colored_polygon(body["points"], Color(color, alpha))
 		var outline: PackedVector2Array = body["points"].duplicate()
 		outline.append(outline[0])
 		draw_polyline(outline, Color(color.darkened(0.4), alpha), 2.0)
