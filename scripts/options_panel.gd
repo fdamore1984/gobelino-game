@@ -3,7 +3,8 @@ extends Control
 ## Opzioni (dal menù iniziale e da quello di pausa): la lingua del gioco. Il
 ## pulsante passa alla lingua successiva (Settings.LANGUAGES), subito e per
 ## tutti i testi. I comandi si cambiano dalla pagina dei comandi (pulsante
-## Modifica, vedi ControlsPanel). Funziona con mouse, touch, tastiera e
+## Modifica, vedi ControlsPanel). Licenze apre le note di copyright e le
+## licenze di Godot, dei suoi componenti e dei font (LicensesPanel). Funziona con mouse, touch, tastiera e
 ## controller; si chiude con B, Esc o il pulsante Indietro.
 
 signal closed
@@ -11,7 +12,9 @@ signal closed
 const COLOR_TITLE := Color(0.85, 0.75, 0.4)
 
 var _language := Button.new()
+var _licenses := Button.new()
 var _back := Button.new()
+var _licenses_panel := LicensesPanel.new()
 
 
 func _ready() -> void:
@@ -35,15 +38,19 @@ func _ready() -> void:
 	title.add_theme_color_override("font_color", COLOR_TITLE)
 	box.add_child(title)
 	_language.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	_licenses.text = "OPTIONS_LICENSES"
 	_back.text = "OPTIONS_BACK"
-	for button: Button in [_language, _back]:
+	for button: Button in [_language, _licenses, _back]:
 		button.custom_minimum_size = Vector2(320, 56)
 		button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		button.add_theme_font_size_override("font_size", 26)
 		button.focus_entered.connect(Sfx.play_ui.bind("ui_move"))
 		box.add_child(button)
 	_language.pressed.connect(_on_language_pressed)
+	_licenses.pressed.connect(_on_licenses_pressed)
 	_back.pressed.connect(close)
+	add_child(_licenses_panel)
+	_licenses_panel.closed.connect(_licenses.grab_focus)
 	_refresh()
 
 
@@ -70,6 +77,11 @@ func _on_language_pressed() -> void:
 	Sfx.play_ui("ui_confirm")
 
 
+func _on_licenses_pressed() -> void:
+	Sfx.play_ui("ui_confirm")
+	_licenses_panel.open()
+
+
 ## Cambio di lingua: il testo del pulsante si rifà (gli altri si traducono
 ## da soli).
 func _notification(what: int) -> void:
@@ -78,7 +90,7 @@ func _notification(what: int) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not visible:
+	if not visible or _licenses_panel.visible:
 		return
 	if event.is_action_pressed("ui_cancel") or event.is_action_pressed("menu") or event.is_action_pressed("dodge"):
 		UiNav.consume(event)

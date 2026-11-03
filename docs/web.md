@@ -22,7 +22,8 @@ anche la pagina itch.io (`store/itch/`) mostrata sotto il gioco.
   `UiStyle`). Nel browser non ci sono i font del sistema: le frecce della
   croce e pochi altri simboli che Fredoka non ha vengono da
   `assets/fonts/symbols.otf` (sottoinsieme di Inter). Licenza OFL di tutti e
-  due in `assets/fonts/OFL.txt`, inclusa nell'export.
+  due in `assets/fonts/OFL.txt`, inclusa in tutti gli export (la mostra
+  Opzioni → Licenze, vedi `scripts/licenses_panel.gd`).
 
 ## Prestazioni sui telefoni
 
