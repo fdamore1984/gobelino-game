@@ -66,6 +66,8 @@ Fast, deadly Souls-like combat: combos, parries, dodges, jumps, slams, Cataclysm
 Controller or keyboard and mouse. In the browser on phones and tablets: Touch Mode, with simple on-screen controls (Slam button, potions you tap to drink), a closer camera and automatic jumping, parrying and torch. English and Italian. Windows, Linux and Steam Deck.
 
 Play it right in your browser, with your saves on every device: https://ufotizio.com/en/gobelino
+
+Made with Godot Engine (MIT license). Engine, third-party and font licenses: Options → Licenses.
 ```
 
 ---
