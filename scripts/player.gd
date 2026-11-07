@@ -159,9 +159,16 @@ const SLAM_MAX_TIME := 2.0
 const SLAM_RADIUS := {"dash": 165.0, "air": 135.0}
 ## Runa del cataclisma: L2 + R2 insieme in aria (colpo potente e focus, in
 ## qualsiasi ordine), con una runa nella cintura (se ne portano
-## START_H_BOMB_CAPACITY, una in più per ogni potenziamento "h_bomb"); se il
-## colpo potente arriva per primo, lo slam appena partito (entro
-## H_BOMB_CHORD_GRACE secondi) diventa la runa e restituisce quello che è
+## START_H_BOMB_CAPACITY, una in più per ogni potenziamento "h_bomb"). È
+## un'azione a sé: con una runa nella cintura il colpo potente in aria
+## aspetta H_BOMB_CHORD_GRACE secondi prima di partire (vedi
+## _pending_heavy), così se arriva anche R2 parte subito la runa, senza lo
+## slam né la carica del colpo potente; R2 premuto per primo non accende la
+## modalità focus finché non è passato quel tempo (vedi
+## LowHealthVignette.FOCUS_DELAY). Partita la runa, L2 e R2 restano suoi
+## finché non si rilasciano (UiNav.claim_chord): niente colpo potente né
+## focus. Se per qualche motivo lo slam è già partito, entro
+## H_BOMB_CHORD_GRACE secondi diventa la runa e restituisce quello che è
 ## costato. La spada sparisce e il goblin alza sopra la testa una grossa runa
 ## del cataclisma (id "h_bomb"); tenendo premuto uno dei due tasti si fluttua salendo piano (AIR_SLAM_RISE_SPEED, sempre più
 ## piano con la carica, con un leggero ondeggiare di AIR_SLAM_BOB pixel)
@@ -177,7 +184,7 @@ const START_H_BOMB_CAPACITY := 3
 const H_BOMB_MIN_RADIUS := 190.0
 const H_BOMB_MAX_RADIUS := 280.0
 const H_BOMB_BOSS_DAMAGE := 0.5
-const H_BOMB_CHORD_GRACE := 0.15
+const H_BOMB_CHORD_GRACE := 0.12
 const AIR_SLAM_RISE_SPEED := 45.0
 const AIR_SLAM_BOB := 3.0
 ## Fuliggine dell'esplosione: il corpo si annerisce (fino a SOOT_STRENGTH
@@ -645,6 +652,10 @@ var _voice := Voice.new()
 ## Carica del colpo potente (0-1) e se il tasto è ancora tenuto premuto.
 var _charge := 0.0
 var _charging := false
+## Colpo potente in aria in attesa (vedi H_BOMB_CHORD_GRACE): "air" (lo
+## slam), "dash" (il colpo dallo scatto in aria) o vuoto; tempo rimasto.
+var _pending_heavy := ""
+var _pending_heavy_time := 0.0
 ## Carica raggiunta dal primo colpo potente della combo: dà il bonus ai
 ## colpi potenti concatenati dopo (vedi CHARGED_CHAIN_BONUS).
 var _chain_charge := 0.0
@@ -717,10 +728,13 @@ func _ready() -> void:
 		_camera.position_smoothing_enabled = true
 		_camera.position_smoothing_speed = CAMERA_SMOOTHING
 		_camera.reset_smoothing()
-		# Sui telefoni e sui tablet, nel browser, tutto più vicino: lo schermo
-		# è piccolo e il gioco ci entra intero (vedi Platform.screen_kind).
+		# Visuale vicina all'azione ("zoom" di data/world.json); sui telefoni
+		# e sui tablet, nel browser, ancora più vicina: lo schermo è piccolo e
+		# il gioco ci entra intero (vedi Platform.screen_kind).
+		var camera_data: Dictionary = World.DATA.data["camera"]
+		_camera.zoom = Vector2.ONE * float(camera_data.get("zoom", 1.0))
 		if Platform.screen_kind != "":
-			_camera.zoom *= float(World.DATA.data["camera"].get(Platform.screen_kind + "_zoom", 1.0))
+			_camera.zoom *= float(camera_data.get(Platform.screen_kind + "_zoom", 1.0))
 
 
 func _physics_process(delta: float) -> void:
@@ -803,6 +817,8 @@ func _physics_process(delta: float) -> void:
 			_change_state(State.NORMAL)
 			_jump()
 
+	_update_pending_heavy(input, attack_input, delta)
+
 	match _state:
 		State.NORMAL:
 			if input != Vector2.ZERO:
@@ -829,8 +845,11 @@ func _physics_process(delta: float) -> void:
 					_chain_dodge(dodge_input)
 				elif _dodge_cooldown == 0.0:
 					_start_dodge(dodge_input)
-			elif UiNav.game_pressed("heavy_attack"):
-				_start_heavy(attack_input)
+			elif UiNav.solo_pressed("heavy_attack"):
+				if _waits_for_h_bomb():
+					_queue_heavy("air")
+				else:
+					_start_heavy(attack_input)
 			elif UiNav.game_pressed("attack") or UiNav.game_held("attack"):
 				# Tenendo premuto si continua ad attaccare (anche un tocco rapidissimo
 				# conta); in aria è un attacco aereo.
@@ -857,9 +876,12 @@ func _physics_process(delta: float) -> void:
 			# colpo potente fa piombare a terra con un colpo ampio, quello
 			# normale è un attacco aereo.
 			_running = false
-			if is_airborne() and _air_dash and UiNav.game_pressed("heavy_attack"):
-				_end_combo()
-				_start_slam("dash", input)
+			if is_airborne() and _air_dash and UiNav.solo_pressed("heavy_attack"):
+				if _waits_for_h_bomb():
+					_queue_heavy("dash")
+				else:
+					_end_combo()
+					_start_slam("dash", input)
 			elif is_airborne() and UiNav.game_pressed("attack"):
 				_end_combo()
 				_start_attack(1, attack_input)
@@ -894,7 +916,7 @@ func _physics_process(delta: float) -> void:
 			if UiNav.game_pressed("attack"):
 				_carry_velocity = _velocity
 				_start_attack(_next_combo_step(), attack_input)
-			elif UiNav.game_pressed("heavy_attack"):
+			elif UiNav.solo_pressed("heavy_attack"):
 				_carry_velocity = _velocity
 				_start_heavy(attack_input)
 			elif UiNav.game_pressed("dodge") and _dodge_cooldown == 0.0:
@@ -1035,9 +1057,8 @@ func _bounce(blocked: Vector2, delta: float) -> void:
 func _collide_enemies(world: World) -> void:
 	if _state in [State.DEAD, State.FALL, State.SLAM, State.SPECIAL]:
 		return
-	for node in get_tree().get_nodes_in_group("enemies"):
-		var enemy := node as Enemy
-		if enemy == null or enemy.is_dead() or absf(enemy.ground_elevation - ground_elevation) > HIT_HEIGHT_REACH \
+	for enemy: Enemy in Enemy.near_point(position, RADIUS):
+		if not is_instance_valid(enemy) or enemy.is_dead() or absf(enemy.ground_elevation - ground_elevation) > HIT_HEIGHT_REACH \
 				or altitude() - enemy.ground_elevation > JUMP_EVADE_HEIGHT:
 			continue
 		var offset := position - enemy.position
@@ -1097,7 +1118,7 @@ func _update_attack(input: Vector2, aim: Vector2, delta: float) -> void:
 			_target_facing = aim.normalized()
 		_face_lock()
 		_charge_time += delta
-		if not UiNav.game_held("heavy_attack"):
+		if not UiNav.solo_held("heavy_attack"):
 			_charging = false
 		elif not _drain_charge(delta):
 			# Mana finito: il colpo parte con la carica raggiunta.
@@ -1129,9 +1150,9 @@ func _update_attack(input: Vector2, aim: Vector2, delta: float) -> void:
 	_velocity = _walk_velocity + lunge + _carry_velocity
 	# Si memorizza la pressione solo se può davvero continuare la combo:
 	# alla fine della combo le pressioni in più vengono ignorate.
-	if UiNav.game_pressed("heavy_attack") and _can_chain_heavy():
+	if UiNav.solo_pressed("heavy_attack") and _can_chain_heavy():
 		_queued_attack = "heavy"
-	elif UiNav.game_held("heavy_attack") and _attack_heavy and not _charging and _queued_attack == "" \
+	elif UiNav.solo_held("heavy_attack") and _attack_heavy and not _charging and _queued_attack == "" \
 			and _state_time >= windup and _can_chain_heavy():
 		# Tenendo premuto il colpo potente, il successivo parte da solo.
 		_queued_attack = "heavy_held"
@@ -1174,7 +1195,12 @@ func _end_combo() -> void:
 ## può reagire (per esempio restare stordito dopo una parata perfetta).
 ## projectile: colpo a distanza (dardi, frecce), che raggiunge anche chi
 ## fluttua a mezz'aria caricando lo slam aereo.
-func receive_hit(from: Vector2, damage: int, projectile := false) -> String:
+## horde: il colpo è di un non morto di un'orda che si disfa addosso.
+## Durante le orde (colpi dei non morti, o qualsiasi colpo con non morti
+## vicini) l'invulnerabilità dura di più ("invulnerable_time" della voce
+## "hordes" di data/world.json) e i non morti attorno vengono respinti (vedi
+## _repel_horde): niente morti di colpo per colpi a catena.
+func receive_hit(from: Vector2, damage: int, projectile := false, horde := false) -> String:
 	# Durante l'attacco speciale niente può colpire il goblin.
 	if _state in [State.DEAD, State.FALL, State.SPECIAL] or is_invulnerable():
 		return "ignored"
@@ -1242,10 +1268,35 @@ func receive_hit(from: Vector2, damage: int, projectile := false) -> String:
 	else:
 		_change_state(State.HURT)
 		_velocity = -to_attacker * HURT_KNOCKBACK
-		_start_invulnerability(HURT_INVULNERABLE_TIME)
+		var hordes: Dictionary = World.DATA.data["hordes"]
+		if horde or _horde_near(float(hordes["pressure_range"])):
+			_start_invulnerability(maxf(HURT_INVULNERABLE_TIME, float(hordes["invulnerable_time"])))
+			_repel_horde(float(hordes["repel_radius"]), float(hordes["repel_speed"]))
+		else:
+			_start_invulnerability(HURT_INVULNERABLE_TIME)
 		Sfx.play("hurt", global_position)
 		_voice.pain()
 	return "hit"
+
+
+## Ci sono non morti delle orde entro reach.
+func _horde_near(reach: float) -> bool:
+	for enemy in Enemy.alive_list():
+		if is_instance_valid(enemy) and not enemy.is_dead() and enemy.is_horde() \
+				and enemy.global_position.distance_squared_to(global_position) < reach * reach:
+			return true
+	return false
+
+
+## Colpiti durante un'orda: i non morti entro radius vengono spinti via,
+## così quando l'invulnerabilità finisce non si è già accerchiati.
+func _repel_horde(radius: float, speed: float) -> void:
+	for enemy in Enemy.alive_list():
+		if not is_instance_valid(enemy) or enemy.is_dead() or not enemy.is_horde():
+			continue
+		var offset := enemy.global_position - global_position
+		if offset.length_squared() < radius * radius:
+			enemy.shove((offset.normalized() if offset != Vector2.ZERO else Vector2.from_angle(randf() * TAU)) * speed)
 
 
 func is_dead() -> bool:
@@ -1352,9 +1403,8 @@ func face(direction: Vector2) -> void:
 func nearest_enemy(max_distance: float) -> Enemy:
 	var nearest: Enemy = null
 	var best := max_distance
-	for node in get_tree().get_nodes_in_group("enemies"):
-		var enemy := node as Enemy
-		if enemy == null or enemy.is_dead() or absf(enemy.ground_elevation - ground_elevation) > HIT_HEIGHT_REACH:
+	for enemy in Enemy.alive_list():
+		if not is_instance_valid(enemy) or enemy.is_dead() or absf(enemy.ground_elevation - ground_elevation) > HIT_HEIGHT_REACH:
 			continue
 		var distance := enemy.position.distance_to(position)
 		if distance <= best:
@@ -1452,9 +1502,8 @@ func teleport(at: Vector2) -> void:
 ## sticky quello già agganciato conta come più vicino di LOCK_SWITCH_MARGIN.
 func _lock_nearest(sticky: bool) -> Enemy:
 	var candidates: Array = []
-	for node in get_tree().get_nodes_in_group("enemies"):
-		var enemy := node as Enemy
-		if enemy == null or enemy.is_dead():
+	for enemy in Enemy.alive_list():
+		if not is_instance_valid(enemy) or enemy.is_dead():
 			continue
 		var distance := enemy.global_position.distance_to(global_position)
 		if sticky and enemy == lock_target:
@@ -1658,6 +1707,20 @@ func is_airborne() -> bool:
 ## Velocità del passo, con il bonus degli stivali.
 func walk_speed() -> float:
 	return SPEED * (1.0 + inventory.bonus("speed"))
+
+
+## Velocità massima dei nemici (vedi Enemy.max_speed): quella del goblin
+## che cammina, ricalcolata una volta per passo di fisica.
+func speed_cap() -> float:
+	var frame := Engine.get_physics_frames()
+	if frame != _speed_cap_frame:
+		_speed_cap_frame = frame
+		_speed_cap = walk_speed()
+	return _speed_cap
+
+
+var _speed_cap := SPEED
+var _speed_cap_frame := -1
 
 
 func run_speed() -> float:
@@ -1949,11 +2012,46 @@ func _start_h_bomb(input: Vector2) -> void:
 	if _state == State.SLAM:
 		mana = minf(mana + _slam_paid.x, max_mana)
 		stamina = minf(stamina + _slam_paid.y, max_stamina)
+	# L2 e R2 ora sono della runa: niente colpo potente in attesa né focus.
+	UiNav.claim_chord("heavy_attack", "focus")
+	_pending_heavy = ""
 	_interrupt_action()
 	_start_slam("plunge", input)
 	_charging = true
 	_state_time = 0.0
 	Sfx.play("h_bomb_lift", global_position)
+
+
+## Il colpo potente in aria aspetta un attimo (vedi H_BOMB_CHORD_GRACE):
+## con una runa nella cintura potrebbe essere l'inizio di L2 + R2.
+func _waits_for_h_bomb() -> bool:
+	return h_bombs > 0 and is_airborne()
+
+
+func _queue_heavy(kind: String) -> void:
+	_pending_heavy = kind
+	_pending_heavy_time = H_BOMB_CHORD_GRACE
+
+
+## Colpo potente in aria in attesa: passato H_BOMB_CHORD_GRACE senza R2
+## parte lo slam (o il colpo dallo scatto); se intanto si è fatto
+## altro (parata, schivata, runa, colpiti) non parte più.
+func _update_pending_heavy(input: Vector2, attack_input: Vector2, delta: float) -> void:
+	if _pending_heavy == "":
+		return
+	if _state not in [State.NORMAL, State.DODGE]:
+		_pending_heavy = ""
+		return
+	_pending_heavy_time -= delta
+	if _pending_heavy_time > 0.0:
+		return
+	var kind := _pending_heavy
+	_pending_heavy = ""
+	if kind == "dash" and _state == State.DODGE and is_airborne() and _air_dash:
+		_end_combo()
+		_start_slam("dash", input)
+	elif _state == State.NORMAL:
+		_start_heavy(attack_input)
 
 
 ## Si tiene premuto almeno uno dei due tasti della runa (L2 o R2).
@@ -2020,9 +2118,8 @@ func _slam_impact() -> void:
 	var radius := _slam_radius()
 	var damage := _slam_damage()
 	var landed := false
-	for node in get_tree().get_nodes_in_group("enemies"):
-		var enemy := node as Enemy
-		if enemy == null or enemy.is_dead() or absf(enemy.ground_elevation - ground_elevation) > HIT_HEIGHT_REACH:
+	for enemy in Enemy.alive_list():
+		if not is_instance_valid(enemy) or enemy.is_dead() or absf(enemy.ground_elevation - ground_elevation) > HIT_HEIGHT_REACH:
 			continue
 		var offset := enemy.global_position - global_position
 		var direction := offset.normalized() if offset != Vector2.ZERO else facing
@@ -2050,9 +2147,8 @@ func _h_bomb_impact() -> void:
 	action_done.emit("h_bomb")
 	h_bombs = maxi(h_bombs - 1, 0)
 	var radius := _slam_radius()
-	for node in get_tree().get_nodes_in_group("enemies"):
-		var enemy := node as Enemy
-		if enemy == null or enemy.is_dead() or absf(enemy.ground_elevation - ground_elevation) > HIT_HEIGHT_REACH:
+	for enemy in Enemy.alive_list():
+		if not is_instance_valid(enemy) or enemy.is_dead() or absf(enemy.ground_elevation - ground_elevation) > HIT_HEIGHT_REACH:
 			continue
 		var offset := enemy.global_position - global_position
 		if offset.length() > radius + enemy.radius:
@@ -2245,9 +2341,8 @@ func _finish_special() -> void:
 func _special_nearest() -> Enemy:
 	var nearest: Enemy = null
 	var best := SPECIAL_RANGE
-	for node in get_tree().get_nodes_in_group("enemies"):
-		var enemy := node as Enemy
-		if enemy == null or enemy.is_dead() or absf(enemy.ground_elevation - ground_elevation) > HIT_HEIGHT_REACH:
+	for enemy in Enemy.alive_list():
+		if not is_instance_valid(enemy) or enemy.is_dead() or absf(enemy.ground_elevation - ground_elevation) > HIT_HEIGHT_REACH:
 			continue
 		var distance := enemy.position.distance_to(position)
 		if distance <= best:
@@ -2663,9 +2758,15 @@ func _update_silhouette() -> void:
 ## altezza (vedi LightShaders e World.set_light_lift).
 func place_torch() -> void:
 	_torch.position = Vector2(0, -ground_elevation + RADIUS * 0.6)
-	_torch.aim(facing)
+	# Il vertice del cono sta dietro le spalle, ma mai dentro una parete (lì
+	# l'ostacolo per la luce spegnerebbe tutto il fascio): con la schiena
+	# contro la roccia si accorcia.
+	var back := _torch.back_offset()
 	if World.current:
+		while back > 0.0 and World.current.is_barrier(World.cell_at(Flashlight.origin_from(position, facing, back + 4.0))):
+			back -= 8.0
 		World.current.set_light_lift(ground_elevation)
+	_torch.aim(facing, maxf(back, 0.0))
 
 
 ## Al buio con la torcia accesa il goblin si vede come di giorno: il buio
@@ -2749,9 +2850,8 @@ func _resolve_attack() -> void:
 	# In aria si arriva anche ai nemici sotto di sé.
 	var reach_below := AIR_ATTACK_REACH if _air_attack or is_airborne() else HIT_HEIGHT_REACH
 	var blocked_by: Enemy = null
-	for node in get_tree().get_nodes_in_group("enemies"):
-		var enemy := node as Enemy
-		if enemy == null or enemy.is_dead():
+	for enemy in Enemy.alive_list():
+		if not is_instance_valid(enemy) or enemy.is_dead():
 			continue
 		var rise := altitude() - enemy.ground_elevation
 		if rise < -HIT_HEIGHT_REACH or rise > reach_below:

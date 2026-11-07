@@ -81,9 +81,8 @@ func _physics_process(delta: float) -> void:
 ## Fuoco amico: il primo altro nemico toccato, alla stessa altezza, viene
 ## ferito come da un colpo di chi ha sparato. Restituisce true se ha colpito.
 func _hit_enemy() -> bool:
-	for node in get_tree().get_nodes_in_group("enemies"):
-		var enemy := node as Enemy
-		if enemy == null or (is_instance_valid(shooter) and enemy == shooter) or enemy.is_dead() \
+	for enemy: Enemy in Enemy.near_point(position, radius):
+		if not is_instance_valid(enemy) or (is_instance_valid(shooter) and enemy == shooter) or enemy.is_dead() \
 				or absf(enemy.ground_elevation - altitude) > HIT_HEIGHT_REACH:
 			continue
 		if position.distance_to(enemy.position) < radius + enemy.radius:

@@ -33,9 +33,18 @@ func _ready() -> void:
 	size = Vector2(ACTIONS.size() * (SLOT + GAP) - GAP, SLOT + 14)
 
 
-func _process(_delta: float) -> void:
+## Si ridisegna al più ogni REDRAW_INTERVAL secondi (attese e scorte non
+## cambiano a ogni frame).
+const REDRAW_INTERVAL := 0.05
+var _redraw_timer := 0.0
+
+
+func _process(delta: float) -> void:
 	position = Vector2(16, get_viewport_rect().size.y - size.y - 12)
-	queue_redraw()
+	_redraw_timer -= delta
+	if _redraw_timer <= 0.0:
+		_redraw_timer = REDRAW_INTERVAL
+		queue_redraw()
 
 
 func _draw() -> void:

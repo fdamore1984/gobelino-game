@@ -79,9 +79,8 @@ func _physics_process(delta: float) -> void:
 	position += direction * SPEED * delta
 	# La luce cade a terra sotto la palla, come un'ellisse isometrica.
 	_light.position.y = -altitude
-	for node in get_tree().get_nodes_in_group("enemies"):
-		var enemy := node as Enemy
-		if enemy == null or enemy.is_dead() or absf(enemy.ground_elevation - altitude) > HIT_HEIGHT_REACH:
+	for enemy in Enemy.alive_list():
+		if not is_instance_valid(enemy) or enemy.is_dead() or absf(enemy.ground_elevation - altitude) > HIT_HEIGHT_REACH:
 			continue
 		if global_position.distance_to(enemy.global_position) < RADIUS + enemy.radius:
 			_explode(enemy)
@@ -112,9 +111,8 @@ func _can_reach(enemy: Enemy) -> bool:
 func _find_target() -> Enemy:
 	var best: Enemy = null
 	var best_distance := SEEK_RANGE
-	for node in get_tree().get_nodes_in_group("enemies"):
-		var enemy := node as Enemy
-		if enemy == null or enemy.is_dead():
+	for enemy in Enemy.alive_list():
+		if not is_instance_valid(enemy) or enemy.is_dead():
 			continue
 		var distance := global_position.distance_to(enemy.global_position)
 		if distance < best_distance and _can_reach(enemy):

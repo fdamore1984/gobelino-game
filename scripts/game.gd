@@ -11,6 +11,8 @@ extends Node2D
 ## morti (voce "hordes" di data/world.json): tanti, debolissimi, sbucano
 ## tutti dalla stessa parte fuori dallo schermo e corrono verso il giocatore
 ## (vedi Enemy.is_horde). Non contano tra i nemici che girano di solito.
+## Vivi insieme ce ne sono al più "max_alive": gli altri dell'orda arrivano
+## man mano che i primi muoiono (vedi _feed_horde).
 ##
 ## Toccando il totem al centro di un'arena parte una sfida di
 ## sopravvivenza (parametri in data/challenge.json): per 30 secondi
@@ -70,6 +72,8 @@ const SAVE_SAFE_DISTANCE := 700.0
 const ARRIVAL_DISTANCE := 70.0
 ## Stanza di riferimento delle catacombe per i nemici (vedi _spawn_dungeon_enemies).
 const ROOM_AREA := 40.0
+## Ogni quanto si contano i non morti vivi dell'orda (vedi _feed_horde).
+const HORDE_COUNT_INTERVAL := 0.25
 
 ## Partita da riprendere al prossimo avvio della scena (la imposta il menù).
 static var pending_save := {}
@@ -97,6 +101,14 @@ var _maintain_timer := MAINTAIN_INTERVAL
 ## Secondi al prossimo arrivo di un'orda (negativo: ancora da estrarre).
 var _horde_timer := -1.0
 var _horde_data: Dictionary = World.DATA.data["hordes"]
+## Non morti dell'orda in corso ancora da far arrivare, direzione da cui
+## arrivano, raggio della macchia in cui compaiono e non morti vivi (contati
+## ogni HORDE_COUNT_INTERVAL secondi).
+var _horde_left := 0
+var _horde_direction := Vector2.RIGHT
+var _horde_spread := 0.0
+var _horde_alive := 0
+var _horde_count_timer := 0.0
 ## Livelli guadagnati per cui va ancora scelto il potenziamento.
 var _pending_level_ups := 0
 ## Sfida in corso: centro dell'arena (Vector2.INF se nessuna), tempo
@@ -193,6 +205,9 @@ func _process(delta: float) -> void:
 		_maintain_enemies()
 	if _cave == Vector2.INF:
 		_update_hordes(delta)
+		_feed_horde(delta)
+	else:
+		_horde_left = 0
 
 
 func _maintain_enemies() -> void:
@@ -227,28 +242,50 @@ func _update_hordes(delta: float) -> void:
 
 
 ## Un'orda di non morti da una direzione a caso, fuori dallo schermo: tanti
-## quanti ne estrae "count" (da 50 a 200; su telefoni e tablet, anche nel
-## browser, "count_mobile", meno),
-## sparsi in un cerchio più largo per le orde più numerose; un verso e un
-## avviso la annunciano. I non morti arrivano a gruppi di "spawn_per_frame"
-## per frame, così non c'è uno scatto.
+## quanti ne estrae "count" (su telefoni e tablet, anche nel browser,
+## "count_mobile", meno), sparsi in un cerchio più largo per le orde più
+## numerose; un verso e un avviso la annunciano. I non morti arrivano poi a
+## gruppi (vedi _feed_horde).
 func _spawn_horde() -> void:
 	var count_data: Array = _horde_data["count_mobile" if Platform.is_mobile else "count"]
 	var count := randi_range(int(count_data[0]), int(count_data[1]))
-	var direction := Vector2.from_angle(randf() * TAU)
-	var center := _player.position + direction * randf_range(_horde_data["distance"][0], _horde_data["distance"][1])
-	var spread := float(_horde_data["spread"]) * sqrt(float(count) / float(_horde_data["spread_count"]))
-	Sfx.play("horde", _player.position + direction * 250.0)
+	_horde_direction = Vector2.from_angle(randf() * TAU)
+	_horde_spread = float(_horde_data["spread"]) * sqrt(float(mini(count, _horde_max_alive())) / float(_horde_data["spread_count"]))
+	_horde_left += count
+	_horde_count_timer = 0.0
+	Sfx.play("horde", _player.position + _horde_direction * 250.0)
 	_hud.flash_challenge(tr("HORDE_INCOMING"))
-	var per_frame := maxi(int(_horde_data["spawn_per_frame"]), 1)
-	for i in count:
-		if i > 0 and i % per_frame == 0:
-			await get_tree().physics_frame
-			# Nel frattempo si è entrati in un sotterraneo o si è tornati al menù.
-			if _cave != Vector2.INF or not is_inside_tree():
-				return
-		var zombie := _spawn_enemy("zombie", center + Vector2.from_angle(randf() * TAU) * spread * sqrt(randf()), _player.level)
+
+
+## Non morti vivi insieme al più (vedi "max_alive" in data/world.json).
+func _horde_max_alive() -> int:
+	return int(_horde_data["max_alive_mobile" if Platform.is_mobile else "max_alive"])
+
+
+## Fa arrivare i non morti dell'orda in corso: al più "spawn_per_frame"
+## per frame (così non c'è uno scatto) e mai più di "max_alive" vivi
+## insieme; gli altri arrivano man mano che i primi muoiono, sempre dalla
+## stessa parte, fuori dallo schermo.
+func _feed_horde(delta: float) -> void:
+	if _horde_left <= 0 or _player.is_dead():
+		return
+	_horde_count_timer -= delta
+	if _horde_count_timer <= 0.0:
+		_horde_count_timer = HORDE_COUNT_INTERVAL
+		_horde_alive = 0
+		for enemy in Enemy.alive_list():
+			if is_instance_valid(enemy) and not enemy.is_dead() and enemy.is_horde():
+				_horde_alive += 1
+	var room := mini(_horde_max_alive() - _horde_alive, int(_horde_data["spawn_per_frame"]))
+	if room <= 0:
+		return
+	var distance: Array = _horde_data["distance"]
+	var center := _player.position + _horde_direction * randf_range(distance[0], distance[1])
+	for i in mini(room, _horde_left):
+		var zombie := _spawn_enemy("zombie", center + Vector2.from_angle(randf() * TAU) * _horde_spread * sqrt(randf()), _player.level)
 		zombie.alert()
+	_horde_left -= mini(room, _horde_left)
+	_horde_alive += room
 
 
 ## Nemici a caso attorno al giocatore, quanti ne vuole il suo livello.
@@ -568,6 +605,9 @@ func _return_to_surface() -> void:
 	_world.set_dungeon(null)
 	_world.set_map_key("surface")
 	_day_night.clear_override()
+	# Un salvataggio di una versione con il mondo diverso può tornare dentro una montagna.
+	if _world.is_barrier(World.cell_at(_surface_return)):
+		_surface_return = _world.safe_position_near(_surface_return)
 	_player.teleport(_surface_return)
 	_cave = Vector2.INF
 	_cave_kind = "cave"
