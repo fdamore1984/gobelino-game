@@ -1224,6 +1224,46 @@ func free_position_near(point: Vector2, radius: float) -> Vector2:
 	return point
 
 
+## Rombi vicini che condividono un lato (vedi reach_field).
+const NEIGHBORS := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+
+
+## Campo dei percorsi verso goal per chi cammina come i nemici (vedi
+## Enemy._try_hop e le orde, Game._refresh_horde_field): per ogni rombo da
+## cui si arriva a piedi al rombo di goal, entro max_distance pixel, quanti
+## passi da un rombo all'altro servono. Da un rombo si passa al vicino se
+## questo non è invalicabile (montagne, roccia, burroni) e se non bisogna
+## salire più di climb pixel (i nemici saltano al più un livello; scendono
+## da qualsiasi altezza). I rombi che mancano non portano a goal.
+func reach_field(goal: Vector2, max_distance: float, climb: float) -> Dictionary:
+	var start := cell_at(goal)
+	var field := {start: 0}
+	var heights := {start: elevation_at(cell_center(start))}
+	var queue: Array[Vector2i] = [start]
+	var limit := max_distance * max_distance
+	var head := 0
+	while head < queue.size():
+		var cell := queue[head]
+		head += 1
+		var steps: int = field[cell]
+		var height: float = heights[cell]
+		for offset: Vector2i in NEIGHBORS:
+			var other: Vector2i = cell + offset
+			if field.has(other) or is_barrier(other):
+				continue
+			var center := cell_center(other)
+			if center.distance_squared_to(goal) > limit:
+				continue
+			# Si cammina da other verso cell: si sale al più di climb.
+			var other_height := elevation_at(center)
+			if height > other_height + climb:
+				continue
+			field[other] = steps + 1
+			heights[other] = other_height
+			queue.append(other)
+	return field
+
+
 ## Il punto più vicino (cercando a spirale) in cui si può stare: per
 ## esempio quando un salvataggio cade dentro una montagna.
 func safe_position_near(point: Vector2) -> Vector2:
@@ -2380,9 +2420,12 @@ class ContactGlow:
 			var ground := a.lerp(b, u)
 			var top := lerpf(top_a, top_b, u)
 			if side in [1, 2]:
-				# Parete davanti: dalla cima fin quasi ai piedi.
+				# Parete davanti: dalla cima fin quasi ai piedi, mai sopra la
+				# cima (chi sta più in alto della cima a un capo del tratto,
+				# per esempio su una rampa, rovesciava il quadrilatero, che si
+				# incrociava su sé stesso: "triangulation failed").
 				outer.append(ground - Vector2(0, top))
-				inner.append(ground - Vector2(0, maxf(altitude, top - WALL_HEIGHT)))
+				inner.append(ground - Vector2(0, minf(maxf(altitude, top - WALL_HEIGHT), top)))
 			else:
 				# Lato dietro: la parete non si vede, si accende il bordo in cima.
 				var toward := (World.cell_center(cell) - ground).normalized()
@@ -2412,10 +2455,14 @@ class ContactGlow:
 			var edge_lit := Color(COLOR_LIGHT, alpha * 0.4)
 			# Due quadrilateri: dal bordo sinistro al centro e dal centro al destro.
 			for k in 2:
-				# Vicino all'angolo del rombo un tratto può essere lungo zero.
-				if outer[k].distance_to(outer[k + 1]) < 1.0:
+				# Vicino all'angolo del rombo un tratto può essere lungo zero, e
+				# con la cima all'altezza dei piedi la parete è alta zero: niente.
+				if outer[k].distance_to(outer[k + 1]) < 1.0 \
+						or (outer[k].distance_to(inner[k]) < 0.5 and outer[k + 1].distance_to(inner[k + 1]) < 0.5):
 					continue
 				var points := PackedVector2Array([outer[k], outer[k + 1], inner[k + 1], inner[k]])
 				var colors := PackedColorArray([clear if k == 0 else lit, lit if k == 0 else clear,
 						edge_lit if k == 0 else clear, clear if k == 0 else edge_lit])
-				draw_polygon(points, colors)
+				# Due triangli già pronti, senza scomposizione: un capo alto zero
+				# (due punti uguali) non è un errore.
+				draw_primitive(points, colors, PackedVector2Array())

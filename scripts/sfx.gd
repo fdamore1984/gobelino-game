@@ -14,6 +14,13 @@ const MAX_DISTANCE := 1400.0
 ## morte, che continuano anche dopo che il nemico morto è sparito.
 const VOICES := {"pain": 4, "scream": 3}
 const VOICE_POOL_SIZE := 6
+## Chiudendo il gioco (vedi quit_game) si fermano tutti i suoni e si
+## aspetta questo tempo, in secondi reali, prima di uscire: il server audio
+## libera i suoni fermati al suo giro successivo. Uscendo con un suono che
+## ancora suona restava in memoria il suo lettore, con l'avviso "ObjectDB
+## instances leaked at exit" (AudioStreamPlaybackWAV).
+const QUIT_DELAY := 0.25
+
 
 var _streams := {}
 var _pool: Array[AudioStreamPlayer2D] = []
@@ -21,10 +28,13 @@ var _next := 0
 var _voice_pool: Array[AudioStreamPlayer2D] = []
 var _next_voice := 0
 var _ui_player := AudioStreamPlayer.new()
+var _quitting := false
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# La X della finestra (e Alt+F4) passa da quit_game, come il pulsante Esci.
+	get_tree().auto_accept_quit = false
 	_build_sounds()
 	for i in POOL_SIZE:
 		var player := AudioStreamPlayer2D.new()
@@ -44,7 +54,7 @@ func _ready() -> void:
 ## Suono nel mondo di gioco, posizionato in at. Il tono varia di poco
 ## a ogni riproduzione, così i suoni ripetuti non stancano.
 func play(sound: String, at: Vector2, pitch := 1.0, volume_db := 0.0) -> void:
-	if not _streams.has(sound):
+	if not _streams.has(sound) or _quitting:
 		return
 	var player := _pool[_next]
 	_next = (_next + 1) % POOL_SIZE
@@ -64,7 +74,7 @@ func voice(kind: String) -> AudioStream:
 ## pitch è il tono della voce di chi la emette.
 func play_voice(kind: String, at: Vector2, pitch := 1.0, volume_db := 0.0) -> void:
 	var stream := voice(kind)
-	if stream == null:
+	if stream == null or _quitting:
 		return
 	var player := _voice_pool[_next_voice]
 	_next_voice = (_next_voice + 1) % VOICE_POOL_SIZE
@@ -77,10 +87,37 @@ func play_voice(kind: String, at: Vector2, pitch := 1.0, volume_db := 0.0) -> vo
 
 ## Suono dell'interfaccia, non posizionale.
 func play_ui(sound: String) -> void:
-	if not _streams.has(sound):
+	if not _streams.has(sound) or _quitting:
 		return
 	_ui_player.stream = _streams[sound]
 	_ui_player.play()
+
+
+## Ferma tutti i suoni del gioco: quelli di Sfx e i lettori nella scena
+## (le voci di giocatore e nemici, vedi Voice).
+func stop_all() -> void:
+	for player: Node in get_tree().root.find_children("*", "AudioStreamPlayer2D", true, false):
+		(player as AudioStreamPlayer2D).stop()
+	for player: Node in get_tree().root.find_children("*", "AudioStreamPlayer", true, false):
+		(player as AudioStreamPlayer).stop()
+
+
+## Chiude il gioco (pulsante Esci, X della finestra): prima ferma tutti i
+## suoni e lascia al server audio il tempo di liberarli (vedi QUIT_DELAY).
+func quit_game() -> void:
+	if _quitting:
+		return
+	_quitting = true
+	stop_all()
+	# Il timer ignora pausa e rallentamenti, così si esce sempre.
+	await get_tree().create_timer(QUIT_DELAY, true, false, true).timeout
+	stop_all()
+	get_tree().quit()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		quit_game()
 
 
 ## Nel browser ogni suono passa al browser come campione la prima volta che

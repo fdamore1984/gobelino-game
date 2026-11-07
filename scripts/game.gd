@@ -74,6 +74,22 @@ const ARRIVAL_DISTANCE := 70.0
 const ROOM_AREA := 40.0
 ## Ogni quanto si contano i non morti vivi dell'orda (vedi _feed_horde).
 const HORDE_COUNT_INTERVAL := 0.25
+## Le orde arrivano solo da dove si raggiunge il giocatore a piedi (vedi
+## World.reach_field e Enemy.horde_field, rifatto da _refresh_horde_field
+## quando il giocatore si è spostato di HORDE_FIELD_SHIFT rombi, al più ogni
+## HORDE_FIELD_INTERVAL secondi, fino a HORDE_FIELD_MARGIN pixel oltre il
+## punto più lontano in cui compaiono): la direzione dell'orda è la prima,
+## tra HORDE_DIRECTIONS, in cui almeno metà dei HORDE_PROBES punti di prova
+## è raggiungibile (se nessuna, quella con più punti; se non ce n'è
+## nemmeno uno l'orda si rimanda di HORDE_RETRY secondi) e ognuno prova al
+## più HORDE_SPAWN_TRIES punti per comparire.
+const HORDE_FIELD_SHIFT := 3
+const HORDE_FIELD_INTERVAL := 1.0
+const HORDE_FIELD_MARGIN := 300.0
+const HORDE_DIRECTIONS := 16
+const HORDE_PROBES := 12
+const HORDE_RETRY := 15.0
+const HORDE_SPAWN_TRIES := 10
 
 ## Partita da riprendere al prossimo avvio della scena (la imposta il menù).
 static var pending_save := {}
@@ -109,6 +125,10 @@ var _horde_direction := Vector2.RIGHT
 var _horde_spread := 0.0
 var _horde_alive := 0
 var _horde_count_timer := 0.0
+## Rombo del giocatore quando si è rifatto il campo dei percorsi delle orde
+## e secondi da allora (vedi _refresh_horde_field).
+var _horde_field_cell := Vector2i(1 << 30, 1 << 30)
+var _horde_field_age := INF
 ## Livelli guadagnati per cui va ancora scelto il potenziamento.
 var _pending_level_ups := 0
 ## Sfida in corso: centro dell'arena (Vector2.INF se nessuna), tempo
@@ -206,8 +226,10 @@ func _process(delta: float) -> void:
 	if _cave == Vector2.INF:
 		_update_hordes(delta)
 		_feed_horde(delta)
+		_update_horde_field(delta)
 	else:
 		_horde_left = 0
+		Enemy.horde_field = {}
 
 
 func _maintain_enemies() -> void:
@@ -249,8 +271,14 @@ func _update_hordes(delta: float) -> void:
 func _spawn_horde() -> void:
 	var count_data: Array = _horde_data["count_mobile" if Platform.is_mobile else "count"]
 	var count := randi_range(int(count_data[0]), int(count_data[1]))
-	_horde_direction = Vector2.from_angle(randf() * TAU)
 	_horde_spread = float(_horde_data["spread"]) * sqrt(float(mini(count, _horde_max_alive())) / float(_horde_data["spread_count"]))
+	# Si arriva da una direzione da cui si raggiunge il giocatore a piedi.
+	_refresh_horde_field(0.0, true)
+	var direction := _horde_reachable_direction(Vector2.from_angle(randf() * TAU))
+	if direction == Vector2.ZERO:
+		_horde_timer = HORDE_RETRY
+		return
+	_horde_direction = direction
 	_horde_left += count
 	_horde_count_timer = 0.0
 	Sfx.play("horde", _player.position + _horde_direction * 250.0)
@@ -281,11 +309,83 @@ func _feed_horde(delta: float) -> void:
 		return
 	var distance: Array = _horde_data["distance"]
 	var center := _player.position + _horde_direction * randf_range(distance[0], distance[1])
+	var spawned := 0
 	for i in mini(room, _horde_left):
-		var zombie := _spawn_enemy("zombie", center + Vector2.from_angle(randf() * TAU) * _horde_spread * sqrt(randf()), _player.level)
+		var at := _horde_spawn_point(center)
+		if at == Vector2.INF:
+			# Il giocatore si è spostato e da qui non lo si raggiunge più: si
+			# cambia direzione (i prossimi arrivano da lì).
+			var direction := _horde_reachable_direction(_horde_direction)
+			if direction != Vector2.ZERO:
+				_horde_direction = direction
+			break
+		var zombie := _spawn_enemy("zombie", at, _player.level)
 		zombie.alert()
-	_horde_left -= mini(room, _horde_left)
-	_horde_alive += room
+		spawned += 1
+	_horde_left -= spawned
+	_horde_alive += spawned
+
+
+## Punto attorno a center in cui far comparire uno dell'orda, da cui si
+## arriva a piedi al giocatore (Vector2.INF se non se ne trova).
+func _horde_spawn_point(center: Vector2) -> Vector2:
+	for k in HORDE_SPAWN_TRIES:
+		var at := center + Vector2.from_angle(randf() * TAU) * _horde_spread * sqrt(randf())
+		if Enemy.horde_field.has(World.cell_at(at)):
+			return at
+	return Vector2.INF
+
+
+## La prima direzione, partendo da first e girando, da cui l'orda raggiunge
+## il giocatore a piedi (vedi HORDE_PROBES); zero se non ce n'è nessuna.
+func _horde_reachable_direction(first: Vector2) -> Vector2:
+	var distance: Array = _horde_data["distance"]
+	var best := Vector2.ZERO
+	var best_count := 0
+	for k in HORDE_DIRECTIONS:
+		var direction := first.rotated(TAU * k / HORDE_DIRECTIONS)
+		var center := _player.position + direction * (float(distance[0]) + float(distance[1])) / 2.0
+		var count := 0
+		for i in HORDE_PROBES:
+			if Enemy.horde_field.has(World.cell_at(center + Vector2.from_angle(TAU * i / HORDE_PROBES) * _horde_spread * 0.6)):
+				count += 1
+		if count * 2 >= HORDE_PROBES:
+			return direction
+		if count > best_count:
+			best = direction
+			best_count = count
+	return best
+
+
+## Mentre c'è un'orda il campo dei percorsi verso il giocatore segue i suoi
+## spostamenti; finita l'orda si toglie.
+func _update_horde_field(delta: float) -> void:
+	var active := _horde_left > 0
+	if not active and not Enemy.horde_field.is_empty():
+		for enemy in Enemy.alive_list():
+			if is_instance_valid(enemy) and not enemy.is_dead() and enemy.is_horde():
+				active = true
+				break
+	if active:
+		_refresh_horde_field(delta)
+	elif not Enemy.horde_field.is_empty():
+		Enemy.horde_field = {}
+		_horde_field_age = INF
+
+
+## Rifà il campo dei percorsi delle orde (vedi HORDE_FIELD_*) se il giocatore
+## si è spostato abbastanza (o subito, con force).
+func _refresh_horde_field(delta: float, force := false) -> void:
+	_horde_field_age += delta
+	var cell := World.cell_at(_player.position)
+	var moved := maxi(absi(cell.x - _horde_field_cell.x), absi(cell.y - _horde_field_cell.y))
+	if not force and (_horde_field_age < HORDE_FIELD_INTERVAL or moved < HORDE_FIELD_SHIFT):
+		return
+	_horde_field_age = 0.0
+	_horde_field_cell = cell
+	var reach := float(_horde_data["distance"][1]) + _horde_spread + HORDE_FIELD_MARGIN
+	var climb := Enemy.HOP_LEVELS * _world.level_height + World.STEP_TOLERANCE
+	Enemy.horde_field = _world.reach_field(_player.position, reach, climb)
 
 
 ## Nemici a caso attorno al giocatore, quanti ne vuole il suo livello.
@@ -965,6 +1065,7 @@ func _on_player_died() -> void:
 
 func _exit_tree() -> void:
 	tutorial_mode = false
+	Enemy.horde_field = {}
 	HitFeedback.reset()
 	# I nemici della prossima partita non devono restare fermi.
 	Enemy.frozen = false

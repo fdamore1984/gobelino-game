@@ -230,6 +230,14 @@ const PASSAGE_Z := 1
 ## All'impatto la telecamera trema, sempre meno.
 const CAMERA_SHAKE := 9.0
 const CAMERA_SHAKE_DECAY := 4.0
+## Tremolio della telecamera a ogni colpo di spada a segno (vedi
+## _resolve_attack): piccolo per i colpi della combo, più forte per i colpi
+## potenti e il colpo finale.
+const HIT_SHAKE := 0.38
+const HIT_SHAKE_HEAVY := 0.62
+## Respinta dei colpi intermedi (vedi _push_limit): il nemico colpito resta
+## entro la portata del colpo successivo, con questo margine.
+const PUSH_REACH_MARGIN := 12.0
 
 ## Frenesia: punti per ogni colpo di spada a segno (anche parato dalla
 ## guardia), di più per il colpo potente e gli attacchi a terra. Dopo
@@ -405,10 +413,10 @@ const BOUNCE_MAX_SPEED := 180.0
 ## I nemici sono solidi: non ci si passa attraverso (si salta sopra solo
 ## più in alto di JUMP_EVADE_HEIGHT, e durante gli attacchi a terra si
 ## ignorano). Andarci addosso non fa danni.
-## All'impatto dell'attacco a terra i nemici entro il raggio più questo
-## margine (non i boss) vengono respinti a questa velocità.
+## All'impatto dell'attacco a terra anche i nemici poco oltre il raggio
+## (entro questo margine, non i boss) vengono respinti lontano come quelli
+## colpiti (Enemy.HEAVY_KNOCKBACK_DISTANCE, vedi Enemy.knock).
 const SLAM_PUSH_MARGIN := 70.0
-const SLAM_PUSH_SPEED := 700.0
 
 ## Colpo parato dalla guardia di un nemico: la combo si interrompe e si
 ## viene respinti indietro per REPEL_TIME secondi (schivata e parata restano
@@ -1436,6 +1444,11 @@ func _repel(from: Vector2) -> void:
 	HitFeedback.hit(get_tree(), 0.07)
 
 
+## Fa tremare la telecamera (amount da 0 a 1), per esempio a un colpo a segno.
+func shake(amount: float) -> void:
+	_shake = maxf(_shake, amount)
+
+
 ## Sta caricando lo slam aereo: fluttua a mezz'aria, esposto a dardi e
 ## frecce (i nemici a distanza ne approfittano, vedi Enemy).
 func is_air_charging() -> bool:
@@ -2126,12 +2139,12 @@ func _slam_impact() -> void:
 		if offset.length() > radius + enemy.radius:
 			# Poco più in là non si fanno danni, ma si viene comunque respinti.
 			if offset.length() <= radius + enemy.radius + SLAM_PUSH_MARGIN and not enemy.is_boss():
-				enemy.shove(direction * SLAM_PUSH_SPEED)
+				enemy.knock(direction, Enemy.HEAVY_KNOCKBACK_DISTANCE)
 			continue
+		# Colpo potente: respinta lunga (vedi Enemy.knock) e barcollamento.
 		enemy.take_damage(damage, direction, true)
-		if not enemy.is_boss():
-			enemy.shove(direction * SLAM_PUSH_SPEED)
-		HitSpark.spawn(get_parent(), enemy.global_position - direction * enemy.radius * 0.8, enemy.ground_elevation + enemy.radius * 0.5, 40.0, COLOR_HEAVY)
+		HitSpark.spawn(get_parent(), enemy.global_position - direction * enemy.radius * 0.8, enemy.ground_elevation + enemy.radius * 0.5, 40.0,
+				COLOR_HEAVY, direction.angle() + PI / 2.0, true)
 		landed = true
 	GroundFx.shockwave(global_position, ground_elevation, radius)
 	Sfx.play("fireball_hit", global_position, 0.6)
@@ -2158,8 +2171,8 @@ func _h_bomb_impact() -> void:
 			# L'armatura non attenua la runa.
 			enemy.take_points(ceili(enemy.max_health * H_BOMB_BOSS_DAMAGE), direction, true, true)
 		else:
+			# Il colpo che lo abbatte lo spinge via (vedi Enemy.knock).
 			enemy.take_points(enemy.health, direction, true, true)
-			enemy.shove(direction * SLAM_PUSH_SPEED)
 	var blast := HBombBlast.new()
 	blast.radius = radius
 	blast.position = position
@@ -2312,7 +2325,7 @@ func _special_strike() -> void:
 	# I nemici sono fermi: il colpo passa sempre, anche la guardia.
 	target.take_damage(damage, direction, _special_hits == max_special_hits)
 	HitSpark.spawn(get_parent(), target.global_position - direction * target.radius * 0.8,
-			target.ground_elevation + target.radius * 0.9, 44.0, COLOR_FRENZY)
+			target.ground_elevation + target.radius * 0.9, 44.0, COLOR_FRENZY, direction.angle() + PI / 2.0 - 0.35 * _swing_sign, true)
 	Sfx.play("swing", global_position, 1.1 + 0.05 * _special_hits)
 	Sfx.play("hit", global_position, 1.0 + 0.04 * _special_hits)
 	HitFeedback.hit(get_tree(), 0.05)
@@ -2867,12 +2880,14 @@ func _resolve_attack() -> void:
 				HitSpark.spawn(get_parent(), enemy.global_position - offset.normalized() * (enemy.radius + 10.0),
 						enemy.ground_elevation + enemy.radius * 0.9, 56.0, COLOR_GUARD_SPARK)
 				continue
-			enemy.take_damage(damage, offset.normalized(), heavy)
+			# Respinta (lunga per i colpi potenti e il colpo finale, entro la
+			# portata del colpo successivo per quelli intermedi, vedi _push_limit).
+			enemy.take_damage(damage, offset.normalized(), heavy, _push_limit(enemy, offset.length()))
 			landed = true
 			# Scintilla nel punto di contatto, sul lato del nemico rivolto verso di noi.
 			var contact := enemy.global_position - offset.normalized() * enemy.radius * 0.8
 			HitSpark.spawn(get_parent(), contact, enemy.ground_elevation + enemy.radius * 0.9,
-					40.0 if _attack_heavy else 28.0, COLOR_HEAVY if _attack_heavy else COLOR_SLASH)
+					40.0 if _attack_heavy else 28.0, COLOR_HEAVY if _attack_heavy else COLOR_SLASH, _cut_angle(offset), heavy)
 	# Ogni colpo a segno carica la Frenesia, anche se la guardia l'ha parato.
 	if landed or blocked_by:
 		_add_frenzy(FRENZY_PER_HEAVY if _attack_heavy else FRENZY_PER_HIT)
@@ -2880,11 +2895,50 @@ func _resolve_attack() -> void:
 		_repel(blocked_by.global_position)
 	if landed:
 		Sfx.play("hit", global_position, 0.8 if _attack_heavy else 1.0 + 0.1 * (_combo_step - 1))
+		shake(HIT_SHAKE_HEAVY if heavy else HIT_SHAKE)
 		# Un attimo di fermo: si sente il colpo (più lungo per il colpo potente).
 		if _attack_heavy:
 			HitFeedback.hit(get_tree(), 0.12 + 0.05 * _charge)
 		else:
 			HitFeedback.hit(get_tree(), 0.1 if _combo_step >= max_combo_hits else 0.09)
+
+
+## Respinta massima del colpo in corso per un nemico a distance pixel (vedi
+## Enemy.knock): i colpi intermedi della combo, e i colpi potenti dopo cui
+## se ne può concatenare un altro, lasciano il nemico a portata del colpo
+## successivo, contando l'affondo che continua dopo il colpo; il colpo
+## finale e l'ultimo colpo potente lo spingono lontano (nessun limite).
+func _push_limit(enemy: Enemy, distance: float) -> float:
+	var reach: float
+	var follow: float
+	if _attack_heavy:
+		if _heavy_step >= max_heavy_chain:
+			return INF
+		reach = HEAVY_RANGE
+		follow = HEAVY_LUNGE_SPEED * HEAVY_ACTIVE / _attack_speed
+	else:
+		if _combo_step >= max_combo_hits:
+			return INF
+		reach = ATTACK_RANGE
+		follow = ATTACK_LUNGE_SPEED * (1.0 + 0.2 * (_combo_step - 1)) * ATTACK_ACTIVE / _attack_speed
+	return maxf(reach + enemy.radius + follow - PUSH_REACH_MARGIN - distance, 0.0)
+
+
+## Direzione sullo schermo del taglio di luce del lampo d'impatto (vedi
+## HitSpark) per un colpo verso offset: di traverso per i fendenti (inclinato
+## secondo il verso del colpo), lungo il colpo per l'affondo, quasi
+## verticale per il colpo dall'alto.
+func _cut_angle(offset: Vector2) -> float:
+	var toward := offset.angle()
+	if not _attack_heavy and not _air_attack:
+		match ATTACK_STYLES[_attack_style]:
+			"thrust":
+				return toward
+			"chop":
+				return lerp_angle(toward + PI / 2.0, PI / 2.0, 0.6)
+			"backhand":
+				return toward - PI / 2.0 + 0.35
+	return toward + PI / 2.0 - 0.35 * _swing_sign
 
 
 func _draw() -> void:
@@ -2973,7 +3027,9 @@ func _draw() -> void:
 	if not behind:
 		_draw_gear(body)
 	if _state != State.DEAD:
-		GoblinLook.face(self, RADIUS, facing, EYE_SIZE, false, "smile", body.a)
+		# Colpito strizza gli occhi e apre la bocca (smorfia di dolore).
+		var hurt := _state == State.HURT
+		GoblinLook.face(self, RADIUS, facing, EYE_SIZE, false, "open" if hurt else "smile", body.a, {"squint": true} if hurt else {})
 
 	# Scudo attivo: una bolla attorno al personaggio.
 	if shield_active and _state != State.DEAD:

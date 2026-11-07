@@ -72,7 +72,8 @@ func _ready() -> void:
 			await _capture_metro(language)
 			await _capture_horde(language)
 			await _capture_touch(language)
-	get_tree().quit()
+	# Come il pulsante Esci: prima si fermano i suoni (vedi Sfx.quit_game).
+	Sfx.quit_game()
 
 
 func _capture_menu(language: String) -> void:

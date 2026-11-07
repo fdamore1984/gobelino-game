@@ -28,6 +28,13 @@ func _ready() -> void:
 	volume_db = PAIN_VOLUME
 
 
+## Uscendo dalla scena (nemico sparito, partita chiusa) il verso si ferma:
+## un lettore che suona ancora alla chiusura del gioco restava in memoria
+## (vedi Sfx.quit_game).
+func _exit_tree() -> void:
+	stop()
+
+
 func pain() -> void:
 	var now := Time.get_ticks_msec()
 	if playing and now - _started < PAIN_MIN_GAP * 1000.0:
