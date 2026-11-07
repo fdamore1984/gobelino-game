@@ -125,7 +125,7 @@ func _capture_combat(language: String) -> void:
 	var warrior := _enemy("warrior", Vector2(95, -25), Enemy.State.CHASE, 0.0)
 	warrior.health = 2
 	_player._set_lock_target(warrior)
-	DamagePopups.spawn(warrior.global_position, warrior.ground_elevation + warrior.radius * 2.4, 2, "heavy")
+	DamagePopups.spawn(warrior.global_position, warrior.ground_elevation + warrior.radius * 2.4, warrior.shown_damage(Player.damage_at(3) * 2.0), "heavy")
 	# Un bruto élite, con l'aura e l'anello dorato.
 	_show_fx(_elite(_enemy("brute", Vector2(-170, 90), Enemy.State.WINDUP, 0.6)))
 	_enemy("caster", Vector2(-330, -140), Enemy.State.WINDUP, 0.6)
