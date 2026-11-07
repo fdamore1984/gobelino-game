@@ -372,7 +372,10 @@ func load_state(data: Dictionary) -> void:
 		_totem_states[SaveGame.vector(at)] = "used"
 	for entry: Dictionary in data.get("stocks", []):
 		var stock: Array[String] = []
-		stock.assign(entry["stock"])
+		# Le pozioni (l'elisir dei salvataggi vecchi) non si vendono più.
+		for id: String in entry["stock"]:
+			if not Items.is_supply(id):
+				stock.append(id)
 		_merchant_stocks[SaveGame.vector(entry["at"])] = stock
 	for at: Array in data.get("caves", []):
 		cleared_caves[SaveGame.vector(at)] = true
@@ -1235,6 +1238,14 @@ func free_position_near(point: Vector2, radius: float) -> Vector2:
 	return point
 
 
+## C'è un ostacolo solido proprio su point (vedi reach_field).
+func _solid_at(point: Vector2) -> bool:
+	for obstacle: Dictionary in obstacles_close(point):
+		if obstacle["solid"] and point.distance_to(obstacle["position"]) < float(obstacle["collision"]):
+			return true
+	return false
+
+
 ## Rombi vicini che condividono un lato (vedi reach_field).
 const NEIGHBORS := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 
@@ -1245,8 +1256,10 @@ const NEIGHBORS := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0,
 ## passi da un rombo all'altro servono. Da un rombo si passa al vicino se
 ## questo non è invalicabile (montagne, roccia, burroni) e se non bisogna
 ## salire più di climb pixel (i nemici saltano al più un livello; scendono
-## da qualsiasi altezza). I rombi che mancano non portano a goal.
-func reach_field(goal: Vector2, max_distance: float, climb: float) -> Dictionary:
+## da qualsiasi altezza). Con avoid_solid anche i rombi il cui centro è
+## coperto da un ostacolo solido (alberi, massi) non si attraversano, così
+## le orde girano attorno. I rombi che mancano non portano a goal.
+func reach_field(goal: Vector2, max_distance: float, climb: float, avoid_solid := false) -> Dictionary:
 	var start := cell_at(goal)
 	var field := {start: 0}
 	var heights := {start: elevation_at(cell_center(start))}
@@ -1264,6 +1277,8 @@ func reach_field(goal: Vector2, max_distance: float, climb: float) -> Dictionary
 				continue
 			var center := cell_center(other)
 			if center.distance_squared_to(goal) > limit:
+				continue
+			if avoid_solid and _solid_at(center):
 				continue
 			# Si cammina da other verso cell: si sale al più di climb.
 			var other_height := elevation_at(center)

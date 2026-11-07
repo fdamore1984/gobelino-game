@@ -1,7 +1,16 @@
 class_name Loot
 extends Node2D
-## Oggetto a terra uscito da una cassa: salta fuori, poi galleggia finché
-## il giocatore non ci passa sopra e lo raccoglie. Tenendo premuto
+## Oggetto a terra uscito da una cassa o da un nemico: salta fuori, poi
+## galleggia finché il giocatore non lo raccoglie. Quando il giocatore
+## passa entro magnet_range() pixel l'oggetto gli vola incontro come
+## attirato da una calamita, sempre più veloce (MAGNET_ACCEL, fino a
+## MAGNET_MAX_SPEED), e si raccoglie toccandolo; non si attira quello che
+## non si può prendere (vedi Player.can_pick_up: per esempio un kit medico
+## con la vita piena), che resta a terra. Le scorte (kit medici, taniche,
+## batterie di ricambio) si usano appena raccolte e, se nessuno le prende,
+## dopo lifetime secondi spariscono, lampeggiando negli ultimi blink
+## (vedi Items.supply_lifetime): bisogna menare e raccoglierle in fretta.
+## Tenendo premuto
 ## "focus" (R2) gli oggetti a terra si vedono molto meglio: mentre il mondo
 ## si spegne (vedi LowHealthVignette) restano a colori, più grandi, sopra a
 ## tutto il resto e con un'aura bianca attorno.
@@ -14,6 +23,15 @@ extends Node2D
 signal picked_up(item_id: String, amount: int)
 
 const PICKUP_RANGE := 38.0
+## Calamita (vedi in cima): distanza da cui si attira, accelerazione e
+## velocità massima verso il giocatore.
+const MAGNET_RANGE := 150.0
+const MAGNET_ACCEL := 1500.0
+const MAGNET_MAX_SPEED := 950.0
+## Si attira solo con un dislivello col giocatore di al più questi pixel.
+const MAGNET_HEIGHT := 120.0
+## Lampeggiando prima di sparire: secondi accesi e spenti.
+const BLINK_PERIOD := 0.24
 ## Appena uscito dalla cassa non si raccoglie subito, così si vede volare.
 const PICKUP_DELAY := 0.45
 const SIZE := 26.0
@@ -30,11 +48,18 @@ var amount := 1
 var player: Player
 ## È la sacca del denaro perso morendo.
 var bag := false
+## Secondi dopo cui sparisce se nessuno lo raccoglie (INF: mai) e da
+## quanti prima di sparire lampeggia (vedi Game._drop_loot).
+var lifetime := INF
+var blink := 0.0
 
 var _from := Vector2.ZERO
 var _to := Vector2.ZERO
 var _age := 0.0
 var _lift := 0.0
+## Attirato dal giocatore (vedi in cima) e velocità attuale.
+var _attracted := false
+var _speed := 0.0
 
 
 ## Esce da from e atterra in to.
@@ -55,17 +80,38 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	_age += delta
-	var t := minf(_age / FLY_TIME, 1.0)
-	position = _from.lerp(_to, t)
+	if _age >= lifetime:
+		queue_free()
+		return
+	if _age < FLY_TIME:
+		position = _from.lerp(_to, _age / FLY_TIME)
 	z_index = FOCUS_Z if LowHealthVignette.focus_held() else 0
-	if _age >= PICKUP_DELAY and player and not player.is_dead() \
-			and player.position.distance_to(position) < PICKUP_RANGE \
-			and absf(player.ground_elevation - _lift) < 40.0:
-		# Con la cintura piena le pozioni restano a terra.
-		if player.pickup(item_id, amount):
-			picked_up.emit(item_id, amount)
-			queue_free()
+	if _age >= PICKUP_DELAY and is_instance_valid(player) and not player.is_dead() and player.can_pick_up(item_id):
+		var distance := player.position.distance_to(position)
+		if not _attracted and distance < magnet_range() and absf(player.ground_elevation - _lift) < MAGNET_HEIGHT:
+			_attracted = true
+		if _attracted:
+			_speed = minf(_speed + MAGNET_ACCEL * delta, MAGNET_MAX_SPEED)
+			position = position.move_toward(player.position, _speed * delta)
+			_lift = lerpf(_lift, player.ground_elevation, minf(delta * 10.0, 1.0))
+			distance = player.position.distance_to(position)
+		if distance < PICKUP_RANGE and (_attracted or absf(player.ground_elevation - _lift) < 40.0):
+			if player.pickup(item_id, amount):
+				picked_up.emit(item_id, amount)
+				queue_free()
+				return
+	else:
+		# Non serve più (per esempio la vita si è riempita): resta dov'è.
+		_attracted = false
+		_speed = 0.0
+	if lifetime != INF and lifetime - _age < blink:
+		modulate.a = 1.0 if fmod(lifetime - _age, BLINK_PERIOD * 2.0) > BLINK_PERIOD else 0.25
 	queue_redraw()
+
+
+## Distanza da cui il giocatore attira l'oggetto (vedi in cima).
+func magnet_range() -> float:
+	return MAGNET_RANGE
 
 
 ## Centro dell'oggetto disegnato (salto e galleggiamento compresi), rispetto alla base.

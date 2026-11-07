@@ -20,6 +20,8 @@ const END_DELAY := 1.5
 const DONE_TIME := 0.9
 ## Nemici del passo di nuovo, se muoiono tutti prima che ci si riesca.
 const RESPAWN_DELAY := 1.5
+## Distanza dal giocatore delle pozioni di un passo (vedi _prepare).
+const SUPPLY_DISTANCE := 260.0
 ## Ora del giorno fissa (vedi DayNight.time).
 const DAY_TIME := 0.3
 ## Il riquadro sta in alto, tra lo stato (a sinistra, fino a PANEL_LEFT) e
@@ -217,8 +219,9 @@ func _alive() -> int:
 
 
 ## Risorse del passo: mana e vigore pieni, rune del cataclisma (id
-## "h_bomb"), Frenesia piena, pozioni e un po' di vita tolta (per poterne
-## bere una).
+## "h_bomb"), Frenesia piena, un po' di vita tolta e pozioni a terra da
+## raccogliere ("supplies": id delle pozioni, che saltano fuori a
+## SUPPLY_DISTANCE pixel dal giocatore).
 func _prepare(setup: Dictionary) -> void:
 	if setup.get("mana", false):
 		player.mana = player.max_mana
@@ -226,11 +229,13 @@ func _prepare(setup: Dictionary) -> void:
 		player.stamina = player.max_stamina
 	if setup.has("h_bombs"):
 		player.h_bombs = maxi(player.h_bombs, int(setup["h_bombs"]))
-	if setup.has("potions"):
-		player.potions = maxi(player.potions, int(setup["potions"]))
 	if setup.has("hurt"):
 		player.health = maxi(mini(player.health, player.max_health - int(setup["hurt"])), 1)
 		player.health_changed.emit(player.health, player.max_health)
+	var supplies: Array = setup.get("supplies", [])
+	for k in supplies.size():
+		var angle := TAU * k / float(supplies.size()) + randf_range(-0.4, 0.4)
+		game.spawn_tutorial_supply(supplies[k], player.position + Vector2.from_angle(angle) * SUPPLY_DISTANCE)
 	# La Frenesia resta piena per tutto il passo (da sola calerebbe).
 	player.keep_frenzy = setup.get("frenzy", false)
 	if player.keep_frenzy:

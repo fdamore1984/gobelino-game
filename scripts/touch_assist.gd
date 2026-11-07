@@ -6,9 +6,6 @@ extends RefCounted
 ## rilasciano le stesse azioni dell'Input Map di tastiera e controller.
 ## - Salto: automatico davanti a un dislivello che si supera con i salti
 ##   rimasti.
-## - Pozioni: si beve da sola quella del mana quando finisce (per il vigore
-##   pensa Player._auto_stamina_potion in tutta la versione web); la vita a
-##   zero la salva una pozione (vedi Player.receive_hit).
 ## - Scudo: si alza appena è carico.
 ## - Torcia: si accende al buio e si spegne con la luce.
 ## - Attacco (tasto unico tenuto premuto): combo normale, poi colpo potente,
@@ -49,9 +46,6 @@ var _h_bomb_jumped := false
 var _slam_steps := -1
 ## Passi trascorsi nella fase attuale dell'attacco.
 var _phase_steps := 0
-## Il mana è finito: si beve appena si può (la pozione per il vigore finito la
-## usa da solo Player._auto_stamina_potion, in tutta la versione web).
-var _mana_out := false
 
 
 ## Bomba H e Frenesia: il tasto compare solo quando si possono usare.
@@ -101,18 +95,6 @@ func _release_all() -> void:
 func _auto_supplies(p: Player) -> void:
 	if not p.shield_active and p.shield_cooldown == 0.0:
 		_tap("shield")
-	# Finito il mana si beve la pozione appena si può: fermi a terra senza
-	# fare altro (vedi Player._start_drink); vigore finito: vedi
-	# Player._auto_stamina_potion.
-	if p.mana < Player.SPELL_COST:
-		_mana_out = true
-	if p.mana >= Player.SPELL_COST or p.mana_potions == 0:
-		_mana_out = false
-	if not p.can_drink() or Platform.touch_attack:
-		return
-	if _mana_out:
-		_tap("mana_potion")
-		_mana_out = false
 
 
 func _auto_torch(p: Player) -> void:

@@ -297,8 +297,6 @@ func _show_details(index: int) -> void:
 	match Items.category(id):
 		"book":
 			action = "INVENTORY_USE_READ"
-		"potion":
-			action = "INVENTORY_USE_DRINK"
 		_:
 			if player.inventory.is_equipped(index):
 				action = "INVENTORY_USE_UNEQUIP"

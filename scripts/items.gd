@@ -5,7 +5,10 @@ class_name Items
 ##
 ## Categorie: "gold" (monete), armi ("weapon"), equipaggiamento ("armor",
 ## "boots", "amulet", "ring": uno per tipo), libri di magia ("book", si
-## leggono una volta e migliorano per sempre) pozioni ("potion") e rune del cataclisma
+## leggono una volta e migliorano per sempre) pozioni ("potion": le
+## lasciano nemici e casse e si bevono da sole appena raccolte, vedi
+## supply_drops e Player.use_supply; "retired" quelle che non esistono più,
+## come l'elisir) e rune del cataclisma
 ## ("bomb", id "h_bomb": per il colpo potente in aria, vedi Player.h_bombs).
 ## Bonus possibili: damage (danni +%), health (vita massima), speed
 ## (velocità +%), mana (mana massimo), spell (potenza della magia +%),
@@ -71,20 +74,61 @@ static func boss_items() -> Array[String]:
 static func _flagged(flag: String) -> Array[String]:
 	var result: Array[String] = []
 	for id: String in DATA.data["items"]:
-		if get_item(id).get(flag, false):
+		if get_item(id).get(flag, false) and not is_supply(id):
 			result.append(id)
 	return result
 
 
-## Si trovano a caso (nelle casse e addosso ai nemici): non quelli dei
-## mercanti né quelli dei boss.
+## Si trovano a caso come oggetti (nelle casse e addosso ai nemici): non
+## quelli dei mercanti, né quelli dei boss, né le pozioni (hanno i loro
+## tiri, vedi supply_drops).
 static func _random_kind(item: Dictionary) -> bool:
-	return not item.get("shop_only", false) and not item.get("boss_only", false)
+	return not item.get("shop_only", false) and not item.get("boss_only", false) and item["category"] != "potion"
 
 
-## Quello che lascia un nemico abbattuto: ogni tanto monete o una pozione
-## (di vita, di mana o di vigore), a volte una runa del cataclisma, di rado
-## un oggetto e molto di rado un oggetto raro dei mercanti.
+## È una pozione (vita, mana, vigore): si beve appena raccolta e non va mai
+## nell'inventario.
+static func is_supply(id: String) -> bool:
+	return DATA.data["items"].has(id) and category(id) == "potion"
+
+
+## Monete date per una pozione che un salvataggio vecchio aveva
+## nell'inventario (al prezzo di vendita, vedi Player.load_state).
+static func supply_refund(id: String) -> int:
+	var price := value(id) if DATA.data["items"].has(id) else 25
+	return maxi(1, floori(price * float(World.DATA.data["merchant"]["sell_ratio"])))
+
+
+## Pozioni che lasciano nemici e casse ("supplies" in data/items.json):
+## source "enemy" tira una volta per tipo con la sua probabilità (luck la
+## moltiplica, di notte si trova di più); "elite" e "chest" sono un numero
+## di pozioni a caso fra i tipi.
+static func supply_drops(source: String, luck := 1.0) -> Array[Array]:
+	var data: Dictionary = DATA.data["supplies"]
+	var drops: Array[Array] = []
+	if source == "enemy":
+		var chances: Dictionary = data["enemy"]
+		for id: String in chances:
+			if randf() < minf(float(chances[id]) * luck, 1.0):
+				drops.append([id, 1])
+		return drops
+	var count: Array = data[source]
+	var kinds: Array = (data["enemy"] as Dictionary).keys()
+	for k in randi_range(int(count[0]), int(count[1])):
+		drops.append([kinds[randi() % kinds.size()], 1])
+	return drops
+
+
+## Secondi prima che una pozione a terra sparisca, e da quanti prima di
+## sparire lampeggia (vedi Loot).
+static func supply_lifetime() -> Vector2:
+	var data: Dictionary = DATA.data["supplies"]
+	return Vector2(float(data["lifetime"]), float(data["blink"]))
+
+
+## Quello che lascia un nemico abbattuto: spesso pozioni (vedi
+## supply_drops), ogni tanto monete, a volte una runa del cataclisma, di
+## rado un oggetto e molto di rado un oggetto raro dei mercanti.
 ## luck moltiplica le probabilità (di notte si trova di più, vedi
 ## Game._loot_luck).
 static func enemy_drops(level: int, luck := 1.0) -> Array[Array]:
@@ -96,14 +140,7 @@ static func enemy_drops(level: int, luck := 1.0) -> Array[Array]:
 	if randf() < float(data["gold_chance"]):
 		var gold: Array = data["gold"]
 		drops.append(["gold", randi_range(gold[0], gold[1]) + int(data["gold_per_level"]) * (level - 1)])
-	# Un solo tiro a fasce: ogni probabilità del JSON è quella vera (vita,
-	# poi mana, poi vigore; insieme al più 1).
-	var roll := randf()
-	for potion: Array in [["potion_chance", "potion_health"], ["mana_potion_chance", "potion_mana"], ["stamina_potion_chance", "potion_stamina"]]:
-		roll -= float(data.get(potion[0], 0.0))
-		if roll < 0.0:
-			drops.append([potion[1], 1])
-			break
+	drops.append_array(supply_drops("enemy", luck))
 	if randf() < float(data.get("h_bomb_chance", 0.0)):
 		drops.append(["h_bomb", 1])
 	if randf() < float(data["rare_chance"]):

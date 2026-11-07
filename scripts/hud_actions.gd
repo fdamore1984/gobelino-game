@@ -1,7 +1,6 @@
 class_name HudActions
 extends Control
-## Barra delle azioni in basso a sinistra: pozioni (vita, mana, vigore),
-## scudo, palla di fuoco, rune del cataclisma (h_bomb, L2 + R2 in aria)
+## Barra delle azioni in basso a sinistra: scudo, palla di fuoco, rune del cataclisma (h_bomb, L2 + R2 in aria)
 ## e inventario, ognuno con la sua icona, il tasto del
 ## controller scelto dal giocatore (vedi Keybinds),
 ## quante ne restano o la ricarica. Sui dispositivi touch non serve: ci
@@ -16,8 +15,7 @@ const COLOR_KEY := UiStyle.CREAM
 ## Azioni: icona e azione dell'Input Map (per il tasto del controller;
 ## più azioni insieme separate da "+").
 const ACTIONS := [
-	["potion", "potion"], ["mana", "mana_potion"], ["shield", "shield"], ["spell", "spell"],
-	["stamina_potion", "stamina_potion"], ["h_bomb", "heavy_attack+focus"], ["bag", "inventory"],
+	["shield", "shield"], ["spell", "spell"], ["h_bomb", "heavy_attack+focus"], ["bag", "inventory"],
 ]
 
 var player: Player
@@ -84,12 +82,6 @@ func _keys(actions: String) -> String:
 ## La casella si può usare adesso (anche per i tasti a schermo, vedi TouchControls).
 static func is_ready(who: Player, kind: String) -> bool:
 	match kind:
-		"potion":
-			return who.potions > 0 and who.health < who.max_health
-		"mana":
-			return who.mana_potions > 0 and who.mana < who.max_mana
-		"stamina_potion":
-			return who.stamina_potions > 0 and who.stamina < who.max_stamina
 		"shield":
 			return who.shield_active or who.shield_cooldown <= 0.0
 		"spell":
@@ -102,12 +94,6 @@ static func is_ready(who: Player, kind: String) -> bool:
 ## Quante ne restano, da scrivere nel distintivo ("" per nessun numero).
 static func count_text(who: Player, kind: String) -> String:
 	match kind:
-		"potion":
-			return str(who.potions)
-		"mana":
-			return str(who.mana_potions)
-		"stamina_potion":
-			return str(who.stamina_potions)
 		"h_bomb":
 			return str(who.h_bombs)
 		"spell":

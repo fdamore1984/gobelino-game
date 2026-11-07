@@ -118,7 +118,6 @@ func _capture_combat(language: String) -> void:
 	_player._state_time = Player.HEAVY_WINDUP + 0.03
 	_player.shield_active = true
 	_player.shield_cooldown = 21.0
-	_player.potions = 1
 	_player.frenzy = 70.0
 	_player.apply_upgrade("combo")
 	_player.apply_upgrade("dodge")
@@ -126,7 +125,7 @@ func _capture_combat(language: String) -> void:
 	var warrior := _enemy("warrior", Vector2(95, -25), Enemy.State.CHASE, 0.0)
 	warrior.health = 2
 	_player._set_lock_target(warrior)
-	DamagePopups.spawn(warrior.global_position, warrior.ground_elevation + warrior.radius * 2.4, 2, "heavy")
+	DamagePopups.spawn(warrior.global_position, warrior.ground_elevation + warrior.radius * 2.4, warrior.shown_damage(Player.damage_at(3) * 2.0), "heavy")
 	# Un bruto élite, con l'aura e l'anello dorato.
 	_show_fx(_elite(_enemy("brute", Vector2(-170, 90), Enemy.State.WINDUP, 0.6)))
 	_enemy("caster", Vector2(-330, -140), Enemy.State.WINDUP, 0.6)
@@ -233,7 +232,7 @@ func _capture_inventory(language: String) -> void:
 	await _start_game(Vector2(0, 0), 1.0)
 	_player.level = 4
 	_hud_stats()
-	for id in ["sword_steel", "armor_leather", "boots_swift", "amulet_mana", "ring_fire", "book_fire", "potion_health", "potion_mana", "sword_iron"]:
+	for id in ["sword_steel", "armor_leather", "boots_swift", "amulet_mana", "ring_fire", "book_fire", "book_mana", "boots_swift", "sword_iron"]:
 		_player.inventory.add(id)
 	_player.inventory.gold = 137
 	_player.inventory.equipped = {"weapon": 0, "armor": 1, "boots": 2}
@@ -268,7 +267,7 @@ func _capture_merchant(language: String) -> void:
 	(_game.get_node("World") as World).refresh_now()
 	await _frames(20)
 	await _save("%s_7_merchant.png" % language)
-	for id in ["sword_iron", "armor_chain", "book_mana", "ring_fire", "potion_mana", "boots_swift"]:
+	for id in ["sword_iron", "armor_chain", "book_mana", "ring_fire", "amulet_mana", "boots_swift"]:
 		_player.inventory.add(id)
 	_player.inventory.gold = 312
 	_player.inventory.equipped = {"armor": 1}
@@ -497,22 +496,24 @@ func _capture_frenzy_bar(language: String) -> void:
 	_end_game()
 
 
-## Tutorial: il goblin beve una pozione con poca vita e poco vigore, un
-## guerriero gli corre addosso.
+## Tutorial: con poca vita e poco vigore, un guerriero abbattuto lascia
+## pozioni e sfere gialle, che volano verso il goblin attirate come da una
+## calamita; un altro guerriero gli corre addosso.
 func _capture_supplies(language: String) -> void:
 	await _start_game(Vector2(0, 0), 1.3)
 	_player.level = 3
 	_hud_stats()
 	_player.health = 1
+	_player.mana = _player.max_mana * 0.3
 	_player.stamina = _player.max_stamina * 0.15
-	_player._state = Player.State.DRINK
-	_player._drinking = "potion"
-	_player._state_time = 0.35
 	_player.facing = Vector2(1, 0.2).normalized()
 	_player.queue_redraw()
 	(_game.get_node("HUD") as Hud).set_health(_player.health, _player.max_health)
-	_enemy("warrior", _player.position + Vector2(170, 40), Enemy.State.CHASE, 0.0)
-	await _frames(30)
+	var fallen := _player.position + Vector2(190, -30)
+	_game._drop_loot(fallen, [["potion_health", 1], ["potion_mana", 1], ["potion_stamina", 1]] as Array[Array])
+	_game._drop_xp(fallen, 90)
+	_enemy("warrior", _player.position + Vector2(-200, 60), Enemy.State.CHASE, 0.0)
+	await _frames(34)
 	await _save("%s_supplies.png" % language)
 	_end_game()
 

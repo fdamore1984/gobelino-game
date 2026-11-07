@@ -17,8 +17,7 @@ const ROWS := [
 	["CONTROLS_ATTACK", [["attack"]]], ["CONTROLS_HEAVY", [["heavy_attack"]]],
 	["CONTROLS_PARRY", [["parry"]]], ["CONTROLS_DODGE", [["dodge"]]], ["CONTROLS_JUMP", [["jump"], ["interact"]]],
 	["CONTROLS_RUN", [["run"]]], ["CONTROLS_FOCUS", [["focus"]]], ["CONTROLS_SPELL", [["spell"]]],
-	["CONTROLS_SHIELD", [["shield"]]], ["CONTROLS_POTION", [["potion"]]], ["CONTROLS_MANA", [["mana_potion"]]],
-	["CONTROLS_STAMINA_POTION", [["stamina_potion"]]], ["CONTROLS_INVENTORY", [["inventory"], ["inventory_sort"]]],
+	["CONTROLS_SHIELD", [["shield"]]], ["CONTROLS_INVENTORY", [["inventory"], ["inventory_sort"]]],
 	["CONTROLS_MAP", [["map"]]], ["CONTROLS_LOCK", [["lock_on"]]], ["CONTROLS_MENU", [["menu"]]],
 ]
 const MOVE_ACTIONS := ["move_up", "move_left", "move_down", "move_right"]

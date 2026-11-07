@@ -22,8 +22,8 @@ const DEVICES := ["keyboard", "mouse", "controller"]
 ## (le azioni ui_* dei menù restano fisse).
 const ACTIONS := [
 	"move_up", "move_down", "move_left", "move_right", "move_click", "attack", "heavy_attack", "parry",
-	"dodge", "jump", "interact", "run", "focus", "spell", "shield", "potion", "mana_potion",
-	"stamina_potion", "inventory", "inventory_sort", "map", "lock_on", "menu",
+	"dodge", "jump", "interact", "run", "focus", "spell", "shield",
+	"inventory", "inventory_sort", "map", "lock_on", "menu",
 ]
 ## Azioni che devono avere almeno un tasto: senza, non si potrebbe più
 ## aprire il menù di pausa.

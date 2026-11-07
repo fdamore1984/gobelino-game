@@ -61,9 +61,9 @@ spiega il tutorial del gioco.
 ```
 Gobelino is a 2D medieval fantasy action RPG with an isometric view: a feral goblin with a sword and a fireball explores boundless lands, caves and catacombs full of monsters and undead.
 
-Fast, deadly Souls-like combat: combos, parries and golden counters, dodges, jumps, slams, Cataclysm runes and the Frenzy special attack, with hits that knock enemies back and a playable tutorial that teaches you everything step by step. Elite enemies, undead hordes in waves, missions from the merchants, more danger and loot at night. Comic-style look, like ufotizio.com: thick ink outlines, big cartoon eyes and a matching interface. Prototype with placeholder graphics and sounds.
+Fast, deadly Souls-like combat: combos, parries and golden counters, dodges, jumps, slams, Cataclysm runes and the Frenzy special attack, with hits that knock enemies back, huge damage numbers and a playable tutorial that teaches you everything step by step. No potion belt: enemies and chests drop potions that fly to you like a magnet and work on the spot, plus yellow orbs that are your only source of experience. Kill fast to stay alive. Elite enemies, undead hordes in waves, missions from the merchants, more danger and loot at night. Comic-style look, like ufotizio.com: thick ink outlines, big cartoon eyes and a matching interface. Prototype with placeholder graphics and sounds.
 
-Controller (with vibration) or keyboard and mouse; three difficulty levels and options for damage numbers, camera shake, blood and interface size. In the browser on phones and tablets: Touch Mode, with simple on-screen controls (Slam button, potions you tap to drink), a closer camera and automatic jumping, parrying and torch. English and Italian. Windows, Linux and Steam Deck.
+Controller (with vibration) or keyboard and mouse; three difficulty levels and options for damage numbers, camera shake, blood and interface size. In the browser on phones and tablets: Touch Mode, with simple on-screen controls (Slam button, potions drunk as soon as you grab them), a closer camera and automatic jumping, parrying and torch. English and Italian. Windows, Linux and Steam Deck.
 
 Play it right in your browser, with your saves on every device: https://ufotizio.com/en/gobelino
 
