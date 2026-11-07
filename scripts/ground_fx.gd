@@ -16,7 +16,7 @@ const FADE_TIME := 4.0
 const MAX_SPLATS := 260
 ## Gocce in volo al più (le orde di non morti che si disfano ne lancerebbero
 ## migliaia): oltre, i colpi lasciano solo lo schizzo a terra.
-const MAX_DROPS := 900
+const MAX_DROPS := 500
 const MAX_CORPSES := 40
 ## Pozze di sangue di chi muore: si allargano in POOL_GROW secondi e poi
 ## restano (finché si resta in quella zona: si tolgono passando tra
@@ -27,6 +27,8 @@ const POOL_ALPHA := 0.95
 ## Le gocce che cadono lasciano schizzi più piccoli della goccia stessa
 ## (lo schizzo con i rivoli è più largo della macchia centrale).
 const DROP_SPLAT := 0.75
+## Parte delle gocce che a terra lasciano una macchia.
+const DROP_SPLAT_CHANCE := 0.4
 ## Onda d'urto: l'anello dura WAVE_TIME, le crepe nel terreno CRACK_TIME.
 const WAVE_TIME := 0.45
 const CRACK_TIME := 2.5
@@ -61,6 +63,9 @@ var _waves: Array[Dictionary] = []
 var _air := AirLayer.new()
 var _wave_layer := WaveLayer.new()
 var _redraw_timer := 0.0
+## Tempo passato (vedi _process) e fin quando c'è qualcosa che si allarga.
+var _clock := 0.0
+var _grow_until := 0.0
 ## Ci sono macchie o corpi nuovi da disegnare.
 var _dirty := false
 
@@ -88,13 +93,16 @@ func _ready() -> void:
 static func bleed(at: Vector2, altitude: float, direction: Vector2, amount: int) -> void:
 	if current == null:
 		return
+	# Il terreno su cui cadono le gocce è quello da cui partono: si calcola
+	# una volta sola, non per ogni goccia a ogni frame.
+	var ground := _ground(at)
 	for i in mini(amount, MAX_DROPS - current._drops.size()):
 		var spread := direction.rotated(randf_range(-0.8, 0.8)) * randf_range(50.0, 240.0)
 		current._drops.append({
 			"position": at, "altitude": altitude, "velocity": Vector2(spread.x, spread.y * 0.6),
-			"rise": randf_range(60.0, 300.0), "size": randf_range(2.0, 4.0), "age": 0.0,
+			"rise": randf_range(60.0, 300.0), "size": randf_range(2.0, 4.0), "age": 0.0, "ground": ground,
 		})
-	current._add_splat(at + direction * 8.0, _ground(at), randf_range(8.0, 12.0), direction, 0.0)
+	current._add_splat(at + direction * 8.0, ground, randf_range(8.0, 12.0), direction, 0.0)
 
 
 ## Pozza di sangue sotto chi muore (giocatore e nemici), larga size: si
@@ -102,8 +110,9 @@ static func bleed(at: Vector2, altitude: float, direction: Vector2, amount: int)
 static func pool(at: Vector2, size: float) -> void:
 	if current == null:
 		return
-	current._pools.append({"position": at, "elevation": _ground(at), "size": size, "age": 0.0,
+	current._pools.append({"position": at, "elevation": _ground(at), "size": size, "born": current._clock,
 			"angle": randf() * TAU, "variant": randi(), "color": BLOOD_COLOR.darkened(randf_range(0.1, 0.25))})
+	current._grow_until = maxf(current._grow_until, current._clock + POOL_GROW)
 	if current._pools.size() > MAX_POOLS:
 		current._pools.pop_front()
 	current._dirty = true
@@ -116,7 +125,7 @@ static func corpse(at: Vector2, elevation: float, points: PackedVector2Array, co
 		return
 	# Una sagoma che si incrocia su sé stessa non si riempie: resta il contorno.
 	var fill := not Geometry2D.triangulate_polygon(points).is_empty()
-	current._corpses.append({"position": at, "elevation": elevation, "points": points, "color": color, "age": 0.0, "fill": fill})
+	current._corpses.append({"position": at, "elevation": elevation, "points": points, "color": color, "born": current._clock, "fill": fill})
 	if current._corpses.size() > MAX_CORPSES:
 		current._corpses.pop_front()
 	current._dirty = true
@@ -188,8 +197,9 @@ func _add_splat(at: Vector2, elevation: float, size: float, direction: Vector2, 
 	var angle := Vector2(direction.x, direction.y / GROUND_SQUASH).angle() + randf_range(-0.35, 0.35)
 	_splats.append({
 		"position": at, "elevation": elevation, "size": size, "angle": angle, "variant": randi(),
-		"age": 0.0, "grow": grow, "color": BLOOD_COLOR.darkened(randf_range(0.0, 0.25)),
+		"born": _clock, "grow": grow, "color": BLOOD_COLOR.darkened(randf_range(0.0, 0.25)),
 	})
+	_grow_until = maxf(_grow_until, _clock + grow)
 	if _splats.size() > MAX_SPLATS:
 		_splats.pop_front()
 	_dirty = true
@@ -198,27 +208,27 @@ func _add_splat(at: Vector2, elevation: float, size: float, direction: Vector2, 
 func _process(delta: float) -> void:
 	var had_drops := not _drops.is_empty()
 	var had_waves := not _waves.is_empty()
-	var growing := false
+	# Macchie, corpi e pozze ricordano quando sono nati (vedi _clock): non
+	# si aggiornano uno per uno a ogni frame.
+	_clock += delta
+	var growing := _clock < _grow_until
 	for i in range(_drops.size() - 1, -1, -1):
 		var drop := _drops[i]
 		drop["age"] += delta
 		drop["position"] += drop["velocity"] * delta
 		drop["rise"] -= DROP_GRAVITY * delta
 		drop["altitude"] += drop["rise"] * delta
-		var ground := _ground(drop["position"])
+		var ground: float = drop["ground"]
 		if drop["altitude"] <= ground or drop["age"] > 2.0:
-			_add_splat(drop["position"], ground, drop["size"] * randf_range(0.8, 1.6) * DROP_SPLAT, (drop["velocity"] as Vector2).normalized(), 0.0)
+			# Solo una parte delle gocce lascia una macchia: a terra non si nota.
+			if randf() < DROP_SPLAT_CHANCE:
+				_add_splat(drop["position"], ground, drop["size"] * randf_range(0.8, 1.6) * DROP_SPLAT, (drop["velocity"] as Vector2).normalized(), 0.0)
 			_drops.remove_at(i)
-	for list: Array[Dictionary] in [_splats, _corpses, _waves, _pools]:
-		for item in list:
-			item["age"] += delta
-			if item.get("grow", 0.0) > 0.0 and item["age"] < item["grow"]:
-				growing = true
-	if not _pools.is_empty() and _pools[-1]["age"] < POOL_GROW:
-		growing = true
-	while not _splats.is_empty() and _splats[0]["age"] >= SPLAT_TIME:
+	for wave in _waves:
+		wave["age"] += delta
+	while not _splats.is_empty() and _clock - float(_splats[0]["born"]) >= SPLAT_TIME:
 		_splats.pop_front()
-	while not _corpses.is_empty() and _corpses[0]["age"] >= CORPSE_TIME:
+	while not _corpses.is_empty() and _clock - float(_corpses[0]["born"]) >= CORPSE_TIME:
 		_corpses.pop_front()
 	while not _waves.is_empty() and _waves[0]["age"] >= CRACK_TIME:
 		_waves.pop_front()
@@ -228,7 +238,9 @@ func _process(delta: float) -> void:
 	if had_waves or not _waves.is_empty():
 		_wave_layer.queue_redraw()
 	_redraw_timer -= delta
-	if growing or (_dirty and _redraw_timer <= IDLE_REDRAW - SPLAT_REDRAW) or _redraw_timer <= 0.0:
+	# Macchie nuove e pozze che si allargano: al più ogni SPLAT_REDRAW secondi
+	# (non a ogni frame: con centinaia di macchie costa troppo).
+	if ((growing or _dirty) and _redraw_timer <= IDLE_REDRAW - SPLAT_REDRAW) or _redraw_timer <= 0.0:
 		_redraw_timer = IDLE_REDRAW
 		_dirty = false
 		queue_redraw()
@@ -253,7 +265,7 @@ func _draw() -> void:
 		var at: Vector2 = pool_item["position"] - Vector2(0, pool_item["elevation"])
 		if not view.has_point(at):
 			continue
-		var size: float = pool_item["size"] * ease(minf(pool_item["age"] / POOL_GROW, 1.0), 0.35)
+		var size: float = pool_item["size"] * ease(minf((_clock - float(pool_item["born"])) / POOL_GROW, 1.0), 0.35)
 		BloodSplatter.draw(self, BloodSplatter.pool_texture(pool_item["variant"]), at, size, BloodSplatter.POOL_CORE,
 				pool_item["angle"], Color(pool_item["color"], POOL_ALPHA), GROUND_SQUASH)
 	for splat in _splats:
@@ -261,15 +273,16 @@ func _draw() -> void:
 		if not view.has_point(at):
 			continue
 		var grow: float = splat["grow"]
-		var scale_factor := 1.0 if grow <= 0.0 else ease(minf(splat["age"] / grow, 1.0), 0.4)
-		var color := Color(splat["color"], 0.85 * _fade(splat["age"], SPLAT_TIME))
+		var age := _clock - float(splat["born"])
+		var scale_factor := 1.0 if grow <= 0.0 else ease(minf(age / grow, 1.0), 0.4)
+		var color := Color(splat["color"], 0.85 * _fade(age, SPLAT_TIME))
 		BloodSplatter.draw(self, BloodSplatter.splat_texture(splat["variant"]), at, splat["size"] * scale_factor,
 				BloodSplatter.SPLAT_CORE, splat["angle"], color, GROUND_SQUASH)
 	for body in _corpses:
 		var at: Vector2 = body["position"] - Vector2(0, body["elevation"])
 		if not view.has_point(at):
 			continue
-		var alpha := _fade(body["age"], CORPSE_TIME)
+		var alpha := _fade(_clock - float(body["born"]), CORPSE_TIME)
 		var color: Color = body["color"]
 		draw_set_transform(at)
 		if body["fill"]:

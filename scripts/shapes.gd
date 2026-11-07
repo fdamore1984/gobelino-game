@@ -39,14 +39,15 @@ static func oval(canvas: CanvasItem, center: Vector2, radii: Vector2, color: Col
 
 ## Occhi grandi da fumetto, come quelli di Ufotizio: due ovali bianchi col
 ## contorno nero e le pupille che guardano verso look. size è il raggio
-## orizzontale di un occhio; arrabbiati con le sopracciglia storte.
-static func eyes(canvas: CanvasItem, center: Vector2, size: float, look: Vector2, angry := false, alpha := 1.0) -> void:
+## orizzontale di un occhio; arrabbiati con le sopracciglia storte; ink:
+## spessore del contorno nero.
+static func eyes(canvas: CanvasItem, center: Vector2, size: float, look: Vector2, angry := false, alpha := 1.0, ink_width := 2.0) -> void:
 	var spacing := size * 1.25 * (1.0 - 0.3 * absf(look.x))
 	var radii := Vector2(size, size * 1.25)
 	var ink := Color(INK, alpha)
 	for side: float in [-1.0, 1.0]:
 		var eye := center + Vector2(side * spacing, 0)
-		oval(canvas, eye, radii + Vector2(2.0, 2.0), ink)
+		oval(canvas, eye, radii + Vector2(ink_width, ink_width), ink)
 		oval(canvas, eye, radii, Color(1, 1, 1, alpha))
 		disc(canvas, eye + look * size * 0.45 + Vector2(0, size * 0.15), size * 0.5, ink)
 		if angry:

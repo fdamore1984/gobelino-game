@@ -2,7 +2,10 @@ class_name Dungeon
 extends RefCounted
 ## Sotterraneo sotto una caverna delle montagne: caverne collegate da
 ## gallerie, generate a caso ma sempre uguali per la stessa caverna e lo
-## stesso piano, in una griglia piccola di rombi. Si arriva davanti a un
+## stesso piano, in una griglia piccola di rombi. Le caverne non sono
+## cerchi: più lobi sovrapposti dal bordo frastagliato; le gallerie
+## serpeggiano, cambiano larghezza e hanno qualche nicchia; alla fine le
+## pareti si levigano (vedi _carve_room, _carve_tunnel, _smooth_caves). Si arriva davanti a un
 ## passaggio nella parete che riporta in superficie e si cerca quello che
 ## scende al piano sotto (i passaggi sono sempre in una parete, mai a terra);
 ## all'ultimo piano, nella caverna più lontana, c'è l'arena del boss.
@@ -12,13 +15,18 @@ extends RefCounted
 ## livello 0, la roccia è un blocco alto che non si scala.
 ##
 ## Le catacombe (kind "metro", parametri in "metro" di data/world.json)
-## sono un sotterraneo come gli altri, sotto un mausoleo in rovina, con una
-## pianta regolare: al centro le navate di pietra (due laterali e una
-## centrale con una fila di colonne) tra due fosse ossarie incassate un
-## livello più in basso (TRACK), che continuano nelle gallerie buie oltre le
-## navate; nelle fosse file di grandi tombe (TRAIN, blocchi alti che non si
-## scalano). Sopra e sotto le navate cappelle e camere sepolcrali, divise a
-## caso in stanze con muri dritti, con le porte sulle navate. Il codice usa
+## sono un sotterraneo come gli altri, sotto un mausoleo in rovina: al
+## centro le navate di pietra (due laterali e una centrale con una fila di
+## colonne) tra due fosse ossarie incassate un livello più in basso
+## (TRACK), che oltre le navate continuano nelle gallerie scavate: curvano
+## un rombo alla volta, hanno un camminamento lungo la parete, nicchie
+## sepolcrali, cunicoli trasversali tra una galleria e l'altra e finiscono
+## in un crollo. Nelle fosse, lungo le navate e nelle gallerie, le grandi
+## tombe di pietra (TRAIN), a volte franate sul bordo della navata: sono
+## ostacoli, ma il coperchio è un livello sopra la navata e ci si sale con
+## un salto. Sopra e sotto le navate cappelle e camere sepolcrali, divise a
+## caso in stanze, con brecce nei muri, angoli franati e cumuli di pietre
+## (vedi _roughen), con le porte sulle navate. Il codice usa
 ## gli stessi nomi interni della metropolitana di Ciccio Massacro.
 
 const DATA := preload("res://data/world.json")
@@ -229,6 +237,7 @@ func _generate() -> void:
 		_carve_tunnel(rooms[best]["center"], rooms[i]["center"], rng)
 	for k in floori(rooms.size() / 3.0):
 		_carve_tunnel(rooms[rng.randi() % rooms.size()]["center"], rooms[rng.randi() % rooms.size()]["center"], rng)
+	_smooth_caves(rooms[0]["center"])
 	var arrival_spot := _wall_spot(rooms[0]["center"], int(rooms[0]["radius"]) + 2)
 	arrival = arrival_spot[0]
 	arrival_side = arrival_spot[1]
@@ -304,38 +313,81 @@ func _room_distance(a: int, b: int) -> float:
 	return (rooms[a]["center"] as Vector2i).distance_to(rooms[b]["center"])
 
 
-## Caverna tondeggiante dai bordi irregolari (rough = false: cerchio pieno).
+## Caverna dalla forma irregolare (rough = false: cerchio pieno, per
+## l'arena del boss): più lobi tondi sovrapposti attorno al centro, con il
+## bordo frastagliato, così nessuna caverna è un cerchio.
 func _carve_room(center: Vector2i, radius: int, rng: RandomNumberGenerator, rough := true) -> void:
-	for i in range(-radius - 1, radius + 2):
-		for j in range(-radius - 1, radius + 2):
-			var limit := radius + (rng.randf_range(-0.7, 0.6) if rough else 0.3)
-			if Vector2(i, j).length() <= limit:
-				_set_floor(center + Vector2i(i, j))
+	var lobes: Array[Vector3] = [Vector3(0, 0, radius)]
+	if rough:
+		var lobe_range: Array = settings().get("cave_lobes", [2, 4])
+		for k in rng.randi_range(lobe_range[0], lobe_range[1]):
+			var direction := Vector2.from_angle(rng.randf() * TAU)
+			var offset := direction * radius * rng.randf_range(0.45, 0.8)
+			lobes.append(Vector3(offset.x, offset.y, radius * rng.randf_range(0.35, 0.6)))
+	var reach := ceili(radius * 1.5) + 1
+	for i in range(-reach, reach + 1):
+		for j in range(-reach, reach + 1):
+			for lobe in lobes:
+				var limit := lobe.z + (rng.randf_range(-0.7, 0.6) if rough else 0.3)
+				if Vector2(i - lobe.x, j - lobe.y).length() <= limit:
+					_set_floor(center + Vector2i(i, j))
+					break
 
 
-## Galleria larga due rombi che va da a a b con qualche svolta.
+## Galleria da a verso b che serpeggia: la direzione oscilla attorno a
+## quella verso la meta, la larghezza cambia da 1 a 3 rombi ("tunnel_width")
+## e ogni tanto si apre una nicchia di lato ("alcove_chance").
 func _carve_tunnel(from: Vector2i, to: Vector2i, rng: RandomNumberGenerator) -> void:
-	var at := from
+	var data := settings()
+	var widths: Array = data.get("tunnel_width", [1, 3])
+	var at := Vector2(from)
+	var breadth := 2
+	var wander := 0.0
 	var guard := 0
-	while at != to and guard < 400:
+	while Vector2i(at.round()) != to and guard < 600:
 		guard += 1
-		var step := Vector2i.ZERO
-		var horizontal := rng.randf() < 0.5
-		if at.x == to.x:
-			horizontal = false
-		elif at.y == to.y:
-			horizontal = true
-		if rng.randf() < 0.15:
-			# Una piccola deviazione, per gallerie meno dritte.
-			step = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)][rng.randi() % 4]
-		elif horizontal:
-			step = Vector2i(signi(to.x - at.x), 0)
+		var toward := (Vector2(to) - at)
+		if toward.length() < 1.5:
+			at = Vector2(to)
 		else:
-			step = Vector2i(0, signi(to.y - at.y))
-		at = (at + step).clamp(Vector2i(1, 1), Vector2i(width - 3, height - 3))
-		_set_floor(at)
-		_set_floor(at + Vector2i(1, 0))
-		_set_floor(at + Vector2i(0, 1))
+			wander = clampf(wander + rng.randf_range(-0.5, 0.5), -1.1, 1.1)
+			at += toward.normalized().rotated(wander)
+		at = at.clamp(Vector2(1, 1), Vector2(width - 3, height - 3))
+		if rng.randf() < 0.15:
+			breadth = clampi(breadth + (1 if rng.randf() < 0.5 else -1), int(widths[0]), int(widths[1]))
+		var cell := Vector2i(at.round())
+		for i in breadth:
+			for j in breadth:
+				_set_floor(cell + Vector2i(i, j))
+		if rng.randf() < float(data.get("alcove_chance", 0.0)):
+			var side := Vector2(toward.y, -toward.x).normalized() * (1.0 if rng.randf() < 0.5 else -1.0)
+			_set_floor(cell + Vector2i((side * float(breadth + 1)).round()))
+			_set_floor(cell + Vector2i((side * float(breadth)).round()))
+
+
+## Leviga le pareti: i rombi di roccia quasi circondati dal pavimento
+## crollano, le punte di pavimento isolate si richiudono (una passata di
+## automa cellulare); poi resta solo ciò che si raggiunge da start.
+func _smooth_caves(start: Vector2i) -> void:
+	var changes: Array[Vector2i] = []
+	var fills: Array[Vector2i] = []
+	for v in range(1, height - 1):
+		for x in range(1, width - 1):
+			var cell := Vector2i(x, v)
+			var around := 0
+			for i in range(-1, 2):
+				for j in range(-1, 2):
+					if (i != 0 or j != 0) and is_floor(cell + Vector2i(i, j)):
+						around += 1
+			if not is_floor(cell) and around >= 6:
+				changes.append(cell)
+			elif is_floor(cell) and around <= 1:
+				fills.append(cell)
+	for cell in changes:
+		_set_floor(cell)
+	for cell in fills:
+		_floor[cell.y * width + cell.x] = 0
+	_keep_reachable(start)
 
 
 ## Pianta delle catacombe (vedi in cima): navate, fosse ossarie,
@@ -364,24 +416,58 @@ func _generate_station(rng: RandomNumberGenerator, data: Dictionary, leaves: Arr
 		rows.append([part[0], y, y + int(part[1]) - 1])
 		y += int(part[1])
 	var segment := int(data["platform_segment"])
+	var max_shift := int(data["tunnel_shift"])
+	var shift := _tunnel_shifts(x0, x1, rng, data, rows)
+	# Fosse ossarie: lungo le navate dritte, oltre nelle gallerie scavate
+	# che curvano un rombo alla volta, con un camminamento lungo la parete
+	# esterna e qualche nicchia sepolcrale; ogni galleria finisce in un
+	# crollo prima del bordo.
+	var tunnel_end: Array = data["tunnel_end"]
+	var spans: Array[Vector2i] = []
+	for t in 2:
+		var row: Array = rows[1 + 2 * t]
+		var outward := -1 if t == 0 else 1
+		var left_end := 1 + rng.randi_range(tunnel_end[0], tunnel_end[1])
+		var right_end := width - 2 - rng.randi_range(tunnel_end[0], tunnel_end[1])
+		for x in range(left_end, right_end + 1):
+			for v in range(int(row[1]), int(row[2]) + 1):
+				_set_tile(Vector2i(x, v + shift[x]), Tile.TRACK)
+			if x >= x0 and x <= x1:
+				continue
+			var walk := (int(row[1]) - 1 if t == 0 else int(row[2]) + 1) + shift[x]
+			_set_tile(Vector2i(x, walk), Tile.FLOOR)
+			if rng.randf() < float(data["niche_chance"]):
+				_set_tile(Vector2i(x, walk + outward), Tile.FLOOR)
+		for span: Vector2i in [Vector2i(left_end, x0 - 1), Vector2i(x1 + 1, right_end)]:
+			if span.y - span.x >= 3:
+				leaves.append(Rect2i(span.x, int(row[1]) - max_shift - 1, span.y - span.x + 1, int(row[2]) - int(row[1]) + 3 + 2 * max_shift))
+				spans.append(span)
+	# Cunicoli trasversali tra le due gallerie, ogni tanto (larghi due rombi).
+	var cross: Array = data["cross_passage"]
+	for mouth: Vector2i in [Vector2i(x0 - 1, -1), Vector2i(x1 + 1, 1)]:
+		var x := mouth.x + mouth.y * rng.randi_range(int(cross[0]) / 2, int(cross[1]))
+		while x > 2 and x < width - 3:
+			for k in 2:
+				for v in range(int(rows[1][2]) + 1, int(rows[3][1])):
+					_set_tile(Vector2i(x + k * mouth.y, v + shift[x + k * mouth.y]), Tile.FLOOR)
+			x += mouth.y * rng.randi_range(cross[0], cross[1])
+	# Navate, con le testate irregolari (mai oltre l'inizio delle gallerie).
+	var ragged := int(data["platform_ragged"])
+	var first_platform := Rect2i()
 	for row: Array in rows:
+		if row[0] == "track":
+			continue
 		var first: int = row[1]
 		var last: int = row[2]
-		if row[0] == "track":
-			# Le fosse attraversano tutta la pianta: oltre le navate sono gallerie.
-			for x in range(1, width - 1):
-				for v in range(first, last + 1):
-					_set_tile(Vector2i(x, v), Tile.TRACK)
-			for start: int in [1, x1 + 1]:
-				var end := x0 - 1 if start == 1 else width - 2
-				if end - start >= 3:
-					leaves.append(Rect2i(start, first, end - start + 1, last - first + 1))
-			continue
-		_fill(Vector2i(x0, first), Vector2i(x1, last))
-		var x := x0
-		while x <= x1:
-			var length := mini(segment, x1 - x + 1)
+		var a := x0 + rng.randi_range(0, ragged)
+		var b := x1 - rng.randi_range(0, ragged)
+		_fill(Vector2i(a, first), Vector2i(b, last))
+		var x := a
+		while x <= b:
+			var length := mini(segment, b - x + 1)
 			leaves.append(Rect2i(x, first, length, last - first + 1))
+			if first_platform.size == Vector2i.ZERO:
+				first_platform = Rect2i(x, first, length, last - first + 1)
 			x += length
 	# Colonne in mezzo alla navata centrale, una ogni "pillar_step" rombi.
 	var island_row: Array = rows[2]
@@ -389,24 +475,30 @@ func _generate_station(rng: RandomNumberGenerator, data: Dictionary, leaves: Arr
 	for x in range(x0 + 2, x1 - 1, int(data["pillar_step"])):
 		_floor[middle * width + x] = 0
 		_set_tile(Vector2i(x, middle), Tile.WALL, false)
-	# File di grandi tombe nelle fosse, solo lungo le navate (così non
-	# chiudono le gallerie): blocchi lunghi con un rombo libero tra l'uno e l'altro.
+	# Grandi tombe di pietra: lungo le navate (a volte franate, di traverso
+	# sul bordo della navata) e nelle gallerie (si passa sul camminamento).
+	# Il coperchio è un livello sopra la navata: ci si sale con un salto.
 	var cars: Array = data["train_cars"]
 	var car_length: Array = data["car_length"]
-	for row: Array in [rows[1], rows[3]]:
-		if rng.randf() >= float(data["train_chance"]):
-			continue
-		var count := rng.randi_range(cars[0], cars[1])
-		var x := rng.randi_range(x0 + 1, maxi(x0 + 1, x1 - 1 - count * (int(car_length[1]) + 1)))
-		for k in count:
-			var length := rng.randi_range(car_length[0], car_length[1])
-			for i in mini(length, x1 - x):
-				for v in range(int(row[1]), int(row[2]) + 1):
-					_floor[v * width + x + i] = 0
-					_set_tile(Vector2i(x + i, v), Tile.TRAIN, false)
-			x += length + 1
+	for t in 2:
+		var row: Array = rows[1 + 2 * t]
+		if rng.randf() < float(data["train_chance"]):
+			var count := rng.randi_range(cars[0], cars[1])
+			var x := rng.randi_range(x0 + 1, maxi(x0 + 1, x1 - 1 - count * (int(car_length[1]) + 1)))
+			for k in count:
+				var length := rng.randi_range(car_length[0], car_length[1])
+				var derail := (-1 if t == 0 else 1) if rng.randf() < float(data["derail_chance"]) else 0
+				_place_car(x, mini(length, x1 - x), int(row[1]) + derail, int(row[2]) + derail, shift)
+				x += length + 1
+		var tunnel_cars: Array = data["tunnel_cars"]
+		for span in spans:
+			for k in rng.randi_range(tunnel_cars[0], tunnel_cars[1]):
+				var length := rng.randi_range(car_length[0], car_length[1])
+				if span.y - span.x - 2 < length:
+					break
+				_place_car(rng.randi_range(span.x + 1, span.y - length), length, int(row[1]), int(row[2]), shift)
 	# Cappelle e camere sepolcrali sopra e sotto le navate, con le porte sulle navate.
-	var areas := [Rect2i(1, 1, width - 2, top - 2), Rect2i(1, station_rows.y + 2, width - 2, height - station_rows.y - 3)]
+	var areas := [Rect2i(x0, 1, x1 - x0 + 1, top - 2), Rect2i(x0, station_rows.y + 2, x1 - x0 + 1, height - station_rows.y - 3)]
 	for k in areas.size():
 		var area: Rect2i = areas[k]
 		if area.size.y < int(data["room_size"][0]):
@@ -420,15 +512,53 @@ func _generate_station(rng: RandomNumberGenerator, data: Dictionary, leaves: Arr
 		for _door in int(data["service_doors"]):
 			_open_door(wall, rng)
 	# Ciò che non si raggiunge dalla navata d'arrivo diventa muro.
-	var start := Rect2i(x0, top, mini(segment, x1 - x0 + 1), side)
-	var reached := _distances_from(_center(start))
+	_keep_reachable(_center(first_platform))
+	return first_platform
+
+
+## Spostamento (in righe) delle fosse in ogni colonna: zero lungo le
+## navate, nelle gallerie cambia di un rombo ogni "tunnel_bend" rombi,
+## fino a "tunnel_shift", restando lontano dal bordo della pianta.
+func _tunnel_shifts(x0: int, x1: int, rng: RandomNumberGenerator, data: Dictionary, rows: Array[Array]) -> PackedInt32Array:
+	var shift := PackedInt32Array()
+	shift.resize(width)
+	shift.fill(0)
+	var bend: Array = data["tunnel_bend"]
+	var limit := int(data["tunnel_shift"])
+	var low := maxi(-limit, 4 - int(rows[1][1]))
+	var high := mini(limit, height - 5 - int(rows[3][2]))
+	for direction: int in [-1, 1]:
+		var x := x0 - 1 if direction < 0 else x1 + 1
+		var current := 0
+		var next_bend := rng.randi_range(bend[0], bend[1])
+		while x >= 0 and x < width:
+			next_bend -= 1
+			if next_bend <= 0:
+				current = clampi(current + (1 if rng.randf() < 0.5 else -1), low, high)
+				next_bend = rng.randi_range(bend[0], bend[1])
+			shift[x] = current
+			x += direction
+	return shift
+
+
+## Grande tomba nella fossa: dalla colonna x per length rombi, sulle righe
+## da first a last (spostate come la fossa della colonna).
+func _place_car(x: int, length: int, first: int, last: int, shift: PackedInt32Array) -> void:
+	for i in length:
+		for v in range(first, last + 1):
+			_set_tile(Vector2i(x + i, v + shift[x + i]), Tile.TRAIN)
+
+
+## Ciò che non si raggiunge a piedi da start diventa muro.
+func _keep_reachable(start: Vector2i) -> void:
+	var reached := _distances_from(start)
 	for v in height:
 		for x in width:
 			var cell := Vector2i(x, v)
 			if is_floor(cell) and not reached.has(cell):
 				_floor[v * width + x] = 0
-				_tiles[v * width + x] = Tile.WALL
-	return start
+				if is_metro():
+					_tiles[v * width + x] = Tile.WALL
 
 
 ## Divide il rettangolo in stanze (aggiunte a leaves) con muri dritti e porte.
@@ -452,6 +582,54 @@ func _generate_rooms(area: Rect2i, rng: RandomNumberGenerator, data: Dictionary,
 			_open_door(wall, rng)
 	for k in range(first, leaves.size()):
 		_add_pillars(leaves[k], rng, data)
+	_roughen(leaves, first, walls, rng, data)
+
+
+## Camere meno regolari: tratti di muro crollati (brecce, oltre alle
+## porte), angoli franati (camere a L) e cumuli di pietre contro i muri,
+## senza mai chiudere porte e passaggi.
+func _roughen(leaves: Array[Rect2i], first: int, walls: Array[Dictionary], rng: RandomNumberGenerator, data: Dictionary) -> void:
+	for wall in walls:
+		var cells: Array = wall["cells"]
+		var across: Vector2i = wall["across"]
+		if cells.size() < 5 or rng.randf() >= float(data.get("breach_chance", 0.0)):
+			continue
+		var length := rng.randi_range(1, 3)
+		var at := rng.randi_range(1, cells.size() - 1 - length)
+		for k in length:
+			var cell: Vector2i = cells[at + k]
+			if is_floor(cell + across) and is_floor(cell - across):
+				_set_floor(cell)
+	for k in range(first, leaves.size()):
+		var leaf := leaves[k]
+		if mini(leaf.size.x, leaf.size.y) >= 6 and rng.randf() < float(data.get("collapse_chance", 0.0)):
+			var size := Vector2i(rng.randi_range(2, leaf.size.x / 3), rng.randi_range(2, leaf.size.y / 3))
+			var corner := Vector2i(leaf.position.x if rng.randf() < 0.5 else leaf.end.x - size.x,
+					leaf.position.y if rng.randf() < 0.5 else leaf.end.y - size.y)
+			for x in range(corner.x, corner.x + size.x):
+				for y in range(corner.y, corner.y + size.y):
+					_fill_wall_inside(Vector2i(x, y), leaf)
+		var debris := float(data.get("debris_chance", 0.0))
+		if debris > 0.0:
+			for x in range(leaf.position.x, leaf.end.x):
+				for y in range(leaf.position.y, leaf.end.y):
+					var cell := Vector2i(x, y)
+					var on_edge := x == leaf.position.x or y == leaf.position.y or x == leaf.end.x - 1 or y == leaf.end.y - 1
+					if on_edge and rng.randf() < debris and (cell - _center(leaf)).length() > 2.0:
+						_fill_wall_inside(cell, leaf)
+
+
+## Fa diventare muro un rombo della stanza leaf, ma non se è davanti a una
+## porta o a un passaggio (un vicino fuori dalla stanza è pavimento).
+func _fill_wall_inside(cell: Vector2i, leaf: Rect2i) -> void:
+	if not is_floor(cell):
+		return
+	for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		if not leaf.has_point(cell + step) and is_floor(cell + step):
+			return
+	_floor[cell.y * width + cell.x] = 0
+	if is_metro():
+		_tiles[cell.y * width + cell.x] = Tile.WALL
 
 
 ## Arrivo, scala (o arena del boss all'ultimo piano), stanze e casse.
@@ -574,7 +752,9 @@ func _add_pillars(leaf: Rect2i, rng: RandomNumberGenerator, data: Dictionary) ->
 		return
 	for x in range(leaf.position.x + 2, leaf.end.x - 2, 3):
 		for y in range(leaf.position.y + 2, leaf.end.y - 2, 3):
-			_floor[y * width + x] = 0
+			# Qualcuna è crollata del tutto: le file non sono più regolari.
+			if rng.randf() >= float(data.get("pillar_skip", 0.0)):
+				_floor[y * width + x] = 0
 
 
 static func _center(rect: Rect2i) -> Vector2i:

@@ -22,6 +22,9 @@ const _RIGHT := ["ui_right", "move_right"]
 ## restano premute; e frame in cui è successo l'ultima volta.
 static var _consumed := {}
 static var _consumed_frame := -10
+## Azioni usate da una combinazione che è appena partita (azione -> true,
+## vedi claim_chord): finché restano premute non contano da sole.
+static var _chorded := {}
 
 
 ## Da chiamare in _unhandled_input dei menù. Restituisce true se ha gestito
@@ -80,6 +83,26 @@ static func game_chord(first: StringName, second: StringName) -> bool:
 	return game_held(first) and game_held(second) and (game_pressed(first) or game_pressed(second))
 
 
+## La combinazione di first e second è partita (per esempio L2 + R2 per la
+## bomba H): finché non si rilasciano, i due tasti non fanno anche le loro
+## azioni da soli (vedi solo_held e solo_pressed: il colpo potente e la
+## modalità focus).
+static func claim_chord(first: StringName, second: StringName) -> void:
+	_chorded[first] = true
+	_chorded[second] = true
+
+
+## L'azione è tenuta premuta in gioco da sola, non come parte di una
+## combinazione partita (vedi claim_chord).
+static func solo_held(action: StringName) -> bool:
+	return game_held(action) and not _chorded.has(action)
+
+
+## L'azione è appena stata premuta in gioco da sola (vedi solo_held).
+static func solo_pressed(action: StringName) -> bool:
+	return game_pressed(action) and not _chorded.has(action)
+
+
 ## Da un menù si è appena tornati in gioco (questo frame o il precedente):
 ## i tocchi sullo schermo che hanno chiuso il menù non devono contare.
 static func just_consumed() -> bool:
@@ -93,6 +116,9 @@ static func update() -> void:
 	for action: StringName in _consumed.keys():
 		if not Input.is_action_pressed(action) and not Input.is_action_just_pressed(action):
 			_consumed.erase(action)
+	for action: StringName in _chorded.keys():
+		if not Input.is_action_pressed(action):
+			_chorded.erase(action)
 
 
 static func _is_consumed(action: StringName) -> bool:

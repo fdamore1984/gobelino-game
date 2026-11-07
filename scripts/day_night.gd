@@ -78,7 +78,10 @@ func clear_override() -> void:
 
 
 func _apply() -> void:
-	color = Color(_override, 1.0) if _override.a > 0.0 else _cycle_color()
+	var wanted := Color(_override, 1.0) if _override.a > 0.0 else _cycle_color()
+	# Solo se cambia: di giorno e di notte il colore resta uguale a lungo.
+	if wanted != color:
+		color = wanted
 
 
 func _cycle_color() -> Color:

@@ -17,6 +17,7 @@ const RANGE := 1100.0
 const SAMPLES := 60
 const REFRESH_TIME := 0.4
 const REFRESH_DISTANCE := 40.0
+const REDRAW_INTERVAL := 0.05
 const COLOR_BORDER := UiStyle.INK
 ## Cornice col contorno nero e l'ombra piena, come i pannelli del sito.
 const FRAME := 7.0
@@ -62,6 +63,9 @@ func _ready() -> void:
 	_texture = ImageTexture.create_from_image(_image)
 
 
+var _redraw_timer := 0.0
+
+
 func _process(delta: float) -> void:
 	if _player == null:
 		var hud := get_parent() as Hud
@@ -84,7 +88,11 @@ func _process(delta: float) -> void:
 			_sample_rows()
 		if _next_center != Vector2.INF:
 			_sample_rows()
-	queue_redraw()
+	# Si ridisegna al più ogni REDRAW_INTERVAL secondi: a occhio non cambia nulla.
+	_redraw_timer -= delta
+	if _redraw_timer <= 0.0:
+		_redraw_timer = REDRAW_INTERVAL
+		queue_redraw()
 
 
 ## Dopo un salto lontano (entrando o uscendo da una caverna) il terreno
@@ -136,9 +144,11 @@ func _draw() -> void:
 		if _inside(at) and (node as Node2D).global_position.distance_to(_player.position) <= near:
 			Shapes.disc(self, at, 3.5, COLOR_OUTLINE)
 			Shapes.disc(self, at, 2.5, COLOR_LOOT)
-	for node in get_tree().get_nodes_in_group("enemies"):
-		var at := _to_map((node as Node2D).global_position)
-		if _inside(at) and (node as Node2D).global_position.distance_to(_player.position) <= near:
+	for enemy in Enemy.alive_list():
+		if not is_instance_valid(enemy) or enemy.is_dead():
+			continue
+		var at := _to_map(enemy.global_position)
+		if _inside(at) and enemy.global_position.distance_to(_player.position) <= near:
 			Shapes.disc(self, at, 5.0, COLOR_OUTLINE)
 			Shapes.disc(self, at, 3.8, COLOR_ENEMY)
 	# Giocatore: freccia nella direzione in cui guarda.

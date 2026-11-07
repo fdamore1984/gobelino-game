@@ -15,8 +15,9 @@ const HEIGHT := 256
 const CONE_SIZE := 256
 const CONE_SOFT := deg_to_rad(10.0)
 ## Il fascio si accende tra queste distanze dal vertice (frazioni della
-## portata): la torcia non abbaglia chi la tiene.
-const CONE_START := Vector2(0.02, 0.1)
+## portata): il vertice sta dietro le spalle (vedi Flashlight), quindi il
+## cono è già pieno attorno a chi tiene la torcia.
+const CONE_START := Vector2(0.005, 0.045)
 
 static var _texture: GradientTexture2D
 ## Apertura in gradi -> texture del fascio.

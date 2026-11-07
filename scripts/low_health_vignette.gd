@@ -7,7 +7,9 @@ extends ColorRect
 ## tingono di rosso e pulsano come un battito, più forte quanto meno vita
 ## resta.
 ##
-## Modalità focus (tenendo premuto "focus", R2 / V): il mondo perde colore
+## Modalità focus (tenendo premuto "focus", R2 / V, da solo per almeno
+## FOCUS_DELAY secondi: come parte della combinazione della bomba H, L2 + R2,
+## non si accende mai, vedi UiNav.claim_chord): il mondo perde colore
 ## e luce (saturazione e gamma più bassi) e i bordi si scuriscono con una
 ## vignettatura nera. Il giocatore e gli elementi con cui interagire (oggetti
 ## a terra, casse chiuse, ingressi, mercanti, totem pronti) restano a colori
@@ -36,6 +38,9 @@ const FOCUS_FADE_SPEED := 6.0
 const FOCUS_SATURATION := 0.3
 const FOCUS_GAMMA := 1.45
 const FOCUS_VIGNETTE := 0.9
+## Il focus si accende dopo questo tempo di pressione: abbastanza per
+## capire se "focus" fa parte della combinazione della bomba H.
+const FOCUS_DELAY := 0.12
 ## Attacco speciale: quanto resta della luce dello sfondo, il suo colore e
 ## quanto è largo (rispetto al raggio di focus_spot) il cerchio attorno a
 ## goblin che resta a colori.
@@ -111,9 +116,20 @@ func _ready() -> void:
 	visible = false
 
 
-## Modalità focus attiva: tenendo premuto "focus" in gioco (non in pausa né da morti).
+## Modalità focus attiva (calcolata una volta per frame in _process, vedi
+## in cima): tenendo premuto "focus" da solo in gioco, non in pausa, da
+## morti né con la bomba H in mano.
 static func focus_held() -> bool:
-	return UiNav.game_held("focus")
+	return _focus_on
+
+
+static var _focus_on := false
+## Da quanto si tiene premuto "focus" da solo (vedi FOCUS_DELAY).
+var _focus_hold := 0.0
+
+
+func _exit_tree() -> void:
+	_focus_on = false
 
 
 func _process(delta: float) -> void:
@@ -125,7 +141,11 @@ func _process(delta: float) -> void:
 	elif player and player.is_dead():
 		target = INTENSITY_LAST
 	_shown = move_toward(_shown, target, FADE_SPEED * delta)
-	var focusing := player != null and not player.is_dead() and not get_tree().paused and focus_held()
+	var wanted := player != null and not player.is_dead() and not get_tree().paused \
+			and UiNav.solo_held("focus") and not player.holding_h_bomb()
+	_focus_hold = _focus_hold + delta if wanted else 0.0
+	_focus_on = wanted and _focus_hold >= FOCUS_DELAY
+	var focusing := _focus_on
 	_focus = move_toward(_focus, 1.0 if focusing else 0.0, FOCUS_FADE_SPEED * delta)
 	# La dissolvenza del buio la fa già il giocatore (con un Tween).
 	var dark := player.special_darkness() if player else 0.0

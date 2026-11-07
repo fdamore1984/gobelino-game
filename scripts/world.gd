@@ -136,6 +136,10 @@ const LIGHT_BASE_NUDGE := 4.0
 ## _light_base_b), TOP scendendo di _light_top (cime e decorazioni).
 enum LightMode { NONE, FACE, TOP }
 
+## Versione della forma del mondo e dei sotterranei: le zone scoperte
+## salvate con una versione precedente non valgono più (vedi load_state).
+const MAP_VERSION := 2
+
 ## Mondo attivo: giocatore e nemici lo usano per muoversi.
 static var current: World
 
@@ -177,6 +181,9 @@ var _region_total := 0
 var _view_queue: Array[Vector2i] = []
 var _dungeon_data: Dictionary = DATA.data["dungeon"]
 var _levels: int
+## Livelli in più delle montagne (vedi "mountain_extra_levels"): in
+## proporzione con il goblin e con gli alberi.
+var _mountain_extra := 0
 var _height_noise := FastNoiseLite.new()
 var _path_noise := FastNoiseLite.new()
 var _forest_noise := FastNoiseLite.new()
@@ -254,6 +261,7 @@ func _ready() -> void:
 	if seed_value == 0:
 		seed_value = randi_range(1, 1 << 30)
 	_levels = _terrain["levels"]
+	_mountain_extra = int(_terrain.get("mountain_extra_levels", 0))
 	level_height = _terrain["level_height"]
 	_setup_noises()
 	_grass_colors = _colors(_terrain["grass_colors"])
@@ -304,6 +312,16 @@ func _setup_noises() -> void:
 	_setup_noise(_height_noise, 0, _terrain["height_frequency"], _terrain["height_octaves"])
 	_setup_noise(_path_noise, 1, _terrain["path_frequency"], 1)
 	_setup_noise(_forest_noise, 2, _terrain["forest_frequency"], 2)
+	# Colline, sentieri e boschi distorti ("warp_amplitude", "warp_frequency"):
+	# altopiani e radure dalle forme irregolari e asimmetriche, non le
+	# terrazze concentriche del rumore da solo.
+	for noise: FastNoiseLite in [_height_noise, _path_noise, _forest_noise]:
+		noise.domain_warp_enabled = true
+		noise.domain_warp_type = FastNoiseLite.DOMAIN_WARP_SIMPLEX
+		noise.domain_warp_amplitude = float(_terrain["warp_amplitude"])
+		noise.domain_warp_frequency = float(_terrain["warp_frequency"])
+		noise.domain_warp_fractal_type = FastNoiseLite.DOMAIN_WARP_FRACTAL_PROGRESSIVE
+		noise.domain_warp_fractal_octaves = 2
 	_setup_noise(_ridge_noise, 4, _terrain["barrier_frequency"], 1)
 	_setup_noise(_gap_noise, 5, _terrain["barrier_gap_frequency"], 1)
 	_setup_noise(_barrier_kind_noise, 6, _terrain["barrier_kind_frequency"], 1)
@@ -323,7 +341,7 @@ func save_state() -> Dictionary:
 	return {
 		"chests": _opened_chests.keys().map(SaveGame.array), "totems": totems,
 		"stocks": stocks, "caves": cleared_caves.keys().map(SaveGame.array),
-		"explored": _explored_state(),
+		"explored": _explored_state(), "map_version": MAP_VERSION,
 	}
 
 
@@ -351,7 +369,9 @@ func load_state(data: Dictionary) -> void:
 	for at: Array in data.get("caves", []):
 		cleared_caves[SaveGame.vector(at)] = true
 	# I salvataggi di prima non hanno le zone scoperte: la mappa riparte vuota.
-	var saved_maps: Dictionary = data.get("explored", {})
+	# Le zone scoperte salvate con una forma diversa del mondo e dei
+	# sotterranei (MAP_VERSION) non corrispondono più: la mappa riparte vuota.
+	var saved_maps: Dictionary = data.get("explored", {}) if int(data.get("map_version", 1)) >= MAP_VERSION else {}
 	for key: String in saved_maps:
 		var seen := {}
 		for entry: Array in saved_maps[key]:
@@ -682,7 +702,7 @@ func level_of(cell: Vector2i) -> int:
 			if _barrier_kind_noise.get_noise_2dv(center) >= 0.0:
 				# La montagna sale a gradini verso la cresta.
 				kind = Kind.MOUNTAIN
-				level = _levels + 1 + mini(floori(ridge * 4.0), 3)
+				level = _levels + 1 + _mountain_extra + mini(floori(ridge * 4.0), 3)
 			else:
 				kind = Kind.RAVINE
 				level = -int(_terrain["ravine_depth"])
@@ -1451,7 +1471,7 @@ func _view_rect(margin: float) -> Rect2:
 
 ## Livello più alto possibile: le cime delle montagne o la roccia del sotterraneo.
 func _max_level() -> int:
-	return dungeon.wall_level if dungeon else _levels + 4
+	return dungeon.wall_level if dungeon else _levels + 4 + _mountain_extra
 
 
 func _chunk_bounds(chunk: Vector2i) -> Rect2:
@@ -1608,8 +1628,11 @@ func draw_cell(canvas: Object, cell: Vector2i, offset: Vector2) -> void:
 	var lip := kind == Kind.GROUND and dungeon == null
 	# Nelle catacombe le pareti sono di pietra con le nicchie, le tombe scolpite.
 	var pattern := ""
-	if dungeon and dungeon.is_metro() and kind == Kind.ROCK:
-		pattern = "train" if dungeon.tile_at(cell) == Dungeon.Tile.TRAIN else "tiles"
+	if dungeon and dungeon.is_metro():
+		if dungeon.tile_at(cell) == Dungeon.Tile.TRAIN:
+			pattern = "train"
+		elif kind == Kind.ROCK:
+			pattern = "tiles"
 	_draw_face(canvas, corners, heights, cell + Vector2i(1, 0), 1, 2, 0, 3, faces[0], lip, cell, pattern)
 	_draw_face(canvas, corners, heights, cell + Vector2i(0, 1), 2, 3, 1, 0, faces[1], lip, cell, pattern)
 
@@ -1644,8 +1667,11 @@ func _top_color(cell: Vector2i, kind: int, path: bool) -> Color:
 				return _metro_colors["train_top"] if dungeon.tile_at(cell) == Dungeon.Tile.TRAIN else _metro_colors["wall_color"]
 			return _dungeon_wall_color
 	if dungeon and dungeon.is_metro():
-		if dungeon.tile_at(cell) == Dungeon.Tile.TRACK:
-			return _metro_colors["track_color"]
+		match dungeon.tile_at(cell):
+			Dungeon.Tile.TRACK:
+				return _metro_colors["track_color"]
+			Dungeon.Tile.TRAIN:
+				return _metro_colors["train_top"]
 		return _metro_floor_colors[posmod(hash([cell.x, cell.y]), _metro_floor_colors.size())]
 	if dungeon:
 		return _dungeon_floor_colors[posmod(hash([cell.x, cell.y]), _dungeon_floor_colors.size())]
@@ -1823,6 +1849,9 @@ func _draw_tomb_side(canvas: Object, a: Vector2, b: Vector2, top_a: float, top_b
 	var h0 := lerpf(bottom_a, bottom_b, 0.14)
 	var h1 := lerpf(bottom_a, bottom_b, 0.86)
 	var top := minf(top_a - bottom_a, top_b - bottom_b) - 16.0
+	# Dalla navata si vede solo la parte alta del fianco: niente riquadri.
+	if top < 20.0:
+		return
 	var panel := PackedVector2Array([p0 - Vector2(0, h0 + 12.0), p1 - Vector2(0, h1 + 12.0), p1 - Vector2(0, h1 + top), p0 - Vector2(0, h0 + top)])
 	_fill(canvas, panel, color.darkened(0.12))
 	var frame := PackedVector2Array()
@@ -1972,6 +2001,14 @@ func _draw_crypt_floor(canvas: Object, cell: Vector2i, offset: Vector2, rng: Ran
 	var point := func(u: float, v: float) -> Vector2:
 		return _from_uv((cell.x + u) * CELL, (cell.y + v) * CELL) + offset - lift
 	var bone: Color = _metro_colors["rail_color"]
+	if dungeon.tile_at(cell) == Dungeon.Tile.TRAIN:
+		# Coperchio della grande tomba: le lastre di pietra e una croce incisa.
+		var seams := PackedVector2Array([point.call(0.0, 0.5), point.call(1.0, 0.5), point.call(0.5, 0.15), point.call(0.5, 0.85)])
+		canvas.draw_multiline(seams, Color(0, 0, 0, 0.18), 1.5)
+		if posmod(cell.x, 3) == 1:
+			canvas.draw_multiline(PackedVector2Array([point.call(0.35, 0.5), point.call(0.65, 0.5), point.call(0.5, 0.3), point.call(0.5, 0.7)]),
+					(_metro_colors["train_top"] as Color).darkened(0.3), 2.5)
+		return
 	if dungeon.tile_at(cell) == Dungeon.Tile.TRACK:
 		var bones := PackedVector2Array()
 		for k in rng.randi_range(3, 6):
@@ -2081,8 +2118,10 @@ func _dungeon_obstacles(chunk: Vector2i) -> Array:
 				if roll < 0.0:
 					type_id = id
 					break
-			# I sarcofagi stanno sulle navate, non nelle fosse.
-			if type_id == "" or (type_id == "bench" and dungeon.tile_at(cell) != Dungeon.Tile.FLOOR):
+			# I sarcofagi stanno sulle navate, non nelle fosse; sopra le grandi
+			# tombe non c'è niente.
+			if type_id == "" or (type_id == "bench" and dungeon.tile_at(cell) != Dungeon.Tile.FLOOR) \
+					or dungeon.tile_at(cell) == Dungeon.Tile.TRAIN:
 				continue
 			var type: Dictionary = _obstacle_types[type_id]
 			var radius_range: Array = type["radius"]
