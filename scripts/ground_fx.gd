@@ -44,6 +44,23 @@ const SPLAT_REDRAW := 0.05
 const IDLE_REDRAW := 0.2
 ## Le gocce stanno in un quadrato del mondo: la terra sotto è ellittica.
 const GROUND_SQUASH := 0.5
+## Sangue di un colpo (vedi bleed): gocce in un cono stretto nel verso del
+## colpo (BLEED_CONE radianti per lato), con le velocità di BLEED_SPEED (i
+## colpi potenti BLEED_SPEED_HEAVY), che a terra lasciano macchie allungate
+## nella direzione in cui volavano (fino a SPLAT_STRETCH_MAX volte, vedi
+## _add_splat); nel punto colpito una nuvoletta rossa (vedi PUFF_*).
+const BLEED_CONE := 0.3
+const BLEED_SPEED := Vector2(70.0, 280.0)
+const BLEED_SPEED_HEAVY := Vector2(110.0, 380.0)
+const SPLAT_STRETCH_MAX := 2.2
+const SPLAT_STRETCH_SPEED := 260.0
+## Nuvolette (sangue nel punto colpito, polvere contro i muri): durata,
+## quante al più insieme e quanti sbuffi per nuvoletta.
+const PUFF_TIME := 0.35
+const MAX_PUFFS := 60
+const PUFF_PARTS := 5
+const PUFF_PARTS_HEAVY := 8
+const COLOR_BLOOD_PUFF := Color(0.75, 0.05, 0.06, 0.55)
 ## Bagliore rosso del punto d'impatto di un attacco a terra (vedi danger_glow).
 const COLOR_DANGER_GLOW := Color(1.0, 0.18, 0.08)
 const COLOR_DANGER_CORE := Color(1.0, 0.55, 0.25)
@@ -60,6 +77,7 @@ var _splats: Array[Dictionary] = []
 var _corpses: Array[Dictionary] = []
 var _pools: Array[Dictionary] = []
 var _waves: Array[Dictionary] = []
+var _puffs: Array[Dictionary] = []
 var _air := AirLayer.new()
 var _wave_layer := WaveLayer.new()
 var _redraw_timer := 0.0
@@ -88,28 +106,53 @@ func _ready() -> void:
 
 
 ## Sangue di un colpo (giocatore e nemici): gocce che schizzano a fiotti
-## nella direzione del colpo (alcune grosse, altre come nebbia) e restano a
-## terra come schizzi, più uno schizzo largo subito sotto chi è colpito.
-static func bleed(at: Vector2, altitude: float, direction: Vector2, amount: int) -> void:
-	if current == null:
+## in un cono stretto nel verso del colpo (alcune grosse, altre come nebbia,
+## più veloci con i colpi potenti) e restano a terra come schizzi allungati,
+## più uno schizzo largo, allungato anche lui, subito sotto chi è colpito e
+## una nuvoletta rossa nel punto colpito (doppia con i colpi potenti).
+static func bleed(at: Vector2, altitude: float, direction: Vector2, amount: int, heavy := false) -> void:
+	# Opzione Sangue (vedi Settings.blood_factor): ridotto o niente.
+	var factor := Settings.blood_factor()
+	if current == null or factor <= 0.0:
 		return
+	amount = roundi(amount * factor)
 	# Il terreno su cui cadono le gocce è quello da cui partono: si calcola
 	# una volta sola, non per ogni goccia a ogni frame.
 	var ground := _ground(at)
+	var speeds := BLEED_SPEED_HEAVY if heavy else BLEED_SPEED
+	current._add_puff(at, altitude, direction, ceili((PUFF_PARTS_HEAVY if heavy else PUFF_PARTS) * factor), COLOR_BLOOD_PUFF, 9.0 if heavy else 7.0)
 	for i in mini(amount, MAX_DROPS - current._drops.size()):
-		var spread := direction.rotated(randf_range(-0.8, 0.8)) * randf_range(50.0, 240.0)
+		var spread := direction.rotated(randf_range(-BLEED_CONE, BLEED_CONE)) * randf_range(speeds.x, speeds.y)
 		current._drops.append({
 			"position": at, "altitude": altitude, "velocity": Vector2(spread.x, spread.y * 0.6),
 			"rise": randf_range(60.0, 300.0), "size": randf_range(2.0, 4.0), "age": 0.0, "ground": ground,
 		})
-	current._add_splat(at + direction * 8.0, ground, randf_range(8.0, 12.0), direction, 0.0)
+	current._add_splat(at + direction * 12.0, ground, randf_range(8.0, 12.0), direction, 0.0, 1.7 if heavy else 1.4)
+
+
+## Sbuffo di polvere di chi viene spinto contro un muro (at: dove sbatte,
+## alzato di altitude; direction: verso cui si allarga, via dal muro; size:
+## raggio di chi sbatte).
+static func dust(at: Vector2, altitude: float, direction: Vector2, size: float) -> void:
+	if current:
+		current._add_puff(at, altitude, direction, PUFF_PARTS_HEAVY, COLOR_DUST, size * 0.45)
+
+
+## Nuvoletta di count sbuffi (dischi che si allargano, si allontanano un po'
+## nella direzione data e svaniscono in PUFF_TIME secondi).
+func _add_puff(at: Vector2, altitude: float, direction: Vector2, count: int, color: Color, size: float) -> void:
+	for k in mini(count, MAX_PUFFS - _puffs.size()):
+		var drift := direction.rotated(randf_range(-0.9, 0.9)) * randf_range(30.0, 110.0)
+		_puffs.append({"position": at + Vector2(randf_range(-4, 4), randf_range(-3, 3)), "altitude": altitude + randf_range(-4, 6),
+				"velocity": drift, "size": size * randf_range(0.7, 1.3), "age": 0.0, "color": color})
 
 
 ## Pozza di sangue sotto chi muore (giocatore e nemici), larga size: si
 ## allarga piano e poi resta (vedi POOL_GROW).
 static func pool(at: Vector2, size: float) -> void:
-	if current == null:
+	if current == null or Settings.blood_factor() <= 0.0:
 		return
+	size *= lerpf(0.6, 1.0, Settings.blood_factor())
 	current._pools.append({"position": at, "elevation": _ground(at), "size": size, "born": current._clock,
 			"angle": randf() * TAU, "variant": randi(), "color": BLOOD_COLOR.darkened(randf_range(0.1, 0.25))})
 	current._grow_until = maxf(current._grow_until, current._clock + POOL_GROW)
@@ -176,6 +219,7 @@ static func danger_glow(canvas: CanvasItem, at: Vector2, radius: float, progress
 ## Toglie tutto (passando tra superficie e sotterraneo).
 func clear() -> void:
 	_drops.clear()
+	_puffs.clear()
 	_splats.clear()
 	_corpses.clear()
 	_pools.clear()
@@ -191,13 +235,14 @@ static func _ground(at: Vector2) -> float:
 
 ## Schizzo di sangue (vedi BloodSplatter.splat_texture) con la macchia
 ## centrale larga size e i rivoli nella direzione del colpo, steso a terra.
-## grow: secondi in cui si allarga (0 = subito pieno).
-func _add_splat(at: Vector2, elevation: float, size: float, direction: Vector2, grow: float) -> void:
+## grow: secondi in cui si allarga (0 = subito pieno); stretch: quanto è
+## allungato nella direzione del colpo (1 = tondo).
+func _add_splat(at: Vector2, elevation: float, size: float, direction: Vector2, grow: float, stretch := 1.0) -> void:
 	# La direzione è sullo schermo: in pianta la componente verticale è doppia.
-	var angle := Vector2(direction.x, direction.y / GROUND_SQUASH).angle() + randf_range(-0.35, 0.35)
+	var angle := Vector2(direction.x, direction.y / GROUND_SQUASH).angle() + randf_range(-0.2, 0.2) * (2.0 - minf(stretch, 2.0))
 	_splats.append({
 		"position": at, "elevation": elevation, "size": size, "angle": angle, "variant": randi(),
-		"born": _clock, "grow": grow, "color": BLOOD_COLOR.darkened(randf_range(0.0, 0.25)),
+		"born": _clock, "grow": grow, "color": BLOOD_COLOR.darkened(randf_range(0.0, 0.25)), "stretch": stretch,
 	})
 	_grow_until = maxf(_grow_until, _clock + grow)
 	if _splats.size() > MAX_SPLATS:
@@ -222,8 +267,20 @@ func _process(delta: float) -> void:
 		if drop["altitude"] <= ground or drop["age"] > 2.0:
 			# Solo una parte delle gocce lascia una macchia: a terra non si nota.
 			if randf() < DROP_SPLAT_CHANCE:
-				_add_splat(drop["position"], ground, drop["size"] * randf_range(0.8, 1.6) * DROP_SPLAT, (drop["velocity"] as Vector2).normalized(), 0.0)
+				# La goccia si allunga a terra nella direzione in cui volava.
+				var flight: Vector2 = drop["velocity"]
+				var stretch := clampf(1.0 + flight.length() / SPLAT_STRETCH_SPEED, 1.0, SPLAT_STRETCH_MAX)
+				_add_splat(drop["position"], ground, drop["size"] * randf_range(0.8, 1.6) * DROP_SPLAT, flight.normalized(), 0.0, stretch)
 			_drops.remove_at(i)
+	var had_puffs := not _puffs.is_empty()
+	for i in range(_puffs.size() - 1, -1, -1):
+		var puff := _puffs[i]
+		puff["age"] += delta
+		puff["position"] += puff["velocity"] * delta
+		puff["velocity"] *= exp(-6.0 * delta)
+		puff["altitude"] += 18.0 * delta
+		if puff["age"] >= PUFF_TIME:
+			_puffs.remove_at(i)
 	for wave in _waves:
 		wave["age"] += delta
 	while not _splats.is_empty() and _clock - float(_splats[0]["born"]) >= SPLAT_TIME:
@@ -233,7 +290,7 @@ func _process(delta: float) -> void:
 	while not _waves.is_empty() and _waves[0]["age"] >= CRACK_TIME:
 		_waves.pop_front()
 	# Gocce e onde si muovono: si ridisegnano finché ci sono (e un'ultima volta per toglierle).
-	if had_drops or not _drops.is_empty():
+	if had_drops or not _drops.is_empty() or had_puffs or not _puffs.is_empty():
 		_air.queue_redraw()
 	if had_waves or not _waves.is_empty():
 		_wave_layer.queue_redraw()
@@ -277,7 +334,7 @@ func _draw() -> void:
 		var scale_factor := 1.0 if grow <= 0.0 else ease(minf(age / grow, 1.0), 0.4)
 		var color := Color(splat["color"], 0.85 * _fade(age, SPLAT_TIME))
 		BloodSplatter.draw(self, BloodSplatter.splat_texture(splat["variant"]), at, splat["size"] * scale_factor,
-				BloodSplatter.SPLAT_CORE, splat["angle"], color, GROUND_SQUASH)
+				BloodSplatter.SPLAT_CORE, splat["angle"], color, GROUND_SQUASH, float(splat.get("stretch", 1.0)))
 	for body in _corpses:
 		var at: Vector2 = body["position"] - Vector2(0, body["elevation"])
 		if not view.has_point(at):
@@ -319,13 +376,18 @@ func _draw_wave(canvas: CanvasItem, wave: Dictionary) -> void:
 			Shapes.disc(canvas, at, rng.randf_range(4.0, 9.0) * (1.0 - t * 0.6), Color(COLOR_DUST, 0.7 * (1.0 - t)))
 
 
-## Gocce in volo, sopra personaggi e ostacoli.
+## Gocce in volo e nuvolette (sangue, polvere), sopra personaggi e ostacoli.
 class AirLayer:
 	extends Node2D
 
 	var fx: GroundFx
 
 	func _draw() -> void:
+		for puff in fx._puffs:
+			var t: float = puff["age"] / GroundFx.PUFF_TIME
+			var color: Color = puff["color"]
+			Shapes.disc(self, puff["position"] - Vector2(0, puff["altitude"]), puff["size"] * (0.6 + 0.9 * ease(t, 0.4)),
+					Color(color, color.a * (1.0 - t)))
 		for drop in fx._drops:
 			Shapes.disc(self, drop["position"] - Vector2(0, drop["altitude"]), drop["size"], GroundFx.BLOOD_COLOR.lightened(0.1))
 

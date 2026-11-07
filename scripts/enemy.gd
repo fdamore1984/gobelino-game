@@ -52,20 +52,98 @@ extends Node2D
 ## Player._start_special): niente decisioni, movimenti, attacchi né
 ## proiettili (vedi EnemyBolt), ma si possono colpire e chi muore cade.
 static var frozen := false
+## Campo dei percorsi verso il giocatore per le orde (rombo -> passi, vedi
+## World.reach_field), aggiornato da Game mentre c'è un'orda.
+static var horde_field := {}
 
 signal died(enemy: Enemy)
 ## Chiede alla scena di gioco di creare i nemici evocati.
 signal summon_requested(summoner: Enemy, type_id: String, positions: Array[Vector2])
 
-enum State { WANDER, CHASE, DASH, WINDUP, STRIKE, RECOVER, STUNNED, SUMMON, DEAD, GUARD, SLAM }
+enum State { WANDER, CHASE, DASH, WINDUP, STRIKE, RECOVER, STUNNED, SUMMON, DEAD, GUARD, SLAM, STAGGER }
 
 const ACCELERATION := 750.0
 ## Lo sguardo ruota con continuità invece che a scatti.
 const TURN_RATE := 9.0
 const LEASH_RANGE := 700.0
 const SEPARATION_RANGE := 60.0
-const KNOCKBACK := 320.0
-const HEAVY_KNOCKBACK_FACTOR := 1.6
+## Respinta dei colpi (vedi take_points e knock): la strada percorsa da un
+## nemico di massa 1 dopo un colpo della combo e dopo un colpo potente (il
+## colpo finale della combo, il colpo potente, gli attacchi a terra, le
+## esplosioni), divisa per massa^KNOCKBACK_MASS_EXPONENT (i boss la
+## dividono ancora per BOSS_KNOCKBACK_DIVISOR: si spostano appena). La
+## spinta frena in modo morbido: la velocità cala in modo esponenziale,
+## KNOCKBACK_DAMPING al secondo (la strada è velocità / KNOCKBACK_DAMPING).
+const KNOCKBACK_DISTANCE := 90.0
+const HEAVY_KNOCKBACK_DISTANCE := 220.0
+const KNOCKBACK_MASS_EXPONENT := 0.6
+const BOSS_KNOCKBACK_DIVISOR := 3.5
+const KNOCKBACK_DAMPING := 9.0
+## Sotto questa velocità la spinta si ferma del tutto.
+const KNOCKBACK_STOP := 6.0
+## Le spinte date con shove (velocità iniziale) percorrono la stessa strada
+## di quando frenavano a velocità costante, SHOVE_DECELERATION px/s².
+const SHOVE_DECELERATION := 1200.0
+## Contro un muro (gradini troppo alti, montagne, roccia, ostacoli solidi) una spinta di almeno
+## WALL_HIT_SPEED px/s si ferma con uno sbuffo di polvere e un piccolo
+## rimbalzo indietro (WALL_BOUNCE della velocità d'urto); conta come muro
+## quando si percorre meno di WALL_HIT_SHARE della strada voluta.
+const WALL_HIT_SPEED := 240.0
+const WALL_BOUNCE := 0.3
+const WALL_HIT_SHARE := 0.4
+## Barcollamento (stato STAGGER, vedi _stagger): colpito, il nemico si
+## inclina all'indietro, si schiaccia e interrompe l'attacco per un tempo
+## tra STAGGER_TIME.x (colpi della combo) e STAGGER_TIME.y (colpi potenti),
+## un po' a caso. Chi barcolla dipende dalla voce "stagger" del tipo
+## (data/enemies.json): "light" (predefinito) da ogni colpo, "heavy" (bruti,
+## golem, ghoul gonfi) solo dai colpi potenti e dal colpo finale della
+## combo, "none" mai; i boss mai. Finito, aspetta un attimo prima di attaccare.
+const STAGGER_TIME := Vector2(0.18, 0.32)
+const STAGGER_TIME_LIMITS := Vector2(0.15, 0.35)
+const STAGGER_COOLDOWN := Vector2(0.25, 0.55)
+## Reazione a ogni colpo (vedi _draw e _body_transform): il corpo si
+## schiaccia e rimbalza (ampiezza HURT_SQUASH, colpi potenti
+## HURT_SQUASH_HEAVY, molla smorzata) e si inclina all'indietro, dalla
+## parte opposta al colpo (HURT_TILT radianti, che si raddrizzano), con la
+## smorfia di dolore (occhi socchiusi) per PAIN_FACE_TIME secondi.
+const HURT_SQUASH := 0.16
+const HURT_SQUASH_HEAVY := 0.26
+const HURT_SQUASH_DAMPING := 9.0
+const HURT_SQUASH_FREQUENCY := 28.0
+const HURT_TILT := 0.32
+const HURT_TILT_HEAVY := 0.45
+const HURT_TILT_RECOVERY := 7.0
+const PAIN_FACE_TIME := 0.28
+## Resistenza ai colpi (voce "poise" del tipo in data/enemies.json, per i
+## nemici grossi e i boss; vedi _take_poise): ogni colpo svuota la barra
+## gialla sotto la vita (un colpo della combo 1, il colpo finale 2, un colpo
+## potente o un attacco a terra 3, il contrattacco tutta); vuota, il nemico
+## barcolla più a lungo (POISE_BREAK_TIME, anche i boss, che altrimenti non
+## barcollano mai) e poi torna piena. Senza colpi per POISE_REGEN_DELAY
+## secondi si riempie da sola ("poise_regen" al secondo, se no in
+## POISE_REFILL_TIME secondi).
+const POISE_BREAK_TIME := 0.6
+const POISE_REGEN_DELAY := 2.5
+const POISE_REFILL_TIME := 1.5
+const COLOR_POISE := Color(1.0, 0.82, 0.25)
+## Nemici élite (vedi make_elite e la voce "elites" di data/world.json): più
+## grossi, più resistenti, con più esperienza e bottino sicuro, avvolti da
+## un'aura che pulsa (ELITE_AURA_*) e da un anello dorato a terra
+## (ELITE_RING_*, vedi _draw_elite_ring), che il buio non spegne e che si
+## vedono anche di giorno sul terreno chiaro.
+const COLOR_ELITE_AURA := Color(1.0, 0.75, 0.2)
+const ELITE_AURA_RADIUS := 1.8
+const ELITE_AURA_ALPHA := 0.55
+const ELITE_RING_RADIUS := 1.35
+const ELITE_RING_WIDTH := 3.0
+const ELITE_RING_GLOW_ALPHA := 0.45
+## Attacchi che non si possono parare (voce "unblockable" del tipo o del suo
+## "slam" in data/enemies.json): mentre li carica, sopra la testa c'è un
+## triangolo rosso col punto esclamativo (vedi _draw_unblockable_icon).
+const COLOR_UNBLOCKABLE := Color(0.95, 0.12, 0.08)
+## Contrattacco possibile (vedi show_counter_glint): un luccichio dorato
+## sopra il nemico stordito, finché il giocatore può colpirlo.
+const COLOR_COUNTER_GLINT := Color(1.0, 0.86, 0.3)
 ## Vita a punti (vedi in cima): danno che vale un punto, rispetto al primo
 ## colpo del giocatore al livello 1, e punti al più per colpo.
 const POINT_DAMAGE := 1.25
@@ -235,6 +313,17 @@ const COLOR_CLAWS := Color(0.88, 0.85, 0.75)
 const COLOR_ACID := Color(0.55, 1.0, 0.25)
 const ZOMBIE_SPEED_SPREAD := 0.15
 const CONTACT_MARGIN := 6.0
+## Non morti delle orde bloccati dal terreno (vedi _slide_along_wall): se in un
+## passo fanno meno di SLIDE_BLOCKED_SHARE della strada voluta, scivolano
+## lungo la parete girando il movimento di uno degli angoli SLIDE_ANGLES
+## (prima dalla parte già scelta); bloccati per più di FIELD_AFTER_BLOCKED
+## secondi seguono per FIELD_FOLLOW_TIME secondi il campo dei percorsi verso
+## il giocatore (horde_field), che li porta attorno agli ostacoli; arrivati
+## sul rombo del giocatore o su uno vicino corrono di nuovo dritti.
+const SLIDE_BLOCKED_SHARE := 0.5
+const SLIDE_ANGLES := [0.6, 1.1, 1.57]
+const FIELD_AFTER_BLOCKED := 0.3
+const FIELD_FOLLOW_TIME := 2.5
 const BURST_SPLATS := 3
 
 var player: Player
@@ -257,6 +346,9 @@ var armor := 0.0
 var drops_loot := true
 ## Evocato da un altro nemico (per i salvataggi).
 var is_minion := false
+## Fa parte del gruppo di una missione (vedi Game e Missions): non si salva
+## e non sparisce allontanandosi.
+var in_mission := false
 
 var _type: Dictionary
 var _color := Color.WHITE
@@ -294,6 +386,24 @@ var _slam_cooldown := 0.0
 var _slam_landed := false
 var _air := 0.0
 var _knockback := Vector2.ZERO
+## Reazione all'ultimo colpo (vedi _body_transform): da quanto è arrivato,
+## ampiezza dello schiacciamento, inclinazione (radianti, positiva verso
+## destra) e quanto dura il barcollamento in corso.
+var _hurt_age := 10.0
+var _hurt_squash := 0.0
+var _hurt_tilt := 0.0
+var _stagger_time := 0.0
+## Il barcollamento in corso viene dalla resistenza ai colpi esaurita.
+var _poise_broken := false
+## Resistenza ai colpi (vedi POISE_*): massima, attuale e attesa prima che
+## si riempia da sola.
+var _poise_max := 0.0
+var _poise := 0.0
+var _poise_wait := 0.0
+## Nemico élite (vedi make_elite).
+var is_elite := false
+## Secondi rimasti del luccichio del contrattacco (vedi show_counter_glint).
+var _counter_glint := 0.0
 var _hit_flash := 0.0
 ## Invulnerabilità rimasta dopo un colpo (vedi take_points).
 var _invulnerable := 0.0
@@ -302,6 +412,11 @@ var _invulnerable := 0.0
 var _height := 0.0
 var _height_velocity := 0.0
 var _hop_cooldown := 0.0
+## Orde (vedi _slide_along_wall): da quanto si è bloccati, da che parte si
+## scivola lungo la parete e per quanto si segue ancora il campo dei percorsi.
+var _blocked_time := 0.0
+var _slide_side := 1.0
+var _field_follow := 0.0
 ## Zona da cui non si esce (il boss nella sua arena): centro e raggio in
 ## rombi; Vector2.INF se non c'è.
 var _home := Vector2.INF
@@ -380,6 +495,8 @@ func setup(id: String, level := 1) -> void:
 	xp_reward = roundi(EnemyTypes.scaled("xp", _type["xp"], threat_level))
 	damage = floori(EnemyTypes.scaled("damage", _type["damage"], threat_level))
 	armor = EnemyTypes.armor(float(_type.get("armor", 0.0)), threat_level)
+	_poise_max = float(_type.get("poise", 0.0))
+	_poise = _poise_max
 	_speed = _type["speed"]
 	var color: Array = _type["color"]
 	_color = Color(color[0], color[1], color[2])
@@ -392,10 +509,28 @@ func setup(id: String, level := 1) -> void:
 	_apply_look()
 
 
+## Nemico élite (dopo setup, prima di aggiungerlo alla scena): più grosso,
+## con più punti vita (gli zombie/non morti delle orde ne hanno
+## "zombie_points"), più esperienza, più resistenza ai colpi e il bottino
+## sicuro (vedi Game._on_enemy_died); un'aura lo distingue.
+func make_elite() -> void:
+	var data: Dictionary = EnemyTypes.WORLD_DATA.data["elites"]
+	is_elite = true
+	radius = float(_type["radius"]) * float(data["size"])
+	_shape_radius = -1.0
+	max_health = int(data["zombie_points"]) if is_horde() else ceili(max_health * float(data["points"]))
+	health = max_health
+	xp_reward = roundi(xp_reward * float(data["xp"]))
+	_poise_max *= float(data["poise"])
+	_poise = _poise_max
+	drops_loot = true
+
+
 ## Stato da salvare: tipo, posizione esatta, vita e valori cambiati dalla
-## scena di gioco (boss più forte, nemici evocati).
+## scena di gioco (boss più forte, nemici evocati, élite).
 func save_state() -> Dictionary:
 	return {
+		"elite": is_elite,
 		"type": type_id, "position": SaveGame.array(position), "health": health, "max_health": max_health, "points": true,
 		"xp": xp_reward, "damage": damage, "loot": drops_loot, "minion": is_minion,
 		"level": threat_level, "armor": armor,
@@ -420,6 +555,14 @@ func load_state(data: Dictionary) -> void:
 	armor = float(data.get("armor", armor))
 	drops_loot = bool(data.get("loot", drops_loot))
 	is_minion = bool(data.get("minion", false))
+	# Salvataggi di prima degli élite: nessun élite.
+	if bool(data.get("elite", false)):
+		var elites: Dictionary = EnemyTypes.WORLD_DATA.data["elites"]
+		is_elite = true
+		radius = float(_type["radius"]) * float(elites["size"])
+		_shape_radius = -1.0
+		_poise_max *= float(elites["poise"])
+		_poise = _poise_max
 	if data.has("facing"):
 		var facing := SaveGame.vector(data["facing"])
 		if facing != Vector2.ZERO:
@@ -491,6 +634,7 @@ func _physics_process(delta: float) -> void:
 		# Fermi come statue: i colpi li fanno sanguinare ma non li spostano.
 		_knockback = Vector2.ZERO
 		_hit_flash = maxf(_hit_flash - delta, 0.0)
+		_update_hurt(delta)
 		_blood.update(delta)
 		_wounds.update(delta)
 		if _on_screen():
@@ -513,12 +657,16 @@ func _physics_process(delta: float) -> void:
 	_attack_cooldown = maxf(_attack_cooldown - delta, 0.0)
 	_summon_cooldown = maxf(_summon_cooldown - delta, 0.0)
 	_hit_flash = maxf(_hit_flash - delta, 0.0)
+	_update_hurt(delta)
+	_update_poise(delta)
+	_counter_glint = maxf(_counter_glint - delta, 0.0)
 	_update_invulnerability(delta)
 	_guard_cooldown = maxf(_guard_cooldown - delta, 0.0)
 	_guard_flash = maxf(_guard_flash - delta, 0.0)
 	_slam_cooldown = maxf(_slam_cooldown - delta, 0.0)
 	_magic_cooldown = maxf(_magic_cooldown - delta, 0.0)
 	_hop_cooldown = maxf(_hop_cooldown - delta, 0.0)
+	_field_follow = maxf(_field_follow - delta, 0.0)
 	_blood.update(delta)
 	_wounds.update(delta)
 
@@ -607,13 +755,14 @@ func _physics_process(delta: float) -> void:
 				_strike_enemies()
 			if not shooting and not _strike_resolved and player_active and _player_in_strike_zone():
 				_strike_resolved = true
-				var result := player.receive_hit(global_position, EnemyTypes.player_damage(is_boss()))
+				var result := player.receive_hit(global_position, EnemyTypes.player_damage(is_boss()), false, false, _attack_unblockable())
 				if result == "parried":
 					Sfx.play("stun", global_position)
 					_change_state(State.STUNNED)
+					player.offer_counter(self)
 				elif result == "blocked":
 					# Parato dal giocatore: il colpo si interrompe e si viene respinti.
-					_knockback = -_attack_direction * REPELLED_KNOCKBACK / float(_type["mass"])
+					shove(-_attack_direction * REPELLED_KNOCKBACK / float(_type["mass"]))
 					_velocity = Vector2.ZERO
 					_change_state(State.RECOVER)
 			if _state == State.STRIKE and shooting:
@@ -656,6 +805,16 @@ func _physics_process(delta: float) -> void:
 				_attack_cooldown = randf_range(ATTACK_COOLDOWN.x, ATTACK_COOLDOWN.y)
 				_change_state(State.CHASE)
 
+		State.STAGGER:
+			# Barcolla all'indietro (vedi _stagger), poi riprende ma non attacca subito.
+			if _state_time >= _stagger_time:
+				_attack_cooldown = maxf(_attack_cooldown, randf_range(STAGGER_COOLDOWN.x, STAGGER_COOLDOWN.y))
+				if _poise_broken:
+					# Dopo la rottura la resistenza torna piena.
+					_poise_broken = false
+					_poise = _poise_max
+				_change_state(State.CHASE)
+
 		State.SUMMON:
 			if _state_time >= _type["summon"]["channel_time"]:
 				var positions: Array[Vector2] = []
@@ -667,10 +826,12 @@ func _physics_process(delta: float) -> void:
 
 		State.DEAD:
 			# Il colpo che lo abbatte lo spinge ancora un po' mentre cade.
-			_knockback = _knockback.move_toward(Vector2.ZERO, 1200.0 * delta)
+			_damp_knockback(delta)
 			if World.current:
+				var fall_start := position
 				position = _confined(World.current.move(position, _knockback * delta, radius * 0.8, 0.0, true, false))
 				ground_elevation = World.current.elevation_at(position)
+				_check_wall_hit(position - fall_start, delta)
 			queue_redraw()
 			if _state_time >= DEATH_FALL_TIME:
 				_silhouette.visible = false
@@ -683,7 +844,7 @@ func _physics_process(delta: float) -> void:
 		if target_velocity != Vector2.ZERO:
 			target_velocity += _separation() * _speed
 		_velocity = _velocity.move_toward(target_velocity, ACCELERATION * delta)
-	elif _state in [State.WINDUP, State.RECOVER, State.STUNNED, State.SUMMON, State.GUARD, State.SLAM]:
+	elif _state in [State.WINDUP, State.RECOVER, State.STUNNED, State.SUMMON, State.GUARD, State.SLAM, State.STAGGER]:
 		_velocity = _velocity.move_toward(Vector2.ZERO, ACCELERATION * delta)
 
 	# Tetto di velocità: mai più veloce di Ciccio che cammina.
@@ -699,10 +860,12 @@ func _physics_process(delta: float) -> void:
 		_turn_toward(to_player, delta * 2.0)
 	elif _state in [State.CHASE, State.DASH, State.SUMMON] and player_active:
 		_turn_toward(to_player, delta)
+	elif _state == State.STAGGER:
+		pass
 	elif _velocity.length() > 5.0:
 		_turn_toward(_velocity, delta)
 
-	_knockback = _knockback.move_toward(Vector2.ZERO, 1200.0 * delta)
+	_damp_knockback(delta)
 	# Come il giocatore (vedi Player._move): si scende dai gradini cadendo e si
 	# sale su quelli più alti solo saltando (climb = altezza del salto); ci si
 	# ferma contro gli ostacoli solidi, i cespugli rallentano e nei
@@ -717,7 +880,10 @@ func _physics_process(delta: float) -> void:
 		var altitude := ground_elevation + _height
 		var start := position
 		position = _confined(world.move(position, motion, radius * 0.8, _height + _air, true, false))
+		if is_horde() and grounded and _state == State.CHASE and _knockback == Vector2.ZERO:
+			position = _slide_along_wall(world, start, motion, position, delta)
 		ground_elevation = world.elevation_at(position)
+		_check_wall_hit(position - start, delta)
 		# Scendendo da un gradino si resta in aria e si cade; sulle rampe no.
 		_height = maxf(altitude - ground_elevation, 0.0)
 		if grounded and _height <= World.STEP_TOLERANCE:
@@ -736,8 +902,9 @@ func _physics_process(delta: float) -> void:
 	elif _silhouette.visible:
 		_silhouette.visible = false
 	_redraw_danger()
-	if _state in [State.SUMMON, State.SLAM] or _telegraph_shown:
-		_telegraph_shown = _state in [State.SUMMON, State.SLAM]
+	var elite_ring := is_elite and _state != State.DEAD and _on_screen()
+	if _state in [State.SUMMON, State.SLAM] or elite_ring or _telegraph_shown:
+		_telegraph_shown = _state in [State.SUMMON, State.SLAM] or elite_ring
 		_telegraph.queue_redraw()
 
 
@@ -753,7 +920,8 @@ func _update_silhouette() -> void:
 ## Ridisegna gli effetti rossi mentre ci sono, e una volta in più per
 ## toglierli (anche se nel frattempo il nemico è morto o è uscito dallo schermo).
 func _redraw_danger() -> void:
-	var danger := _state in [State.WINDUP, State.STRIKE] or not _trail.is_empty()
+	var danger := _state in [State.WINDUP, State.STRIKE] or not _trail.is_empty() or is_elite or _counter_glint > 0.0 \
+			or (_state == State.SLAM and _attack_unblockable())
 	if danger or _danger_shown:
 		_danger_shown = danger
 		_danger_back.queue_redraw()
@@ -788,11 +956,100 @@ func _update_trail(delta: float) -> void:
 		_trail.append(Vector4(global_position.x, global_position.y, _air + _height, 0.0))
 
 
-## Spinta improvvisa (per esempio dall'impatto dell'attacco a terra del
-## giocatore): velocity è la velocità iniziale, che poi si esaurisce.
+## Spinta improvvisa (per esempio quando il giocatore, colpito durante
+## un'orda, respinge i non morti attorno): velocity è la velocità iniziale;
+## la strada percorsa è quella di una frenata costante di
+## SHOVE_DECELERATION, uguale per tutti i nemici.
 func shove(velocity: Vector2) -> void:
 	if _state != State.DEAD:
-		_knockback = velocity
+		var speed := velocity.length()
+		_knockback = velocity * KNOCKBACK_DAMPING * speed / (2.0 * SHOVE_DECELERATION)
+
+
+## Respinta di un colpo: il nemico scivola via nella direzione data per
+## distance pixel (per un nemico di massa 1, vedi KNOCKBACK_DISTANCE),
+## divisi per la sua resistenza alle spinte (vedi knock_resistance), al più
+## max_push pixel (il giocatore tiene i nemici a portata del colpo
+## successivo della combo, vedi Player._push_limit).
+func knock(direction: Vector2, distance: float, max_push := INF) -> void:
+	var push := minf(distance / knock_resistance(), max_push)
+	if push <= 0.0 or direction == Vector2.ZERO:
+		_knockback = Vector2.ZERO
+		return
+	_knockback = direction.normalized() * push * KNOCKBACK_DAMPING
+
+
+## Quanto il nemico resiste alle spinte: massa^KNOCKBACK_MASS_EXPONENT, i
+## boss ancora BOSS_KNOCKBACK_DIVISOR volte di più.
+func knock_resistance() -> float:
+	return pow(maxf(float(_type["mass"]), 0.1), KNOCKBACK_MASS_EXPONENT) * (BOSS_KNOCKBACK_DIVISOR if is_boss() else 1.0)
+
+
+## La spinta frena in modo morbido (vedi KNOCKBACK_DAMPING).
+func _damp_knockback(delta: float) -> void:
+	_knockback *= exp(-KNOCKBACK_DAMPING * delta)
+	if _knockback.length_squared() < KNOCKBACK_STOP * KNOCKBACK_STOP:
+		_knockback = Vector2.ZERO
+
+
+## Spinti contro un muro (moved: la strada fatta in questo passo): uno
+## sbuffo di polvere dove si sbatte e un piccolo rimbalzo indietro.
+func _check_wall_hit(moved: Vector2, delta: float) -> void:
+	var speed := _knockback.length()
+	if speed < WALL_HIT_SPEED or delta <= 0.0:
+		return
+	var direction := _knockback / speed
+	if moved.dot(direction) >= speed * delta * WALL_HIT_SHARE:
+		return
+	GroundFx.dust(global_position + direction * radius * 0.9, ground_elevation + radius * 0.5, -direction, radius)
+	_knockback = -direction * speed * WALL_BOUNCE
+	_hurt_age = 0.0
+	_hurt_squash = maxf(_hurt_squash, HURT_SQUASH)
+	Sfx.play("impact", global_position, 1.5 / sqrt(float(_type["mass"])), -12.0)
+
+
+## Reazione a un colpo (vedi _body_transform e _draw_face): lampeggio bianco
+## (in take_points), corpo che si schiaccia e rimbalza, inclinazione
+## all'indietro dalla parte opposta al colpo e smorfia di dolore. I nemici
+## più pesanti si inclinano meno.
+func _react(direction: Vector2, heavy: bool) -> void:
+	_hurt_age = 0.0
+	_hurt_squash = HURT_SQUASH_HEAVY if heavy else HURT_SQUASH
+	var side := signf(direction.x) if absf(direction.x) > 0.05 else (1.0 if randf() < 0.5 else -1.0)
+	_hurt_tilt = side * (HURT_TILT_HEAVY if heavy else HURT_TILT) / sqrt(knock_resistance())
+
+
+## La reazione al colpo si esaurisce: l'inclinazione si raddrizza (non
+## mentre si barcolla, che resta inclinati).
+func _update_hurt(delta: float) -> void:
+	_hurt_age += delta
+	if _state != State.STAGGER:
+		_hurt_tilt *= exp(-HURT_TILT_RECOVERY * delta)
+
+
+## Barcollamento dopo un colpo (vedi STAGGER_TIME e la voce "stagger" dei
+## dati): interrompe l'attacco in corso (anche la carica del salto, non il
+## salto già partito), l'evocazione e la guardia; chi è stordito resta stordito.
+func _stagger(heavy: bool) -> void:
+	if is_boss() or is_horde() or _state in [State.DEAD, State.STUNNED]:
+		return
+	if _state == State.SLAM and _state_time >= float(_type["slam"]["windup"]):
+		return
+	match str(_type.get("stagger", "light")):
+		"none":
+			return
+		"heavy":
+			if not heavy:
+				return
+	var time := STAGGER_TIME.y * randf_range(0.9, 1.1) if heavy else STAGGER_TIME.x * randf_range(0.85, 1.15)
+	_stagger_time = clampf(time, STAGGER_TIME_LIMITS.x, STAGGER_TIME_LIMITS.y)
+	_air = 0.0
+	_change_state(State.STAGGER)
+
+
+## Sta barcollando dopo un colpo.
+func is_staggered() -> bool:
+	return _state == State.STAGGER
 
 
 ## Velocità massima dei movimenti del nemico: quella di Ciccio che cammina
@@ -809,22 +1066,32 @@ func points_for(amount: int) -> int:
 
 
 ## Colpo del giocatore con quel danno (vedi points_for); heavy: colpo
-## finale della combo, spinge più lontano.
-func take_damage(amount: int, direction: Vector2, heavy := false) -> void:
-	take_points(points_for(amount), direction, heavy)
+## potente o finale della combo, spinge più lontano e fa barcollare anche i
+## nemici pesanti; max_push: respinta massima in pixel (vedi knock); poise:
+## quanto svuota la resistenza ai colpi (vedi _take_poise; -1: 2 per i colpi
+## potenti, 1 per gli altri).
+func take_damage(amount: int, direction: Vector2, heavy := false, max_push := INF, poise := -1.0) -> void:
+	take_points(points_for(amount), direction, heavy, false, max_push, poise)
 
 
 ## Toglie punti vita. Durante l'invulnerabilità dopo un colpo non succede
 ## nulla, salvo con force (runa del cataclisma, non morto che si disfa) e durante
 ## l'attacco speciale della Frenesia (i nemici sono fermi e i colpi vanno a raffica).
-func take_points(points: int, direction: Vector2, heavy := false, force := false) -> void:
+## Ogni colpo spinge via (vedi knock), fa reagire il corpo (vedi _react),
+## schizza sangue nel verso del colpo, mostra i punti persi (vedi
+## DamagePopups; critical: il contrattacco) e può far barcollare (vedi
+## _stagger e _take_poise).
+func take_points(points: int, direction: Vector2, heavy := false, force := false, max_push := INF, poise := -1.0, critical := false) -> void:
 	if _state == State.DEAD or (_invulnerable > 0.0 and not force and not frozen):
 		return
 	health -= maxi(points, 1)
+	DamagePopups.spawn(global_position, ground_elevation + _air + _height + radius * 2.4, maxi(points, 1),
+			"critical" if critical else ("heavy" if heavy else "normal"))
 	_invulnerable = HURT_INVULNERABLE_TIME
 	_hit_flash = 0.12
-	_knockback = direction * KNOCKBACK * (HEAVY_KNOCKBACK_FACTOR if heavy else 1.0) / float(_type["mass"])
-	GroundFx.bleed(global_position, ground_elevation + radius * 0.8, direction, BLEED_DROPS_HEAVY if heavy else BLEED_DROPS)
+	knock(direction, HEAVY_KNOCKBACK_DISTANCE if heavy else KNOCKBACK_DISTANCE, max_push)
+	_react(direction, heavy)
+	GroundFx.bleed(global_position, ground_elevation + radius * 0.8, direction, BLEED_DROPS_HEAVY if heavy else BLEED_DROPS, heavy)
 	_wounds.add(-direction)
 	_blood.add(BLOOD_PER_HEAVY if heavy else BLOOD_PER_HIT)
 	if health <= 0:
@@ -846,6 +1113,8 @@ func take_points(points: int, direction: Vector2, heavy := false, force := false
 		_finish_summon()
 	elif _state == State.WANDER:
 		_change_state(State.CHASE)
+	if not frozen and not _take_poise(poise if poise >= 0.0 else (2.0 if heavy else 1.0)):
+		_stagger(heavy)
 
 
 ## Conto alla rovescia dell'invulnerabilità, lampeggiando come il giocatore.
@@ -892,6 +1161,12 @@ func _rush(to_player: Vector2, distance: float, player_active: bool) -> Vector2:
 		if player.receive_hit(global_position, EnemyTypes.player_damage(false), false, true) != "dodged":
 			_burst(to_player)
 			return Vector2.ZERO
+	# Bloccato dal terreno da un po': segue il campo dei percorsi attorno
+	# agli ostacoli (vedi _slide_along_wall e _field_direction).
+	if _field_follow > 0.0:
+		var along := _field_direction()
+		if along != Vector2.ZERO:
+			return along * _speed
 	return to_player.normalized() * _speed
 
 
@@ -958,15 +1233,74 @@ func _update_height(delta: float) -> void:
 func _try_hop(world: World, motion: Vector2, moved: Vector2) -> void:
 	if _hop_cooldown > 0.0 or motion.length() < 0.5 or moved.length() >= motion.length() * HOP_BLOCKED_SHARE:
 		return
-	var probe := position + motion.normalized() * (radius * 0.8 + 16.0)
-	if world.is_barrier(World.cell_at(probe)):
-		return
-	var rise := world.elevation_at(probe) - ground_elevation
-	if rise <= World.STEP_TOLERANCE or rise > HOP_LEVELS * world.level_height + World.STEP_TOLERANCE:
+	var rise := _hop_rise(world, motion)
+	if rise <= 0.0:
 		return
 	_hop_cooldown = HOP_COOLDOWN
 	_height_velocity = sqrt(2.0 * GRAVITY * (rise + HOP_CLEARANCE))
 	Sfx.play("jump", global_position, 0.8 / sqrt(_type["mass"]), -10.0)
+
+
+## Quanto si salirebbe saltando sul gradino davanti nella direzione di
+## motion (0 se non c'è un gradino da saltare: piano, parete invalicabile o
+## più alta di HOP_LEVELS livelli).
+func _hop_rise(world: World, motion: Vector2) -> float:
+	var probe := position + motion.normalized() * (radius * 0.8 + 16.0)
+	if world.is_barrier(World.cell_at(probe)):
+		return 0.0
+	var rise := world.elevation_at(probe) - ground_elevation
+	if rise <= World.STEP_TOLERANCE or rise > HOP_LEVELS * world.level_height + World.STEP_TOLERANCE:
+		return 0.0
+	return rise
+
+
+## Non morto di un'orda fermato da una parete (from: dove era, motion: il
+## movimento voluto, to: dove la parete l'ha fermato): se davanti c'è un
+## gradino da saltare ci pensa _try_hop; altrimenti scivola lungo la parete,
+## girando il movimento prima dalla parte già scelta. Restituisce la
+## posizione nuova.
+func _slide_along_wall(world: World, from: Vector2, motion: Vector2, to: Vector2, delta: float) -> Vector2:
+	var wanted := motion.length()
+	if wanted < 0.5 or (to - from).length() >= wanted * SLIDE_BLOCKED_SHARE:
+		_blocked_time = maxf(_blocked_time - delta, 0.0)
+		return to
+	_blocked_time += delta
+	if _blocked_time >= FIELD_AFTER_BLOCKED:
+		_field_follow = FIELD_FOLLOW_TIME
+	if _hop_cooldown <= 0.0 and _hop_rise(world, motion) > 0.0:
+		return to
+	for angle: float in SLIDE_ANGLES:
+		for side: float in [_slide_side, -_slide_side]:
+			var turned := motion.rotated(side * angle) * lerpf(1.0, 0.75, angle / (PI / 2.0))
+			var slid := _confined(world.move(from, turned, radius * 0.8, _height + _air, true, false))
+			if (slid - from).length() >= turned.length() * 0.6:
+				_slide_side = side
+				return slid
+	return to
+
+
+## Direzione lungo il campo dei percorsi delle orde (horde_field): verso il
+## rombo vicino più vicino al giocatore in cui si può passare da qui (non
+## più alto di un salto, come in World.reach_field). Zero se si è fuori dal
+## campo, sul rombo del giocatore o su uno vicino.
+func _field_direction() -> Vector2:
+	var world := World.current
+	var cell := World.cell_at(global_position)
+	if world == null or not horde_field.has(cell) or int(horde_field[cell]) <= 1:
+		return Vector2.ZERO
+	var best := cell
+	var best_steps: int = horde_field[cell]
+	var climb := HOP_LEVELS * world.level_height + World.STEP_TOLERANCE
+	var height := world.elevation_at(World.cell_center(cell))
+	for offset: Vector2i in World.NEIGHBORS:
+		var other: Vector2i = cell + offset
+		var steps: int = horde_field.get(other, best_steps)
+		if steps < best_steps and world.elevation_at(World.cell_center(other)) <= height + climb:
+			best = other
+			best_steps = steps
+	if best == cell:
+		return Vector2.ZERO
+	return (World.cell_center(best) - global_position).normalized()
 
 
 ## Il punto, tenuto dentro la zona da cui non si esce (se c'è).
@@ -1169,8 +1503,65 @@ func _begin_windup(min_time: float, max_time: float, can_feint: bool) -> void:
 	_feint_at = _windup_time * randf_range(0.4, 0.7) if can_feint and randf() < FEINT_CHANCE else -1.0
 	if player:
 		_attack_direction = (player.global_position - global_position).normalized()
-	Sfx.play("enemy_windup", global_position, 1.0 / sqrt(_type["mass"]), -4.0)
+	Sfx.play(_windup_sound(), global_position, 1.0 / sqrt(_type["mass"]), -4.0)
 	_change_state(State.WINDUP)
+
+
+## Suono della carica, diverso per ogni tipo di attacco (si riconosce senza
+## guardare): fendente, tiro a distanza, sputo, colpo che gira tutto attorno.
+func _windup_sound() -> String:
+	if _is_ranged():
+		return "windup_spit" if _type.get("spit", false) else "windup_ranged"
+	if _type.get("unblockable", false):
+		return "windup_spin"
+	return "enemy_windup"
+
+
+## L'attacco in corso non si può parare (vedi la voce "unblockable").
+func _attack_unblockable() -> bool:
+	if _state == State.SLAM:
+		return bool((_type["slam"] as Dictionary).get("unblockable", false))
+	return _state in [State.WINDUP, State.STRIKE] and not _is_ranged() and not _casting and bool(_type.get("unblockable", false))
+
+
+## Il giocatore ha parato alla perfezione: può contrattaccare per time
+## secondi (vedi Player.offer_counter), intanto sopra la testa luccica.
+func show_counter_glint(time: float) -> void:
+	_counter_glint = time
+
+
+## Resistenza ai colpi rimasta, da 0 a 1 (1 anche per chi non ne ha).
+func poise_ratio() -> float:
+	return _poise / _poise_max if _poise_max > 0.0 else 1.0
+
+
+## La resistenza ai colpi si riempie da sola dopo un po' senza colpi.
+func _update_poise(delta: float) -> void:
+	if _poise_max <= 0.0 or _poise_broken or _poise >= _poise_max:
+		return
+	_poise_wait -= delta
+	if _poise_wait <= 0.0:
+		_poise = minf(_poise + float(_type.get("poise_regen", _poise_max / POISE_REFILL_TIME)) * delta, _poise_max)
+
+
+## Un colpo svuota la resistenza (amount); vuota, il nemico barcolla a
+## lungo (anche i boss). Restituisce true se l'ha rotta.
+func _take_poise(amount: float) -> bool:
+	if _poise_max <= 0.0 or _poise_broken or is_horde():
+		return false
+	_poise = maxf(_poise - amount, 0.0)
+	_poise_wait = POISE_REGEN_DELAY
+	if _poise > 0.0 or _state in [State.DEAD, State.STUNNED]:
+		return false
+	# In volo (salto con colpo a terra) si rompe all'atterraggio, al colpo dopo.
+	if _state == State.SLAM and _state_time >= float(_type["slam"]["windup"]):
+		return false
+	_poise_broken = true
+	_stagger_time = POISE_BREAK_TIME
+	_air = 0.0
+	_change_state(State.STAGGER)
+	Sfx.play("stun", global_position, 0.8)
+	return true
 
 
 func _can_slam(distance: float) -> bool:
@@ -1191,7 +1582,8 @@ func _begin_slam() -> void:
 	_slam_landed = false
 	_air = 0.0
 	_velocity = Vector2.ZERO
-	Sfx.play("enemy_windup", global_position, 0.8 / sqrt(_type["mass"]), -2.0)
+	# Il salto con colpo a terra ha il suo suono (un ringhio che sale).
+	Sfx.play("windup_slam", global_position, 0.9 / sqrt(_type["mass"]), -2.0)
 	_change_state(State.SLAM)
 
 
@@ -1245,10 +1637,11 @@ func _land_slam(player_active: bool, slam: Dictionary) -> void:
 	if player_active and player.global_position.distance_to(global_position) <= impact_radius + Player.RADIUS:
 		# Anche il colpo a terra si può parare: con una parata perfetta
 		# (istantanea, appena prima dell'impatto) si resta storditi.
-		if player.receive_hit(global_position, EnemyTypes.player_damage(is_boss())) == "parried":
+		if player.receive_hit(global_position, EnemyTypes.player_damage(is_boss()), false, false, _attack_unblockable()) == "parried":
 			Sfx.play("stun", global_position)
 			_slam_cooldown = randf_range(SLAM_RETRY.x, SLAM_RETRY.y) * 2.0
 			_change_state(State.STUNNED)
+			player.offer_counter(self)
 
 
 func _can_summon(distance: float) -> bool:
@@ -1466,6 +1859,8 @@ func _on_screen() -> bool:
 ## più una zona a terra: si riconosce dal corpo che si accende e dalla spada
 ## (o dal bastone) portata indietro.
 func _draw_telegraph() -> void:
+	if is_elite and _state != State.DEAD:
+		_draw_elite_ring()
 	if _state == State.SLAM and not _slam_landed:
 		var slam: Dictionary = _type["slam"]
 		var total := float(slam["windup"]) + _slam_air_time(slam)
@@ -1512,7 +1907,8 @@ func _draw() -> void:
 	var walking := _velocity.length() > 15.0 and _state != State.DEAD
 	BodyParts.draw_legs(self, -leg + radius * 0.55, radius * 0.85, radius * LEG_SPACING, maxf(4.5, radius * LEG_WIDTH),
 			_walk_phase, _velocity.normalized(), radius * 0.3 if walking else 0.0, _color.darkened(0.4))
-	draw_set_transform(_body_offset())
+	# Il corpo reagisce ai colpi: si schiaccia, rimbalza e si inclina (vedi _body_transform).
+	draw_set_transform_matrix(_body_transform())
 	_prepare_meshes()
 	if _hit_flash <= 0.0:
 		body = _blood.tint(body)
@@ -1531,13 +1927,18 @@ func _draw() -> void:
 	if not behind:
 		_draw_gear()
 	if not is_horde() and not is_mutant():
+		# Appena colpito fa la smorfia di dolore: occhi socchiusi e bocca aperta.
 		var attacking := _state in [State.WINDUP, State.STRIKE, State.SLAM]
-		GoblinLook.face(self, radius, _facing, EYE_SIZE, true, "open" if attacking else "grin", 1.0, {}, ink_width())
+		var pained := in_pain()
+		GoblinLook.face(self, radius, _facing, EYE_SIZE, true, "open" if attacking or pained else "grin", 1.0,
+				{"squint": true} if pained else {}, ink_width())
 	if is_mutant():
 		_draw_growths(body)
 	elif is_boss():
 		_draw_crown()
 
+	# Stelline dello stordimento e vita restano dritte sopra la testa.
+	draw_set_transform(_body_offset())
 	if _state == State.STUNNED:
 		for i in 3:
 			var angle := _state_time * 4.0 + TAU * i / 3.0
@@ -1552,6 +1953,13 @@ func _draw() -> void:
 		var segment := (width - gap * (max_health - 1)) / max_health
 		for k in health:
 			draw_rect(Rect2(origin + Vector2(k * (segment + gap), 0), Vector2(segment, 6)), COLOR_DANGER)
+	# Resistenza ai colpi: una barra gialla sottile sotto la vita, quando non è piena.
+	if _poise_max > 0.0 and not is_boss() and _state != State.DEAD and (_poise < _poise_max or _poise_broken):
+		var poise_width := maxf(40.0, radius * 1.8)
+		var poise_origin := Vector2(-poise_width / 2.0, -radius * 1.2 - 2.0)
+		draw_rect(Rect2(poise_origin - Vector2(2, 1), Vector2(poise_width + 4, 6)), Color(Shapes.INK, 0.85))
+		var flash := _poise_broken and int(Time.get_ticks_msec() / 80) % 2 == 0
+		draw_rect(Rect2(poise_origin, Vector2(poise_width * poise_ratio(), 4)), Color.WHITE if flash else COLOR_POISE)
 
 
 ## "Occhio" che indica la direzione, magia e arma.
@@ -1578,11 +1986,19 @@ func _draw_gear() -> void:
 func _draw_ghoul() -> void:
 	var across := _facing.orthogonal()
 	var eyes := _facing * radius * 0.45 + Vector2(0, -radius * 0.2)
+	var pained := in_pain()
 	for eye: Vector3 in GHOUL_EYES:
 		var at := eyes + across * radius * eye.x + Vector2(0, radius * eye.y)
-		Shapes.ink_disc(self, at, radius * eye.z, COLOR_ZOMBIE_EYES, ink_width() * 0.6)
+		if pained:
+			# Smorfia di dolore: gli occhi si strizzano in due fessure.
+			var size := radius * eye.z
+			var ink := ink_width() * 0.6
+			Shapes.oval(self, at, Vector2(size + ink, size * 0.3 + ink), Shapes.INK)
+			Shapes.oval(self, at, Vector2(size, size * 0.3), COLOR_ZOMBIE_EYES)
+		else:
+			Shapes.ink_disc(self, at, radius * eye.z, COLOR_ZOMBIE_EYES, ink_width() * 0.6)
 	var mouth := eyes + Vector2(0, radius * 0.35)
-	var open := 0.12 + (0.12 if _state in [State.WINDUP, State.STRIKE, State.SUMMON] else 0.0)
+	var open := 0.12 + (0.12 if pained or _state in [State.WINDUP, State.STRIKE, State.SUMMON] else 0.0)
 	draw_colored_polygon(PackedVector2Array([mouth - across * radius * 0.25, mouth + across * radius * 0.25, mouth + Vector2(0, radius * open)]), Color(0.12, 0.02, 0.03))
 	if _type.get("spit", false) or is_casting():
 		var charge := clampf(_state_time / _windup_time, 0.0, 1.0) if _state == State.WINDUP else 0.0
@@ -1667,6 +2083,27 @@ func _body_offset() -> Vector2:
 	return Vector2(0, -ground_elevation - _air - _height - leg - bob + crouch)
 
 
+## Trasformazione del corpo (vedi _body_offset) con la reazione all'ultimo
+## colpo (vedi _react): lo schiacciamento che rimbalza (una molla smorzata;
+## barcollando resta un po' schiacciato) e l'inclinazione all'indietro,
+## imperniati sul fondo del corpo, così i piedi restano a terra.
+func _body_transform() -> Transform2D:
+	var offset := _body_offset()
+	var squash := _hurt_squash * exp(-HURT_SQUASH_DAMPING * _hurt_age) * cos(HURT_SQUASH_FREQUENCY * _hurt_age)
+	if _state == State.STAGGER:
+		squash = maxf(squash, _hurt_squash * 0.5)
+	if absf(squash) < 0.002 and absf(_hurt_tilt) < 0.002:
+		return Transform2D(0.0, offset)
+	var bottom := Vector2(0, radius)
+	return Transform2D(_hurt_tilt, Vector2(1.0 + squash, 1.0 - squash), 0.0, offset + bottom) * Transform2D(0.0, -bottom)
+
+
+## Smorfia di dolore: occhi socchiusi e bocca aperta subito dopo un colpo
+## e mentre barcolla.
+func in_pain() -> bool:
+	return _state != State.DEAD and (_hurt_age < PAIN_FACE_TIME or _state == State.STAGGER)
+
+
 func _prepare_meshes() -> void:
 	if _shape_radius != radius:
 		_shape_radius = radius
@@ -1687,6 +2124,11 @@ func ink_width() -> float:
 func _draw_danger_back() -> void:
 	if _state == State.DEAD:
 		return
+	if is_elite:
+		# Aura dell'élite: un bagliore dorato che pulsa piano.
+		var pulse := _elite_pulse()
+		_danger_back.draw_set_transform(_body_offset())
+		Shapes.glow(_danger_back, Vector2.ZERO, radius * ELITE_AURA_RADIUS * (0.92 + 0.12 * pulse), Color(COLOR_ELITE_AURA, ELITE_AURA_ALPHA * (0.7 + 0.3 * pulse)))
 	if _state == State.WINDUP and not _is_ranged():
 		# Carica dell'attacco: bagliore rosso sempre più acceso attorno al corpo.
 		var progress := clampf(_state_time / _windup_time, 0.0, 1.0)
@@ -1703,13 +2145,68 @@ func _draw_danger_back() -> void:
 		_danger_back.draw_mesh(_body_mesh, null, Transform2D.IDENTITY, Color(COLOR_DANGER, TRAIL_ALPHA * fade * fade))
 
 
-## Davanti al corpo: l'arco rosso lasciato dalla spada che fende.
+## Battito dell'aura e dell'anello dell'élite (da 0 a 1).
+func _elite_pulse() -> float:
+	return 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.004 + _update_slot)
+
+
+## Anello dorato a terra sotto l'élite, con un bagliore, che pulsa con l'aura.
+func _draw_elite_ring() -> void:
+	var pulse := _elite_pulse()
+	var ring := radius * ELITE_RING_RADIUS * (0.95 + 0.1 * pulse)
+	Shapes.glow(_telegraph, Vector2.ZERO, ring * 1.3, Color(COLOR_ELITE_AURA, ELITE_RING_GLOW_ALPHA * (0.7 + 0.3 * pulse)), GroundFx.GROUND_SQUASH)
+	_telegraph.draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, GroundFx.GROUND_SQUASH))
+	_telegraph.draw_arc(Vector2.ZERO, ring, 0.0, TAU, 48, Color(COLOR_ELITE_AURA, 0.65 + 0.35 * pulse), ELITE_RING_WIDTH, true)
+	_telegraph.draw_set_transform(Vector2.ZERO)
+
+
+## Davanti al corpo: l'arco rosso lasciato dalla spada che fende, l'icona
+## degli attacchi che non si possono parare e il luccichio del contrattacco.
 func _draw_danger_front() -> void:
+	if _state == State.DEAD:
+		return
+	var unblockable := _attack_unblockable() and (_state == State.WINDUP or (_state == State.SLAM and not _slam_landed))
+	if unblockable or (_counter_glint > 0.0 and _state == State.STUNNED):
+		var above := _body_offset() + Vector2(0, -radius * 1.2 - 38.0)
+		_danger_front.draw_set_transform(Vector2.ZERO)
+		if unblockable:
+			_draw_unblockable_icon(above)
+		else:
+			_draw_counter_glint(above)
 	if _state != State.STRIKE or _is_ranged():
 		return
 	var angles := _sword_angles()
 	_danger_front.draw_set_transform(_body_offset())
 	BodyParts.draw_trail(_danger_front, Vector2.ZERO, angles.x, angles.z, radius * 0.6, radius + float(_type["strike_reach"]), Color(COLOR_DANGER, 0.8))
+
+
+## Triangolo rosso col punto esclamativo (contorno a inchiostro) che pulsa
+## sopra la testa: l'attacco che sta caricando non si può parare.
+func _draw_unblockable_icon(at: Vector2) -> void:
+	var pulse := 1.0 + 0.12 * sin(Time.get_ticks_msec() * 0.02)
+	var size := 15.0 * pulse
+	var points := PackedVector2Array([at + Vector2(0, -size), at + Vector2(size * 1.05, size * 0.75), at + Vector2(-size * 1.05, size * 0.75)])
+	var outline := PackedVector2Array()
+	var middle := at + Vector2(0, size * 0.15)
+	for point in points:
+		outline.append(middle + (point - middle) * 1.32)
+	_danger_front.draw_primitive(outline, PackedColorArray([Shapes.INK]), PackedVector2Array())
+	_danger_front.draw_primitive(points, PackedColorArray([COLOR_UNBLOCKABLE]), PackedVector2Array())
+	_danger_front.draw_line(at + Vector2(0, -size * 0.5), at + Vector2(0, size * 0.22), Color.WHITE, 3.5)
+	Shapes.disc(_danger_front, at + Vector2(0, size * 0.48), 2.2, Color.WHITE)
+
+
+## Luccichio dorato a croce sopra il nemico che si può contrattaccare.
+func _draw_counter_glint(at: Vector2) -> void:
+	var spin := Time.get_ticks_msec() * 0.006
+	var size := 13.0 + 3.0 * sin(Time.get_ticks_msec() * 0.025)
+	Shapes.glow(_danger_front, at, size * 1.8, Color(COLOR_COUNTER_GLINT, 0.55))
+	for k in 4:
+		var direction := Vector2.from_angle(spin + PI / 2.0 * k)
+		var length := size * (1.0 if k % 2 == 0 else 0.6)
+		_danger_front.draw_primitive(PackedVector2Array([at + direction * length, at + direction.orthogonal() * 3.0,
+				at - direction.orthogonal() * 3.0]), PackedColorArray([COLOR_COUNTER_GLINT]), PackedVector2Array())
+	Shapes.disc(_danger_front, at, 4.0, Color.WHITE)
 
 
 ## Angoli della spada nel fendente: inizio, fine e posizione attuale.

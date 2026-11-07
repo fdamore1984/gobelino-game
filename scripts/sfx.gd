@@ -14,6 +14,13 @@ const MAX_DISTANCE := 1400.0
 ## morte, che continuano anche dopo che il nemico morto è sparito.
 const VOICES := {"pain": 4, "scream": 3}
 const VOICE_POOL_SIZE := 6
+## Chiudendo il gioco (vedi quit_game) si fermano tutti i suoni e si
+## aspetta questo tempo, in secondi reali, prima di uscire: il server audio
+## libera i suoni fermati al suo giro successivo. Uscendo con un suono che
+## ancora suona restava in memoria il suo lettore, con l'avviso "ObjectDB
+## instances leaked at exit" (AudioStreamPlaybackWAV).
+const QUIT_DELAY := 0.25
+
 
 var _streams := {}
 var _pool: Array[AudioStreamPlayer2D] = []
@@ -21,10 +28,13 @@ var _next := 0
 var _voice_pool: Array[AudioStreamPlayer2D] = []
 var _next_voice := 0
 var _ui_player := AudioStreamPlayer.new()
+var _quitting := false
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# La X della finestra (e Alt+F4) passa da quit_game, come il pulsante Esci.
+	get_tree().auto_accept_quit = false
 	_build_sounds()
 	for i in POOL_SIZE:
 		var player := AudioStreamPlayer2D.new()
@@ -44,7 +54,7 @@ func _ready() -> void:
 ## Suono nel mondo di gioco, posizionato in at. Il tono varia di poco
 ## a ogni riproduzione, così i suoni ripetuti non stancano.
 func play(sound: String, at: Vector2, pitch := 1.0, volume_db := 0.0) -> void:
-	if not _streams.has(sound):
+	if not _streams.has(sound) or _quitting:
 		return
 	var player := _pool[_next]
 	_next = (_next + 1) % POOL_SIZE
@@ -64,7 +74,7 @@ func voice(kind: String) -> AudioStream:
 ## pitch è il tono della voce di chi la emette.
 func play_voice(kind: String, at: Vector2, pitch := 1.0, volume_db := 0.0) -> void:
 	var stream := voice(kind)
-	if stream == null:
+	if stream == null or _quitting:
 		return
 	var player := _voice_pool[_next_voice]
 	_next_voice = (_next_voice + 1) % VOICE_POOL_SIZE
@@ -77,10 +87,37 @@ func play_voice(kind: String, at: Vector2, pitch := 1.0, volume_db := 0.0) -> vo
 
 ## Suono dell'interfaccia, non posizionale.
 func play_ui(sound: String) -> void:
-	if not _streams.has(sound):
+	if not _streams.has(sound) or _quitting:
 		return
 	_ui_player.stream = _streams[sound]
 	_ui_player.play()
+
+
+## Ferma tutti i suoni del gioco: quelli di Sfx e i lettori nella scena
+## (le voci di giocatore e nemici, vedi Voice).
+func stop_all() -> void:
+	for player: Node in get_tree().root.find_children("*", "AudioStreamPlayer2D", true, false):
+		(player as AudioStreamPlayer2D).stop()
+	for player: Node in get_tree().root.find_children("*", "AudioStreamPlayer", true, false):
+		(player as AudioStreamPlayer).stop()
+
+
+## Chiude il gioco (pulsante Esci, X della finestra): prima ferma tutti i
+## suoni e lascia al server audio il tempo di liberarli (vedi QUIT_DELAY).
+func quit_game() -> void:
+	if _quitting:
+		return
+	_quitting = true
+	stop_all()
+	# Il timer ignora pausa e rallentamenti, così si esce sempre.
+	await get_tree().create_timer(QUIT_DELAY, true, false, true).timeout
+	stop_all()
+	get_tree().quit()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		quit_game()
 
 
 ## Nel browser ogni suono passa al browser come campione la prima volta che
@@ -236,6 +273,31 @@ func _build_sounds() -> void:
 	_streams["splat"] = _render_filtered(0.25, Vector2(0.5, 0.1), func(t: float, d: float) -> float:
 		var squelch := sin(TAU * lerpf(180.0, 60.0, t / d) * t) * 0.5 * exp(-t * 20.0)
 		return clampf(_noise() * exp(-t * 28.0) + squelch, -1.0, 1.0) * _env(t, d, 0.002))
+	# Carica di un attacco: ogni tipo ha il suo suono, si riconosce senza
+	# guardare (vedi Enemy._windup_sound).
+	# Carica di un tiro a distanza: la corda dell'arco che si tende o la
+	# magia che si accende, un luccichio che sale.
+	_streams["windup_ranged"] = _render(0.5, func(t: float, d: float) -> float:
+		var glide := sin(TAU * lerpf(500.0, 1200.0, t / d) * t) * (0.6 + 0.4 * sin(TAU * 24.0 * t))
+		var creak := signf(sin(TAU * (140.0 + 40.0 * sin(TAU * 20.0 * t)) * t)) * 0.08 * (1.0 - t / d)
+		return (glide * 0.18 + creak) * _env(t, d, 0.04))
+	# Carica dello sputo: un gorgoglio che sale.
+	_streams["windup_spit"] = _render_filtered(0.5, Vector2(0.2, 0.45), func(t: float, d: float) -> float:
+		var bubble := sin(TAU * (90.0 + 160.0 * t / d + 40.0 * sin(TAU * 13.0 * t)) * t)
+		return (bubble * 0.4 + _noise() * 0.25) * (0.5 + 0.5 * absf(sin(TAU * 9.0 * t))) * _env(t, d, 0.05))
+	# Carica del salto con colpo a terra: un ringhio basso che sale, col rombo sotto.
+	_streams["windup_slam"] = _render_filtered(0.7, Vector2(0.15, 0.3), func(t: float, d: float) -> float:
+		var growl := _saw(lerpf(55.0, 95.0, t / d) * t) * 0.45
+		var rumble := sin(TAU * 38.0 * t) * 0.35
+		return (growl + rumble + _noise() * 0.2) * (0.6 + 0.4 * sin(TAU * 7.0 * t)) * _env(t, d, 0.15))
+	# Carica del colpo che gira tutto attorno: un fruscio che accelera.
+	_streams["windup_spin"] = _render_filtered(0.6, Vector2(0.15, 0.6), func(t: float, d: float) -> float:
+		return _noise() * 0.5 * absf(sin(TAU * lerpf(3.0, 9.0, t / d) * t)) * _env(t, d, 0.1))
+	# Contrattacco: uno stridio di metallo e un accordo che squilla.
+	_streams["counter"] = _render(0.5, func(t: float, d: float) -> float:
+		var shing := (sin(TAU * 2400.0 * t) * 0.5 + sin(TAU * 3600.0 * t) * 0.3) * exp(-t * 14.0)
+		var chord := (sin(TAU * 660.0 * t) + sin(TAU * 990.0 * t) * 0.7 + sin(TAU * 1320.0 * t) * 0.5) * 0.18 * exp(-t * 4.0)
+		return clampf(shing + chord + _noise() * 0.3 * exp(-t * 40.0), -1.0, 1.0) * _env(t, d, 0.002))
 	# Interfaccia
 	_streams["ui_move"] = _render(0.04, func(t: float, d: float) -> float:
 		return sin(TAU * 900.0 * t) * 0.2 * _env(t, d, 0.002))

@@ -85,7 +85,8 @@ static func eyes_center(radius: float, facing: Vector2) -> Vector2:
 
 ## Faccia: occhioni con le pupille che guardano dove si va, bocca ed
 ## eventualmente la cicatrice (look: {"scar": true}, per il goblin dello
-## sfondo del menù). Va disegnata per ultima. ink: spessore delle linee nere
+## sfondo del menù) o gli occhi socchiusi della smorfia di dolore (look:
+## {"squint": true}). Va disegnata per ultima. ink: spessore delle linee nere
 ## di occhi e bocca (i nemici lo hanno uguale al contorno del corpo).
 static func face(canvas: CanvasItem, radius: float, facing: Vector2, eye_size: float, angry: bool, mouth: String,
 		alpha := 1.0, look := {}, ink_width := -1.0) -> void:
@@ -94,7 +95,7 @@ static func face(canvas: CanvasItem, radius: float, facing: Vector2, eye_size: f
 	var eyes := eyes_center(radius, facing)
 	var size := maxf(radius * eye_size, 3.5)
 	var ink := Color(Shapes.INK, alpha)
-	Shapes.eyes(canvas, eyes, size, facing, angry, alpha, ink_width if ink_width > 0.0 else 2.0)
+	Shapes.eyes(canvas, eyes, size, facing, angry, alpha, ink_width if ink_width > 0.0 else 2.0, look.get("squint", false))
 	var spacing := size * 1.25 * (1.0 - 0.3 * absf(facing.x))
 	if look.get("scar", false):
 		# Cicatrice di traverso su un occhio.

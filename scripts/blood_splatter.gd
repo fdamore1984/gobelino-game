@@ -64,13 +64,14 @@ static func wound_texture() -> Texture2D:
 ## Disegna una texture del sangue centrata in at: core è il raggio della
 ## macchia centrale (core_ratio: la sua parte di metà texture), angle la
 ## rotazione in pianta e squash lo schiacciamento verticale dopo la
-## rotazione (0.5 per le macchie a terra). Rispetta la trasformazione
-## corrente del canvas.
+## rotazione (0.5 per le macchie a terra); stretch allunga la macchia
+## nella direzione angle (e la stringe un poco di traverso, così l'area
+## resta simile). Rispetta la trasformazione corrente del canvas.
 static func draw(canvas: CanvasItem, texture: Texture2D, at: Vector2, core: float, core_ratio: float,
-		angle: float, color: Color, squash := 1.0) -> void:
+		angle: float, color: Color, squash := 1.0, stretch := 1.0) -> void:
 	var half := core / core_ratio
-	var along := Vector2.from_angle(angle) * half
-	var across := along.orthogonal()
+	var along := Vector2.from_angle(angle) * half * stretch
+	var across := Vector2.from_angle(angle).orthogonal() * half / sqrt(stretch)
 	var points := PackedVector2Array()
 	for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
 		var offset := along * corner.x - across * corner.y

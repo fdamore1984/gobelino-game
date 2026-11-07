@@ -38,7 +38,8 @@ func _init(layout: int, count: int, clean := 0.0) -> void:
 
 
 func add(value: float) -> void:
-	amount = clampf(amount + value, 0.0, 1.0)
+	# Opzione Sangue (vedi Settings.blood_factor).
+	amount = clampf(amount + value * Settings.blood_factor(), 0.0, 1.0)
 
 
 ## Si pulisce un po'. Restituisce true finché c'è sangue da disegnare.

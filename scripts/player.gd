@@ -72,7 +72,7 @@ signal special_finished
 ## "special", "shield", "lock", "drink_<scorta>".
 signal action_done(kind: String)
 
-enum State { NORMAL, ATTACK, PARRY, DODGE, SLIDE, HURT, DEAD, SLAM, FALL, RECOIL, DRINK, SPECIAL }
+enum State { NORMAL, ATTACK, PARRY, DODGE, SLIDE, HURT, DEAD, SLAM, FALL, RECOIL, DRINK, SPECIAL, COUNTER }
 
 const RADIUS := 22.0
 ## Grandezza degli occhi rispetto al corpo.
@@ -230,6 +230,14 @@ const PASSAGE_Z := 1
 ## All'impatto la telecamera trema, sempre meno.
 const CAMERA_SHAKE := 9.0
 const CAMERA_SHAKE_DECAY := 4.0
+## Tremolio della telecamera a ogni colpo di spada a segno (vedi
+## _resolve_attack): piccolo per i colpi della combo, più forte per i colpi
+## potenti e il colpo finale.
+const HIT_SHAKE := 0.38
+const HIT_SHAKE_HEAVY := 0.62
+## Respinta dei colpi intermedi (vedi _push_limit): il nemico colpito resta
+## entro la portata del colpo successivo, con questo margine.
+const PUSH_REACH_MARGIN := 12.0
 
 ## Frenesia: punti per ogni colpo di spada a segno (anche parato dalla
 ## guardia), di più per il colpo potente e gli attacchi a terra. Dopo
@@ -273,6 +281,24 @@ const PARRY_ARC := deg_to_rad(140.0)
 ## Una parata iniziata appena prima del colpo stordisce il nemico
 ## e potenzia gli attacchi.
 const PERFECT_PARRY_WINDOW := 0.2
+
+## Contrattacco (vedi offer_counter e _start_counter): dopo una parata
+## perfetta di un colpo in mischia, per COUNTER_WINDOW secondi l'attacco
+## diventa un colpo critico sul nemico stordito, se è entro COUNTER_RANGE:
+## in COUNTER_DASH_TIME secondi si scatta accanto a lui, poi un fendente
+## dorato dal basso verso l'alto (COUNTER_ARC, in COUNTER_SWING_TIME
+## secondi) che fa COUNTER_DAMAGE_FACTOR volte il danno (al più i punti
+## massimi di un colpo), lo respinge lontano e rompe la sua resistenza ai
+## colpi; il recupero finisce a COUNTER_TIME. Durante il contrattacco non
+## si viene colpiti.
+const COUNTER_WINDOW := 1.0
+const COUNTER_RANGE := 260.0
+const COUNTER_DASH_TIME := 0.1
+const COUNTER_SWING_TIME := 0.16
+const COUNTER_TIME := 0.45
+const COUNTER_ARC := deg_to_rad(240.0)
+const COUNTER_DAMAGE_FACTOR := 3.0
+const COLOR_COUNTER := Color(1.0, 0.85, 0.3)
 
 ## Bonus della parata perfetta: attacchi più forti e più rapidi.
 const EMPOWER_TIME := 4.0
@@ -405,10 +431,10 @@ const BOUNCE_MAX_SPEED := 180.0
 ## I nemici sono solidi: non ci si passa attraverso (si salta sopra solo
 ## più in alto di JUMP_EVADE_HEIGHT, e durante gli attacchi a terra si
 ## ignorano). Andarci addosso non fa danni.
-## All'impatto dell'attacco a terra i nemici entro il raggio più questo
-## margine (non i boss) vengono respinti a questa velocità.
+## All'impatto dell'attacco a terra anche i nemici poco oltre il raggio
+## (entro questo margine, non i boss) vengono respinti lontano come quelli
+## colpiti (Enemy.HEAVY_KNOCKBACK_DISTANCE, vedi Enemy.knock).
 const SLAM_PUSH_MARGIN := 70.0
-const SLAM_PUSH_SPEED := 700.0
 
 ## Colpo parato dalla guardia di un nemico: la combo si interrompe e si
 ## viene respinti indietro per REPEL_TIME secondi (schivata e parata restano
@@ -695,6 +721,14 @@ var _special_zoom := Vector2.ONE
 var _zoom_tween: Tween
 ## Altezza del terreno sotto il personaggio (vedi World.elevation_at).
 var ground_elevation := 0.0
+## Contrattacco (vedi offer_counter): nemico che si può contrattaccare,
+## tempo rimasto per farlo, da dove e verso dove si scatta, se il colpo è
+## già partito.
+var _counter_target: Enemy
+var _counter_window := 0.0
+var _counter_from := Vector2.ZERO
+var _counter_to := Vector2.ZERO
+var _counter_struck := false
 ## Automazioni della Modalità Touch (solo versione web, vedi TouchAssist).
 var _touch_assist: TouchAssist = TouchAssist.new() if Platform.touch_mode else null
 
@@ -731,10 +765,27 @@ func _ready() -> void:
 		# Visuale vicina all'azione ("zoom" di data/world.json); sui telefoni
 		# e sui tablet, nel browser, ancora più vicina: lo schermo è piccolo e
 		# il gioco ci entra intero (vedi Platform.screen_kind).
-		var camera_data: Dictionary = World.DATA.data["camera"]
-		_camera.zoom = Vector2.ONE * float(camera_data.get("zoom", 1.0))
-		if Platform.screen_kind != "":
-			_camera.zoom *= float(camera_data.get(Platform.screen_kind + "_zoom", 1.0))
+		_camera.zoom = _base_zoom()
+		if not Settings.changed.is_connected(_on_settings_changed):
+			Settings.changed.connect(_on_settings_changed)
+
+
+## Zoom della telecamera ("zoom" di data/world.json; sui telefoni e sui
+## tablet, nel browser, ancora più vicina). Con l'interfaccia più grande
+## (vedi Settings.apply_ui_scale) tutto si ingrandisce: la telecamera si
+## allontana di altrettanto, il mondo no.
+func _base_zoom() -> Vector2:
+	var camera_data: Dictionary = World.DATA.data["camera"]
+	var zoom := Vector2.ONE * float(camera_data.get("zoom", 1.0))
+	if Platform.screen_kind != "":
+		zoom *= float(camera_data.get(Platform.screen_kind + "_zoom", 1.0))
+	return zoom / Settings.ui_scale
+
+
+## Cambiata la dimensione dell'interfaccia (dalle Opzioni del menù di pausa).
+func _on_settings_changed() -> void:
+	if _camera and _state != State.SPECIAL:
+		_camera.zoom = _base_zoom()
 
 
 func _physics_process(delta: float) -> void:
@@ -744,6 +795,7 @@ func _physics_process(delta: float) -> void:
 	_dodge_cooldown = maxf(_dodge_cooldown - delta, 0.0)
 	_dodge_chain_grace = maxf(_dodge_chain_grace - delta, 0.0)
 	_empowered_time = maxf(_empowered_time - delta, 0.0)
+	_counter_window = maxf(_counter_window - delta, 0.0)
 	_block_flash = maxf(_block_flash - delta, 0.0)
 	soot = maxf(soot - delta / SOOT_CLEAN_TIME, 0.0)
 	_combo_timer = maxf(_combo_timer - delta, 0.0)
@@ -775,7 +827,7 @@ func _physics_process(delta: float) -> void:
 	# Gli attacchi col mouse partono verso il cursore.
 	var attack_input := _aim if _aim != Vector2.ZERO else input
 
-	if _state not in [State.DEAD, State.HURT, State.SPECIAL]:
+	if _state not in [State.DEAD, State.HURT, State.SPECIAL, State.COUNTER]:
 		if UiNav.game_pressed("potion"):
 			_start_drink("potion")
 		if UiNav.game_pressed("shield"):
@@ -793,8 +845,12 @@ func _physics_process(delta: float) -> void:
 		_update_passage_z()
 		_update_run_button(delta)
 
+	# Contrattacco: dopo una parata perfetta, l'attacco (anche con la parata
+	# ancora premuta) colpisce il nemico stordito.
+	if _can_counter() and UiNav.game_pressed("attack"):
+		_start_counter()
 	# Runa del Cataclisma: L2 + R2 insieme in aria (colpo potente e focus, in qualsiasi ordine).
-	if UiNav.game_chord("heavy_attack", "focus") and _can_start_h_bomb():
+	elif UiNav.game_chord("heavy_attack", "focus") and _can_start_h_bomb():
 		_start_h_bomb(attack_input)
 	# Frenesia piena: L1 + R1 insieme (parata e attacco, in qualsiasi ordine)
 	# scatenano l'attacco speciale, annullando l'azione in corso.
@@ -937,6 +993,10 @@ func _physics_process(delta: float) -> void:
 			_running = false
 			_update_special()
 
+		State.COUNTER:
+			_running = false
+			_update_counter()
+
 		State.RECOIL:
 			_velocity = _velocity.move_toward(Vector2.ZERO, DECELERATION * 1.5 * delta)
 			if _state_time >= REPEL_TIME:
@@ -994,7 +1054,8 @@ func _physics_process(delta: float) -> void:
 		_camera.position = Vector2(0, _camera_height) + _look_ahead
 		# Il tremolio va sullo scostamento, che non viene ammorbidito.
 		_shake = move_toward(_shake, 0.0, CAMERA_SHAKE_DECAY * delta)
-		_camera.offset = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * CAMERA_SHAKE * _shake * _shake
+		# Opzione Tremolio della telecamera: ridotto o spento (vedi Settings.shake_factor).
+		_camera.offset = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * CAMERA_SHAKE * _shake * _shake * Settings.shake_factor()
 	queue_redraw()
 
 
@@ -1055,7 +1116,7 @@ func _bounce(blocked: Vector2, delta: float) -> void:
 ## della velocità diretta contro il nemico si annulla. Durante gli attacchi a
 ## terra e l'attacco speciale si passa attraverso i nemici.
 func _collide_enemies(world: World) -> void:
-	if _state in [State.DEAD, State.FALL, State.SLAM, State.SPECIAL]:
+	if _state in [State.DEAD, State.FALL, State.SLAM, State.SPECIAL, State.COUNTER]:
 		return
 	for enemy: Enemy in Enemy.near_point(position, RADIUS):
 		if not is_instance_valid(enemy) or enemy.is_dead() or absf(enemy.ground_elevation - ground_elevation) > HIT_HEIGHT_REACH \
@@ -1200,9 +1261,11 @@ func _end_combo() -> void:
 ## vicini) l'invulnerabilità dura di più ("invulnerable_time" della voce
 ## "hordes" di data/world.json) e i non morti attorno vengono respinti (vedi
 ## _repel_horde): niente morti di colpo per colpi a catena.
-func receive_hit(from: Vector2, damage: int, projectile := false, horde := false) -> String:
+## unblockable: attacco che non si può parare (vedi Enemy._attack_unblockable):
+## la parata non lo ferma, lo scudo sì.
+func receive_hit(from: Vector2, damage: int, projectile := false, horde := false, unblockable := false) -> String:
 	# Durante l'attacco speciale niente può colpire il goblin.
-	if _state in [State.DEAD, State.FALL, State.SPECIAL] or is_invulnerable():
+	if _state in [State.DEAD, State.FALL, State.SPECIAL, State.COUNTER] or is_invulnerable():
 		return "ignored"
 	if (_state == State.DODGE and _state_time <= DODGE_INVULNERABLE_TIME) \
 			or (_state == State.SLIDE and _state_time <= SLIDE_INVULNERABLE_TIME):
@@ -1220,14 +1283,15 @@ func receive_hit(from: Vector2, damage: int, projectile := false, horde := false
 	var to_attacker := (from - global_position).normalized()
 	# Modalità Touch: la parata è automatica quando non si attacca (non
 	# perfetta: la parata perfetta resta a chi para col tempo giusto).
-	if _touch_assist and _state == State.NORMAL and not Platform.touch_attack and stamina > 0.0:
+	if _touch_assist and _state == State.NORMAL and not Platform.touch_attack and not unblockable and stamina > 0.0:
 		_start_parry(to_attacker)
 		_state_time = PERFECT_PARRY_WINDOW + 0.01
-	if _state == State.PARRY and absf(facing.angle_to(to_attacker)) <= PARRY_ARC / 2.0:
+	if _state == State.PARRY and not unblockable and absf(facing.angle_to(to_attacker)) <= PARRY_ARC / 2.0:
 		_block_flash = 0.2
 		if _state_time <= PERFECT_PARRY_WINDOW:
 			_empowered_time = EMPOWER_TIME
 			Sfx.play("perfect", global_position)
+			Rumble.parry()
 			return "parried"
 		stamina -= STAMINA_BLOCK
 		_stamina_delay = STAMINA_REGEN_DELAY
@@ -1270,10 +1334,12 @@ func receive_hit(from: Vector2, damage: int, projectile := false, horde := false
 		_velocity = -to_attacker * HURT_KNOCKBACK
 		var hordes: Dictionary = World.DATA.data["hordes"]
 		if horde or _horde_near(float(hordes["pressure_range"])):
-			_start_invulnerability(maxf(HURT_INVULNERABLE_TIME, float(hordes["invulnerable_time"])))
+			_start_invulnerability(maxf(HURT_INVULNERABLE_TIME, float(hordes["invulnerable_time"])) * Settings.difficulty_value("invulnerable"))
 			_repel_horde(float(hordes["repel_radius"]), float(hordes["repel_speed"]))
 		else:
-			_start_invulnerability(HURT_INVULNERABLE_TIME)
+			# Più lunga a Facile, più corta a Difficile (vedi Settings.difficulty_value).
+			_start_invulnerability(HURT_INVULNERABLE_TIME * Settings.difficulty_value("invulnerable"))
+		Rumble.hurt()
 		Sfx.play("hurt", global_position)
 		_voice.pain()
 	return "hit"
@@ -1340,6 +1406,21 @@ func _die() -> void:
 	_voice.scream()
 	GroundFx.pool(global_position, DEATH_POOL)
 	died.emit()
+
+
+## Ripartenza dopo la sconfitta (vedi Game._respawn): in at, con tutta la
+## vita, invulnerabili per invulnerable secondi.
+func revive(at: Vector2, invulnerable: float) -> void:
+	lock_manual = false
+	_set_lock_target(null)
+	_interrupt_action()
+	_counter_window = 0.0
+	soot = 0.0
+	teleport(at)
+	health = max_health
+	health_changed.emit(health, max_health)
+	_start_invulnerability(invulnerable)
+	Sfx.play("potion", global_position)
 
 
 ## Un nemico ucciso: il corpo si sporca ancora un po' di sangue.
@@ -1434,6 +1515,82 @@ func _repel(from: Vector2) -> void:
 	_change_state(State.RECOIL)
 	Sfx.play("block", global_position)
 	HitFeedback.hit(get_tree(), 0.07)
+
+
+## Un nemico è rimasto stordito da una parata perfetta: per COUNTER_WINDOW
+## secondi lo si può contrattaccare (sopra di lui luccica, vedi
+## Enemy.show_counter_glint).
+func offer_counter(enemy: Enemy) -> void:
+	_counter_target = enemy
+	_counter_window = COUNTER_WINDOW
+	enemy.show_counter_glint(COUNTER_WINDOW)
+
+
+## Si può contrattaccare: c'è il nemico stordito, vivo e vicino, e si è
+## liberi (a terra, fermi o in parata).
+func _can_counter() -> bool:
+	if _counter_window <= 0.0 or not is_instance_valid(_counter_target) or _counter_target.is_dead():
+		return false
+	return _state in [State.NORMAL, State.PARRY] and not is_airborne() \
+			and _counter_target.global_position.distance_to(global_position) <= COUNTER_RANGE
+
+
+func _start_counter() -> void:
+	_interrupt_action()
+	_counter_window = 0.0
+	_counter_target.show_counter_glint(0.0)
+	_counter_from = position
+	_counter_to = _special_landing(_counter_target)
+	_counter_struck = false
+	_velocity = Vector2.ZERO
+	var direction := (_counter_target.position - position).normalized()
+	if direction != Vector2.ZERO:
+		facing = direction
+		_target_facing = direction
+	_swing_sign = -_swing_sign
+	_change_state(State.COUNTER)
+	Sfx.play("counter", global_position)
+	action_done.emit("counter")
+
+
+## Contrattacco: scatto accanto al nemico, il fendente, il recupero.
+func _update_counter() -> void:
+	_velocity = Vector2.ZERO
+	if _state_time < COUNTER_DASH_TIME:
+		position = _counter_from.lerp(_counter_to, ease(_state_time / COUNTER_DASH_TIME, 0.4))
+		return
+	if not _counter_struck:
+		position = _counter_to
+		_counter_struck = true
+		_counter_strike()
+	elif _state_time >= COUNTER_TIME:
+		_change_state(State.NORMAL)
+
+
+## Il colpo critico del contrattacco (vedi COUNTER_*).
+func _counter_strike() -> void:
+	var target := _counter_target
+	if not is_instance_valid(target) or target.is_dead():
+		return
+	var direction := (target.global_position - global_position).normalized()
+	if direction == Vector2.ZERO:
+		direction = facing
+	facing = direction
+	_target_facing = direction
+	var damage := roundi(base_damage() * COUNTER_DAMAGE_FACTOR * (EMPOWER_DAMAGE_FACTOR if is_empowered() else 1.0) * (1.0 + inventory.bonus("damage")))
+	target.take_points(target.points_for(damage), direction, true, true, INF, INF, true)
+	HitSpark.spawn(get_parent(), target.global_position - direction * target.radius * 0.8, target.ground_elevation + target.radius * 0.9,
+			56.0, COLOR_COUNTER, direction.angle() + PI / 2.0 - 0.6 * _swing_sign, true)
+	Sfx.play("hit", global_position, 0.75)
+	HitFeedback.hit(get_tree(), 0.18)
+	shake(0.85)
+	Rumble.counter()
+	_add_frenzy(FRENZY_PER_HEAVY)
+
+
+## Fa tremare la telecamera (amount da 0 a 1), per esempio a un colpo a segno.
+func shake(amount: float) -> void:
+	_shake = maxf(_shake, amount)
 
 
 ## Sta caricando lo slam aereo: fluttua a mezz'aria, esposto a dardi e
@@ -2126,18 +2283,20 @@ func _slam_impact() -> void:
 		if offset.length() > radius + enemy.radius:
 			# Poco più in là non si fanno danni, ma si viene comunque respinti.
 			if offset.length() <= radius + enemy.radius + SLAM_PUSH_MARGIN and not enemy.is_boss():
-				enemy.shove(direction * SLAM_PUSH_SPEED)
+				enemy.knock(direction, Enemy.HEAVY_KNOCKBACK_DISTANCE)
 			continue
-		enemy.take_damage(damage, direction, true)
-		if not enemy.is_boss():
-			enemy.shove(direction * SLAM_PUSH_SPEED)
-		HitSpark.spawn(get_parent(), enemy.global_position - direction * enemy.radius * 0.8, enemy.ground_elevation + enemy.radius * 0.5, 40.0, COLOR_HEAVY)
+		# Colpo potente: respinta lunga (vedi Enemy.knock), barcollamento e
+		# resistenza ai colpi molto svuotata.
+		enemy.take_damage(damage, direction, true, INF, 3.0)
+		HitSpark.spawn(get_parent(), enemy.global_position - direction * enemy.radius * 0.8, enemy.ground_elevation + enemy.radius * 0.5, 40.0,
+				COLOR_HEAVY, direction.angle() + PI / 2.0, true)
 		landed = true
 	GroundFx.shockwave(global_position, ground_elevation, radius)
 	Sfx.play("fireball_hit", global_position, 0.6)
 	if landed:
 		Sfx.play("hit", global_position, 0.7)
 		HitFeedback.hit(get_tree(), 0.14)
+		Rumble.hit_dealt(true)
 		_add_frenzy(FRENZY_PER_HEAVY)
 
 
@@ -2158,8 +2317,8 @@ func _h_bomb_impact() -> void:
 			# L'armatura non attenua la runa.
 			enemy.take_points(ceili(enemy.max_health * H_BOMB_BOSS_DAMAGE), direction, true, true)
 		else:
+			# Il colpo che lo abbatte lo spinge via (vedi Enemy.knock).
 			enemy.take_points(enemy.health, direction, true, true)
-			enemy.shove(direction * SLAM_PUSH_SPEED)
 	var blast := HBombBlast.new()
 	blast.radius = radius
 	blast.position = position
@@ -2171,6 +2330,7 @@ func _h_bomb_impact() -> void:
 	Sfx.play("h_bomb", global_position)
 	Sfx.play("fireball_hit", global_position, 0.6)
 	HitFeedback.hit(get_tree(), 0.16)
+	Rumble.explosion(0.0)
 
 
 ## Raggio dell'esplosione della runa (secondo la carica), dello slam o del colpo dallo scatto.
@@ -2312,7 +2472,7 @@ func _special_strike() -> void:
 	# I nemici sono fermi: il colpo passa sempre, anche la guardia.
 	target.take_damage(damage, direction, _special_hits == max_special_hits)
 	HitSpark.spawn(get_parent(), target.global_position - direction * target.radius * 0.8,
-			target.ground_elevation + target.radius * 0.9, 44.0, COLOR_FRENZY)
+			target.ground_elevation + target.radius * 0.9, 44.0, COLOR_FRENZY, direction.angle() + PI / 2.0 - 0.35 * _swing_sign, true)
 	Sfx.play("swing", global_position, 1.1 + 0.05 * _special_hits)
 	Sfx.play("hit", global_position, 1.0 + 0.04 * _special_hits)
 	HitFeedback.hit(get_tree(), 0.05)
@@ -2867,12 +3027,15 @@ func _resolve_attack() -> void:
 				HitSpark.spawn(get_parent(), enemy.global_position - offset.normalized() * (enemy.radius + 10.0),
 						enemy.ground_elevation + enemy.radius * 0.9, 56.0, COLOR_GUARD_SPARK)
 				continue
-			enemy.take_damage(damage, offset.normalized(), heavy)
+			# Respinta (lunga per i colpi potenti e il colpo finale, entro la
+			# portata del colpo successivo per quelli intermedi, vedi _push_limit).
+			# Resistenza ai colpi: il colpo potente la svuota di più (vedi Enemy._take_poise).
+			enemy.take_damage(damage, offset.normalized(), heavy, _push_limit(enemy, offset.length()), 3.0 if _attack_heavy else (2.0 if heavy else 1.0))
 			landed = true
 			# Scintilla nel punto di contatto, sul lato del nemico rivolto verso di noi.
 			var contact := enemy.global_position - offset.normalized() * enemy.radius * 0.8
 			HitSpark.spawn(get_parent(), contact, enemy.ground_elevation + enemy.radius * 0.9,
-					40.0 if _attack_heavy else 28.0, COLOR_HEAVY if _attack_heavy else COLOR_SLASH)
+					40.0 if _attack_heavy else 28.0, COLOR_HEAVY if _attack_heavy else COLOR_SLASH, _cut_angle(offset), heavy)
 	# Ogni colpo a segno carica la Frenesia, anche se la guardia l'ha parato.
 	if landed or blocked_by:
 		_add_frenzy(FRENZY_PER_HEAVY if _attack_heavy else FRENZY_PER_HIT)
@@ -2880,11 +3043,51 @@ func _resolve_attack() -> void:
 		_repel(blocked_by.global_position)
 	if landed:
 		Sfx.play("hit", global_position, 0.8 if _attack_heavy else 1.0 + 0.1 * (_combo_step - 1))
+		shake(HIT_SHAKE_HEAVY if heavy else HIT_SHAKE)
+		Rumble.hit_dealt(heavy)
 		# Un attimo di fermo: si sente il colpo (più lungo per il colpo potente).
 		if _attack_heavy:
 			HitFeedback.hit(get_tree(), 0.12 + 0.05 * _charge)
 		else:
 			HitFeedback.hit(get_tree(), 0.1 if _combo_step >= max_combo_hits else 0.09)
+
+
+## Respinta massima del colpo in corso per un nemico a distance pixel (vedi
+## Enemy.knock): i colpi intermedi della combo, e i colpi potenti dopo cui
+## se ne può concatenare un altro, lasciano il nemico a portata del colpo
+## successivo, contando l'affondo che continua dopo il colpo; il colpo
+## finale e l'ultimo colpo potente lo spingono lontano (nessun limite).
+func _push_limit(enemy: Enemy, distance: float) -> float:
+	var reach: float
+	var follow: float
+	if _attack_heavy:
+		if _heavy_step >= max_heavy_chain:
+			return INF
+		reach = HEAVY_RANGE
+		follow = HEAVY_LUNGE_SPEED * HEAVY_ACTIVE / _attack_speed
+	else:
+		if _combo_step >= max_combo_hits:
+			return INF
+		reach = ATTACK_RANGE
+		follow = ATTACK_LUNGE_SPEED * (1.0 + 0.2 * (_combo_step - 1)) * ATTACK_ACTIVE / _attack_speed
+	return maxf(reach + enemy.radius + follow - PUSH_REACH_MARGIN - distance, 0.0)
+
+
+## Direzione sullo schermo del taglio di luce del lampo d'impatto (vedi
+## HitSpark) per un colpo verso offset: di traverso per i fendenti (inclinato
+## secondo il verso del colpo), lungo il colpo per l'affondo, quasi
+## verticale per il colpo dall'alto.
+func _cut_angle(offset: Vector2) -> float:
+	var toward := offset.angle()
+	if not _attack_heavy and not _air_attack:
+		match ATTACK_STYLES[_attack_style]:
+			"thrust":
+				return toward
+			"chop":
+				return lerp_angle(toward + PI / 2.0, PI / 2.0, 0.6)
+			"backhand":
+				return toward - PI / 2.0 + 0.35
+	return toward + PI / 2.0 - 0.35 * _swing_sign
 
 
 func _draw() -> void:
@@ -2918,6 +3121,8 @@ func _draw() -> void:
 			Shapes.disc(self, -_dodge_direction * k * 16.0 + Vector2(0, -LEG_LENGTH), RADIUS * (1.0 - 0.15 * k), Color(body, 0.35 / k))
 	if _state == State.SPECIAL:
 		_draw_special_streak(body)
+	if _state == State.COUNTER:
+		_draw_counter_streak(body)
 	if _state != State.SLIDE and not rolling:
 		var foot_y := RADIUS * 0.85 - (6.0 if is_airborne() else 0.0)
 		BodyParts.draw_legs(self, -LEG_LENGTH + RADIUS * 0.55, foot_y, LEG_SPACING, LEG_WIDTH, _walk_phase,
@@ -2973,7 +3178,11 @@ func _draw() -> void:
 	if not behind:
 		_draw_gear(body)
 	if _state != State.DEAD:
-		GoblinLook.face(self, RADIUS, facing, EYE_SIZE, false, "smile", body.a)
+		# Colpito strizza gli occhi e apre la bocca (smorfia di dolore); nel
+		# contrattacco urla.
+		var hurt := _state == State.HURT
+		GoblinLook.face(self, RADIUS, facing, EYE_SIZE, false, "open" if hurt or _state == State.COUNTER else "smile", body.a,
+				{"squint": true} if hurt else {})
 
 	# Scudo attivo: una bolla attorno al personaggio.
 	if shield_active and _state != State.DEAD:
@@ -3043,6 +3252,9 @@ func _draw_sword() -> void:
 		return
 	if _state == State.SPECIAL:
 		_draw_special_sword()
+		return
+	if _state == State.COUNTER:
+		_draw_counter_sword()
 		return
 	if _state == State.PARRY:
 		# In parata la spada è di traverso davanti al corpo: si illumina
@@ -3275,6 +3487,32 @@ func _draw_special_sword() -> void:
 	var angle := lerpf(start, end, ease(t, 0.5))
 	BodyParts.draw_trail(self, Vector2.ZERO, start, angle, RADIUS + 6.0, ATTACK_RANGE + RADIUS, Color(COLOR_FRENZY, 0.75 * (1.0 - t * 0.5)))
 	BodyParts.draw_sword(self, Vector2.from_angle(angle) * RADIUS * 0.8, angle, HEAVY_SWORD_LENGTH, SWORD_WIDTH * 1.3, heat)
+
+
+## Contrattacco: la spada dorata portata indietro durante lo scatto, poi
+## il fendente ampio dal basso verso l'alto con la scia dorata, che sfuma
+## nel recupero.
+func _draw_counter_sword() -> void:
+	var gold := Color(1.45, 1.25, 0.7)
+	var start := facing.angle() - _swing_sign * COUNTER_ARC / 2.0
+	var end := facing.angle() + _swing_sign * COUNTER_ARC / 2.0
+	var t := clampf((_state_time - COUNTER_DASH_TIME) / COUNTER_SWING_TIME, 0.0, 1.0)
+	var angle := lerpf(start, end, ease(t, 0.35))
+	if _state_time >= COUNTER_DASH_TIME:
+		var fade := 1.0 - clampf((_state_time - COUNTER_DASH_TIME - COUNTER_SWING_TIME) / (COUNTER_TIME - COUNTER_DASH_TIME - COUNTER_SWING_TIME), 0.0, 1.0)
+		BodyParts.draw_trail(self, Vector2.ZERO, start, angle, RADIUS + 6.0, HEAVY_RANGE + RADIUS, Color(COLOR_COUNTER, 0.9 * fade))
+	BodyParts.draw_sword(self, Vector2.from_angle(angle) * RADIUS * 0.8, angle, HEAVY_SWORD_LENGTH, SWORD_WIDTH * 1.3, gold)
+
+
+## Scia dello scatto del contrattacco: copie dorate del corpo dal punto di partenza.
+func _draw_counter_streak(body: Color) -> void:
+	var fade := 1.0 - clampf(_state_time / (COUNTER_DASH_TIME * 2.0), 0.0, 1.0)
+	if fade <= 0.0:
+		return
+	var from := _counter_from - position
+	var lift := Vector2(0, -LEG_LENGTH)
+	for k in 4:
+		Shapes.disc(self, from.lerp(Vector2.ZERO, k / 4.0) + lift, RADIUS * (0.7 + 0.075 * k), Color(COLOR_COUNTER.lerp(body, 0.4), 0.3 * fade * (k + 1) / 4.0))
 
 
 ## Carica del colpo potente: un anello che si riempie e diventa bianco al massimo.

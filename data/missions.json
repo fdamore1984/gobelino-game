@@ -1,0 +1,6 @@
+{
+	"distance": [1400, 2600],
+	"clear": {"enemies": [4, 0.3], "max": 9, "radius": 200, "trigger": 900, "release": 2600},
+	"crate": {"reach": 36},
+	"reward": {"gold": [40, 80], "gold_per_level": 8, "xp_per_level": 20}
+}

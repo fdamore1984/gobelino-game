@@ -39,6 +39,14 @@ func _ready() -> void:
 	var mode := "screenshots"
 	# Le partite avviate per le foto non si salvano (niente scritta né slot sovrascritti).
 	Game.saving_enabled = false
+	# Le foto si fanno con le opzioni predefinite, qualunque siano quelle
+	# salvate dal giocatore (senza salvarle: si cambiano solo in memoria).
+	Settings.difficulty = "normal"
+	Settings.damage_numbers = true
+	Settings.camera_shake = "normal"
+	Settings.blood = "normal"
+	Settings.ui_scale = 1.0
+	Settings.apply_ui_scale()
 	if not OS.get_cmdline_user_args().is_empty():
 		mode = OS.get_cmdline_user_args()[0]
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTPUT))
@@ -72,7 +80,8 @@ func _ready() -> void:
 			await _capture_metro(language)
 			await _capture_horde(language)
 			await _capture_touch(language)
-	get_tree().quit()
+	# Come il pulsante Esci: prima si fermano i suoni (vedi Sfx.quit_game).
+	Sfx.quit_game()
 
 
 func _capture_menu(language: String) -> void:
@@ -117,7 +126,9 @@ func _capture_combat(language: String) -> void:
 	var warrior := _enemy("warrior", Vector2(95, -25), Enemy.State.CHASE, 0.0)
 	warrior.health = 2
 	_player._set_lock_target(warrior)
-	_enemy("brute", Vector2(-170, 90), Enemy.State.WINDUP, 0.6)
+	DamagePopups.spawn(warrior.global_position, warrior.ground_elevation + warrior.radius * 2.4, 2, "heavy")
+	# Un bruto élite, con l'aura e l'anello dorato.
+	_show_fx(_elite(_enemy("brute", Vector2(-170, 90), Enemy.State.WINDUP, 0.6)))
 	_enemy("caster", Vector2(-330, -140), Enemy.State.WINDUP, 0.6)
 	_enemy("golem", Vector2(470, -40), Enemy.State.CHASE, 0.0)
 	await _save("%s_1_combat.png" % language)
@@ -134,7 +145,10 @@ func _capture_parry(language: String) -> void:
 	_player._state_time = 0.05
 	_player._empowered_time = Player.EMPOWER_TIME
 	_hud_stats()
-	_player._set_lock_target(_enemy("brute", Vector2(95, 10), Enemy.State.STUNNED, 0.4))
+	var stunned := _enemy("brute", Vector2(95, 10), Enemy.State.STUNNED, 0.4)
+	_player._set_lock_target(stunned)
+	_player.offer_counter(stunned)
+	_show_fx(stunned)
 	_enemy("warrior", Vector2(-160, -60), Enemy.State.WINDUP, 0.5)
 	_enemy("summoner", Vector2(330, -170), Enemy.State.CHASE, 0.0)
 	await _save("%s_2_parry.png" % language)
@@ -512,8 +526,11 @@ func _capture_enemies(language: String) -> void:
 	var origin := _player.position
 	_player.facing = Vector2(1, 0).normalized()
 	_player._set_lock_target(_enemy("warrior", origin + Vector2(100, 10), Enemy.State.GUARD, 0.1))
-	_enemy("brute", origin + Vector2(-140, 60), Enemy.State.WINDUP, 0.7)
+	var brute := _enemy("brute", origin + Vector2(-140, 60), Enemy.State.WINDUP, 0.7)
+	brute._poise = brute._poise_max * 0.5
+	brute.queue_redraw()
 	_enemy("archer", origin + Vector2(300, -140), Enemy.State.WINDUP, 0.7)
+	_show_fx(_enemy("whirler", origin + Vector2(260, 130), Enemy.State.WINDUP, 0.6))
 	_enemy("golem", origin + Vector2(-260, -130), Enemy.State.CHASE, 0.0)
 	await _save("%s_enemies.png" % language)
 	_end_game()
@@ -769,6 +786,21 @@ func _enemy(type_id: String, at: Vector2, state: Enemy.State, state_time: float)
 	enemy.queue_redraw()
 	enemy._telegraph.queue_redraw()
 	return enemy
+
+
+## Rende élite il nemico (vedi Enemy.make_elite).
+func _elite(enemy: Enemy) -> Enemy:
+	enemy.make_elite()
+	enemy.queue_redraw()
+	return enemy
+
+
+## La fisica dei nemici delle foto è ferma: si ridisegnano a mano aura,
+## anello, icone e luccichii.
+func _show_fx(enemy: Enemy) -> void:
+	enemy._danger_back.queue_redraw()
+	enemy._danger_front.queue_redraw()
+	enemy._telegraph.queue_redraw()
 
 
 func _label(text: String, size: int, color: Color, width: float, y: float) -> Label:

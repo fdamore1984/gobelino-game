@@ -23,6 +23,9 @@ var _wounds: Array[Dictionary] = []
 
 ## Un colpo che arriva dalla direzione from (dal corpo verso chi colpisce).
 func add(from: Vector2) -> void:
+	# Con il sangue spento niente ferite (vedi Settings.blood_factor).
+	if Settings.blood_factor() <= 0.0:
+		return
 	var side := from.normalized() if from != Vector2.ZERO else Vector2.from_angle(randf() * TAU)
 	var at := side.rotated(randf_range(-0.5, 0.5)) * randf_range(0.15, 0.4)
 	_wounds.append({"at": at, "angle": side.angle() + PI / 2.0 + randf_range(-0.5, 0.5),

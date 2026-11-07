@@ -140,6 +140,9 @@ func _explode(enemy: Enemy, crashed := false) -> void:
 		enemy.take_damage(damage, direction, true)
 		HitFeedback.hit(get_tree(), 0.05)
 	Sfx.play("fireball_hit", global_position, 1.0, -2.0 if enemy or crashed else -8.0)
+	# Il controller vibra, sempre meno con la distanza (vedi Rumble).
+	if World.current and World.current.player:
+		Rumble.explosion((World.current.player as Node2D).global_position.distance_to(global_position) * 1.5)
 
 
 func _draw() -> void:

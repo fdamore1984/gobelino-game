@@ -89,12 +89,34 @@
 		"invulnerable_time": 1.5,
 		"pressure_range": 900,
 		"repel_radius": 160,
-		"repel_speed": 520
+		"repel_speed": 520,
+		"waves": [2, 3],
+		"wave_pause": 4.0,
+		"reward_share": 0.6,
+		"reward": {"gold": [15, 30], "gold_per_level": 3, "xp_per_level": 12, "potion": 1, "item_chance": 0.5}
 	},
 	"enemy_attacks": {
-		"max_simultaneous": 2,
-		"player_damage": 1,
-		"boss_player_damage": 2
+		"max_simultaneous": 2
+	},
+	"difficulty": {
+		"easy": {"player_damage": 1, "boss_player_damage": 1, "invulnerable": 1.5, "horde": 0.6},
+		"normal": {"player_damage": 1, "boss_player_damage": 2, "invulnerable": 1.0, "horde": 1.0},
+		"hard": {"player_damage": 2, "boss_player_damage": 3, "invulnerable": 0.75, "horde": 1.4}
+	},
+	"elites": {
+		"chance": 0.06, "min_level": 3, "horde": [1, 3],
+		"size": 1.3, "points": 1.6, "xp": 3.0, "poise": 1.5, "zombie_points": 3
+	},
+	"night": {
+		"population": 1.5,
+		"loot": 1.6
+	},
+	"death": {
+		"gold_lost": 0.25,
+		"respawn_invulnerable": 2.5,
+		"clear_radius": 900,
+		"respawn_delay": 2.5,
+		"safe_interval": 1.0
 	},
 	"level_up": {
 		"health_offer_chance": 0.25

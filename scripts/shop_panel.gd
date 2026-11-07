@@ -17,6 +17,10 @@ const COLOR_DIM := Color(UiStyle.OVERLAY, 0.85)
 const COLOR_TOO_EXPENSIVE := Color(1, 1, 1, 0.45)
 
 var player: Player
+## Missioni (vedi Missions): sotto le griglie la missione proposta dal
+## mercante, con il pulsante per accettarla (una sola alla volta).
+var missions: Missions
+signal mission_accepted
 
 var _data: Dictionary = World.DATA.data["merchant"]
 var _merchant := Vector2.INF
@@ -30,6 +34,8 @@ var _details := Label.new()
 var _hint: Label
 var _close := Button.new()
 var _buttons: Array[Button] = []
+var _mission_text := Label.new()
+var _mission_button := Button.new()
 
 
 func _ready() -> void:
@@ -71,6 +77,23 @@ func _ready() -> void:
 	_nothing.custom_minimum_size = _sell_scroll.custom_minimum_size
 	_nothing.add_theme_color_override("font_color", COLOR_TEXT)
 	box.add_child(_nothing)
+	# Missione del mercante: testo e pulsante Accetta.
+	box.add_child(_label("MISSION_TITLE", 18, COLOR_TEXT))
+	var mission_row := HBoxContainer.new()
+	mission_row.add_theme_constant_override("separation", 14)
+	mission_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_mission_text.custom_minimum_size = Vector2(560, 0)
+	_mission_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_mission_text.add_theme_font_size_override("font_size", 17)
+	_mission_text.add_theme_color_override("font_color", COLOR_TITLE)
+	mission_row.add_child(_mission_text)
+	_mission_button.text = "MISSION_ACCEPT"
+	_mission_button.custom_minimum_size = Vector2(160, 44)
+	_mission_button.add_theme_font_size_override("font_size", 20)
+	_mission_button.focus_entered.connect(Sfx.play_ui.bind("ui_move"))
+	_mission_button.pressed.connect(_accept_mission)
+	mission_row.add_child(_mission_button)
+	box.add_child(mission_row)
 	_details.custom_minimum_size = Vector2(760, 52)
 	_details.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -175,6 +198,7 @@ func _rebuild(focus_index: int) -> void:
 	var can_sell := _sell_grid.get_child_count() > 0
 	_sell_scroll.visible = can_sell
 	_nothing.visible = not can_sell
+	_refresh_mission()
 	_focus.call_deferred(_buttons[clampi(focus_index, 0, _buttons.size() - 1)])
 
 
@@ -221,6 +245,32 @@ func _show_buy(id: String) -> void:
 	if Items.value(id) > player.inventory.gold:
 		action = tr("SHOP_NOT_ENOUGH")
 	_details.text = "%s\n%s" % [InventoryPanel.describe(id), action]
+
+
+## Testo della missione proposta (o di quella in corso) e pulsante Accetta.
+func _refresh_mission() -> void:
+	var offer := missions.offer_for(_merchant, World.current, player.level) if missions and World.current else {}
+	_mission_button.visible = false
+	if missions and missions.is_active():
+		_mission_text.text = "%s\n%s" % [tr("MISSION_BUSY"), missions.status_text()]
+	elif offer.is_empty():
+		_mission_text.text = ""
+	else:
+		var title := "MISSION_CLEAR_TITLE" if offer["type"] == "clear" else "MISSION_CRATE_TITLE"
+		var description := "MISSION_CLEAR_DESC" if offer["type"] == "clear" else "MISSION_CRATE_DESC"
+		_mission_text.text = "%s: %s\n%s" % [tr(title), tr(description), tr("MISSION_REWARD") % int(offer["gold"])]
+		_mission_button.visible = true
+
+
+func _accept_mission() -> void:
+	if missions == null or not missions.accept(_merchant):
+		Sfx.play_ui("block")
+		return
+	Sfx.play_ui("ui_confirm")
+	mission_accepted.emit()
+	_refresh_mission()
+	if not _buttons.is_empty():
+		_focus.call_deferred(_buttons[0])
 
 
 func _show_sell(id: String) -> void:

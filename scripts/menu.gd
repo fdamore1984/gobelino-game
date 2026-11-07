@@ -206,7 +206,8 @@ func _on_slot_panel_closed() -> void:
 
 
 func _on_quit_pressed() -> void:
-	get_tree().quit()
+	# Prima si fermano i suoni (vedi Sfx.quit_game).
+	Sfx.quit_game()
 
 
 func _on_controls_pressed() -> void:

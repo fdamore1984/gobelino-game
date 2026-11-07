@@ -85,8 +85,13 @@ static func _random_kind(item: Dictionary) -> bool:
 ## Quello che lascia un nemico abbattuto: ogni tanto monete o una pozione
 ## (di vita, di mana o di vigore), a volte una runa del cataclisma, di rado
 ## un oggetto e molto di rado un oggetto raro dei mercanti.
-static func enemy_drops(level: int) -> Array[Array]:
-	var data: Dictionary = DATA.data["enemy_drop"]
+## luck moltiplica le probabilità (di notte si trova di più, vedi
+## Game._loot_luck).
+static func enemy_drops(level: int, luck := 1.0) -> Array[Array]:
+	var source: Dictionary = DATA.data["enemy_drop"]
+	var data := {}
+	for key: String in source:
+		data[key] = minf(float(source[key]) * luck, 1.0) if key.ends_with("_chance") else source[key]
 	var drops: Array[Array] = []
 	if randf() < float(data["gold_chance"]):
 		var gold: Array = data["gold"]
