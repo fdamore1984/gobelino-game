@@ -109,7 +109,7 @@ func _capture_menu(language: String) -> void:
 func _capture_combat(language: String) -> void:
 	await _start_game(Vector2(0, 20), 1.15)
 	_player.level = 3
-	_player.experience = 170
+	_player.experience = roundi(_player.experience_needed() * 0.7)
 	_player.facing = Vector2(1, -0.2).normalized()
 	_player._combo_step = 3
 	_player._heavy_step = 1
@@ -139,7 +139,7 @@ func _capture_combat(language: String) -> void:
 func _capture_parry(language: String) -> void:
 	await _start_game(Vector2(0, 0), 1.3)
 	_player.level = 2
-	_player.experience = 60
+	_player.experience = roundi(_player.experience_needed() * 0.4)
 	_player.facing = Vector2.RIGHT
 	_player._state = Player.State.PARRY
 	_player._state_time = 0.05

@@ -96,12 +96,14 @@ static func enemy_drops(level: int, luck := 1.0) -> Array[Array]:
 	if randf() < float(data["gold_chance"]):
 		var gold: Array = data["gold"]
 		drops.append(["gold", randi_range(gold[0], gold[1]) + int(data["gold_per_level"]) * (level - 1)])
-	if randf() < float(data.get("potion_chance", 0.0)):
-		drops.append(["potion_health", 1])
-	elif randf() < float(data.get("mana_potion_chance", 0.0)):
-		drops.append(["potion_mana", 1])
-	elif randf() < float(data.get("stamina_potion_chance", 0.0)):
-		drops.append(["potion_stamina", 1])
+	# Un solo tiro a fasce: ogni probabilità del JSON è quella vera (vita,
+	# poi mana, poi vigore; insieme al più 1).
+	var roll := randf()
+	for potion: Array in [["potion_chance", "potion_health"], ["mana_potion_chance", "potion_mana"], ["stamina_potion_chance", "potion_stamina"]]:
+		roll -= float(data.get(potion[0], 0.0))
+		if roll < 0.0:
+			drops.append([potion[1], 1])
+			break
 	if randf() < float(data.get("h_bomb_chance", 0.0)):
 		drops.append(["h_bomb", 1])
 	if randf() < float(data["rare_chance"]):

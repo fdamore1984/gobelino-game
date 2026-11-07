@@ -1,7 +1,7 @@
 class_name HudStatus
 extends Control
 ## Pannello di stato in alto a sinistra: ritratto con il livello, barre di
-## vita (a segmenti), stamina, mana, esperienza e Frenesia, livelli delle abilità, monete e
+## vita, stamina, mana, esperienza e Frenesia, livelli delle abilità, monete e
 ## nemici sconfitti. Tutto disegnato con forme geometriche. La barra della
 ## Frenesia, piena, pulsa e mostra i tasti dell'attacco speciale (parata + attacco).
 ## Stile del sito (vedi UiStyle): contorni neri spessi, barre a pillola,
@@ -63,10 +63,10 @@ func _draw() -> void:
 	draw_style_box(_panel, Rect2(Vector2.ZERO, size))
 	_draw_portrait(font)
 
-	# Vita: un segmento per punto vita (barre di vita e mana senza numeri).
+	# Vita: barra continua come le altre (barre di vita e mana senza numeri).
 	var low := player.health <= maxf(1.0, player.max_health / 3.0)
 	_draw_heart(Vector2(BAR_X + 9, 26), 9.0)
-	_draw_segments(Rect2(BAR_X + 24, 14, BAR_WIDTH - 24, 22), player.health, player.max_health, COLOR_HEALTH_LOW if low else COLOR_HEALTH)
+	_draw_bar(Rect2(BAR_X + 24, 19, BAR_WIDTH - 24, 14), float(player.health) / maxi(player.max_health, 1), COLOR_HEALTH_LOW if low else COLOR_HEALTH)
 
 	# Stamina: attaccare, schivare, saltare, parare e correre la consumano.
 	var stamina_rect := Rect2(BAR_X + 24, 40, BAR_WIDTH - 24, 14)
@@ -160,20 +160,6 @@ func _draw_ring(rect: Rect2, color: Color) -> void:
 	ring.draw_center = false
 	ring.border_color = color
 	draw_style_box(ring, rect.grow(3.0))
-
-
-## Barra a segmenti: uno per ogni punto, pieni fino a value, ognuno col suo
-## contorno nero.
-func _draw_segments(rect: Rect2, value: int, maximum: int, color: Color) -> void:
-	var gap := 3.0
-	var width := (rect.size.x - gap * (maximum - 1)) / maximum
-	var full := UiStyle.box(color, 6, 3, 0.0)
-	var empty := UiStyle.box(UiStyle.SOFT, 6, 3, 0.0)
-	for i in maximum:
-		var segment := Rect2(rect.position + Vector2(i * (width + gap), 0), Vector2(width, rect.size.y))
-		draw_style_box(full if i < value else empty, segment)
-		if i < value and segment.size.x > 12.0:
-			draw_rect(Rect2(segment.position + Vector2(5, 5), Vector2(segment.size.x - 10, 3)), color.lightened(0.4))
 
 
 func _text(font: Font, text: String, at: Vector2, font_size: int, color: Color, align := HORIZONTAL_ALIGNMENT_LEFT, outline := OUTLINE_SIZE) -> void:

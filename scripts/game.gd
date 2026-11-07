@@ -210,7 +210,8 @@ func _ready() -> void:
 	_player.leveled_up.connect(_on_player_leveled_up)
 	_player.died.connect(_on_player_died)
 	_player.frenzy_changed.connect(_hud.set_frenzy)
-	_player.special_finished.connect(_on_special_finished)
+	_player.special_finished.connect(_resume_level_ups)
+	_player.h_bomb_finished.connect(_resume_level_ups)
 	_hud.upgrade_chosen.connect(_on_upgrade_chosen)
 	_hud.interact_pressed.connect(_interact)
 	_hud.player = _player
@@ -1209,14 +1210,22 @@ func _on_enemy_died(enemy: Enemy) -> void:
 
 func _on_player_leveled_up(_level: int) -> void:
 	_pending_level_ups += 1
-	# Durante l'attacco speciale la scelta aspetta la fine della raffica.
-	if _pending_level_ups == 1 and not _player.is_special_active():
+	# Durante l'attacco speciale la scelta aspetta la fine della raffica, e
+	# dopo la runa la fine dell'esplosione.
+	if _pending_level_ups == 1 and not _level_up_on_hold():
 		_show_level_up()
 
 
-## Finito l'attacco speciale si scelgono i potenziamenti guadagnati nel frattempo.
-func _on_special_finished() -> void:
-	if _pending_level_ups > 0 and not _hud.is_level_up_open():
+## Scelta dei potenziamenti rimandata: attacco speciale o esplosione della runa
+## ancora in corso.
+func _level_up_on_hold() -> bool:
+	return _player.is_special_active() or _player.is_h_bomb_exploding()
+
+
+## Finiti l'attacco speciale o l'esplosione si scelgono i potenziamenti
+## guadagnati nel frattempo (se non c'è ancora l'altro in corso).
+func _resume_level_ups() -> void:
+	if _pending_level_ups > 0 and not _hud.is_level_up_open() and not _level_up_on_hold():
 		_show_level_up()
 
 

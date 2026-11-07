@@ -64,6 +64,16 @@ anche la pagina itch.io (`store/itch/`) mostrata sotto il gioco.
   (vedi sotto); la pausa resta comunque su Start del controller e sul pulsante
   Menu del touch.
 
+## Pozione del vigore automatica (tutta la versione web)
+
+Nel browser, con qualsiasi controllo (touch, tastiera e mouse o controller),
+quando il vigore arriva a zero il goblin beve da solo una pozione verde, se
+ne ha: `Player._auto_stamina_potion`, chiamato a ogni passo di fisica, usa
+la stessa azione del tasto (`Player._start_drink`, con l'animazione normale),
+che parte appena si è fermi a terra senza fare altro. Se nel frattempo il
+vigore si riempie da solo, la pozione non si beve. Nelle versioni per PC non
+succede.
+
 ## Modalità Touch (solo nel browser)
 
 All'avvio della versione web `Platform._detect_touch_only` guarda se c'è un
@@ -85,8 +95,8 @@ la Modalità Touch non esiste: niente controlli a schermo né automazioni.
   altro tasto.
 - **Automazioni** (`scripts/touch_assist.gd`, chiamato da
   `Player._physics_process`; preme e rilascia le azioni dell'Input Map):
-  salto davanti ai dislivelli superabili con i salti rimasti; pozioni di mana e vigore bevute da sole
-  quando mana o vigore finiscono (a vita zero, in `Player.receive_hit`, si
+  salto davanti ai dislivelli superabili con i salti rimasti; pozione di mana bevuta da sola
+  quando il mana finisce (a vita zero, in `Player.receive_hit`, si
   consuma subito una pozione della vita); scudo alzato appena è carico; torcia accesa e
   spenta secondo il buio (`DayNight.darkness`).
 - **Combattimento**: Attacco tenuto premuto fa da solo combo normale →
