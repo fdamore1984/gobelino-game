@@ -524,7 +524,7 @@ func _refresh_horde_field(delta: float, force := false) -> void:
 	_horde_field_cell = cell
 	var reach := float(_horde_data["distance"][1]) + _horde_spread + HORDE_FIELD_MARGIN
 	var climb := Enemy.HOP_LEVELS * _world.level_height + World.STEP_TOLERANCE
-	Enemy.horde_field = _world.reach_field(_player.position, reach, climb)
+	Enemy.horde_field = _world.reach_field(_player.position, reach, climb, true)
 
 
 ## Nemici a caso attorno al giocatore, quanti ne vuole il suo livello.
@@ -651,8 +651,11 @@ func _open_chest(at: Vector2) -> void:
 	for i in rng.randi_range(count[0], count[1]):
 		var id := Items.pick_random(_player.level, rng)
 		drops.append([id, rng.randi_range(5, 15) + 2 * _player.level if id == "gold" else 1])
-	# Gli oggetti saltano fuori dalla cassa a ventaglio, verso il giocatore.
+	drops.append_array(Items.supply_drops("chest"))
+	# Gli oggetti saltano fuori dalla cassa a ventaglio, verso il giocatore,
+	# insieme alle sfere gialle dell'esperienza.
 	_drop_loot(at, drops)
+	_drop_xp(at, int(data["xp_per_level"]) * _player.level)
 
 
 # --- Territorio, caverne e sotterraneo ----------------------------------
@@ -867,8 +870,10 @@ func _return_to_surface() -> void:
 	_dungeon_data = Dungeon.data_for(_cave_kind)
 
 
-## Toglie nemici, bottino a terra, sangue e corpi del posto che si lascia.
+## Toglie nemici, bottino a terra, sangue e corpi del posto che si lascia
+## (le sfere gialle rimaste danno subito la loro esperienza).
 func _clear_level() -> void:
+	_collect_orbs()
 	for node in get_tree().get_nodes_in_group("enemies"):
 		node.queue_free()
 	for node in get_tree().get_nodes_in_group("loot"):
@@ -953,17 +958,59 @@ func _on_boss_died(boss: Enemy) -> void:
 	Sfx.play("level_up", boss.global_position)
 
 
-## Oggetti che saltano fuori a ventaglio da at, verso il giocatore.
+## Oggetti che saltano fuori a ventaglio da at, verso il giocatore. Le
+## pozioni, se nessuno le raccoglie, spariscono dopo un po' (vedi
+## Items.supply_lifetime).
 func _drop_loot(at: Vector2, drops: Array[Array]) -> void:
 	var away := (_player.position - at).normalized()
+	var supply_time := Items.supply_lifetime()
 	for i in drops.size():
 		var loot := Loot.new()
 		loot.item_id = drops[i][0]
 		loot.amount = drops[i][1]
 		loot.player = _player
+		if Items.is_supply(loot.item_id):
+			loot.lifetime = supply_time.x
+			loot.blink = supply_time.y
 		var angle := away.angle() + (i - (drops.size() - 1) / 2.0) * 0.7
 		loot.launch(at, _world.free_position_near(at + Vector2.from_angle(angle) * 60.0, 10.0))
 		_entities.add_child(loot)
+
+
+## Sfere gialle per xp punti d'esperienza che schizzano fuori da at (vedi
+## XpOrb): una ogni "orb_xp" punti (che crescono col livello del giocatore
+## come l'esperienza dei nemici, così il numero dipende dal tipo di nemico),
+## fra "min" e "max" ("boss_max" per i boss). Le sfere più ricche sono più
+## grandi.
+func _drop_xp(at: Vector2, xp: int, boss := false) -> void:
+	if xp <= 0:
+		return
+	var data: Dictionary = World.DATA.data["xp_orbs"]
+	var orb_xp := EnemyTypes.scaled("xp", float(data["orb_xp"]), _player.level)
+	var count := clampi(roundi(xp / orb_xp), int(data["min"]), int(data["boss_max" if boss else "max"]))
+	count = mini(count, xp)
+	for i in count:
+		var orb := XpOrb.new()
+		# L'esperienza divisa fra le sfere, il resto sulle prime.
+		orb.amount = floori(float(xp) / count) + (1 if i < xp % count else 0)
+		orb.size_scale = clampf(sqrt(orb.amount / orb_xp), 0.8, 1.8)
+		orb.player = _player
+		var spread := randf_range(25.0, 70.0 + 3.0 * count)
+		orb.launch(at, _world.free_position_near(at + Vector2.from_angle(randf() * TAU) * spread, 6.0))
+		_entities.add_child(orb)
+
+
+## Le sfere gialle ancora a terra danno subito la loro esperienza (lasciando
+## il posto o salvando, così non va persa).
+func _collect_orbs() -> void:
+	var total := 0
+	for node in get_tree().get_nodes_in_group(XpOrb.GROUP):
+		if node.is_queued_for_deletion():
+			continue
+		total += (node as XpOrb).amount
+		node.queue_free()
+	if total > 0 and not _player.is_dead():
+		_player.add_experience(total)
 
 
 # --- Salvataggi --------------------------------------------------------
@@ -990,6 +1037,7 @@ func _save(message: String) -> void:
 		return
 	_autosave_timer = AUTOSAVE_INTERVAL
 	_autosave_pending = false
+	_collect_orbs()
 	if saving_enabled and SaveGame.write(_save_data()):
 		_hud.flash_challenge(message)
 
@@ -1148,7 +1196,10 @@ func _finish_challenge() -> void:
 	var xp := int(data["xp_per_level"]) * _player.level
 	_world.set_totem_state(_challenge_arena, "used")
 	_challenge_arena = Vector2.INF
-	_player.potions = maxi(_player.potions, mini(_player.potions + int(data["potion_reward"]), _player.potion_capacity()))
+	var supplies: Array[Array] = []
+	for k in int(data["potion_reward"]):
+		supplies.append(["potion_health", 1])
+	_drop_loot(_player.position + Vector2.from_angle(randf() * TAU) * 90.0, supplies)
 	_hud.flash_challenge(tr("CHALLENGE_WON") % xp)
 	Sfx.play("level_up", _player.global_position)
 	_player.add_experience(xp)
@@ -1195,10 +1246,11 @@ func _on_enemy_died(enemy: Enemy) -> void:
 	# Nel tutorial i nemici non danno esperienza né bottino.
 	if tutorial_mode:
 		return
-	Sfx.play("xp", enemy.global_position)
-	_player.add_experience(enemy.xp_reward)
+	# L'esperienza non arriva subito: il nemico lascia sfere gialle da
+	# raccogliere (vedi _drop_xp e XpOrb), di più i nemici più duri.
+	_drop_xp(enemy.global_position, enemy.xp_reward, enemy.is_boss())
 	_player.stain_with_blood()
-	# Ogni tanto un nemico lascia monete o un oggetto (il boss ha il suo bottino).
+	# Spesso pozioni, ogni tanto monete o un oggetto (il boss ha il suo bottino).
 	if enemy.drops_loot and not enemy.is_boss():
 		# Di notte si trova di più; gli élite lasciano sempre qualcosa.
 		var drops := Items.enemy_drops(_player.level, _loot_luck())
@@ -1364,9 +1416,10 @@ func _roll_elite() -> bool:
 	return _player.level >= int(data["min_level"]) and randf() < float(data["chance"])
 
 
-## Bottino sicuro dell'élite: denaro e un oggetto adatto al livello.
+## Bottino sicuro dell'élite: denaro, qualche pozione e un oggetto adatto al livello.
 func _elite_drops() -> Array[Array]:
 	var drops: Array[Array] = [["gold", randi_range(8, 16) + 2 * _player.level]]
+	drops.append_array(Items.supply_drops("elite"))
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	var id := Items.pick_random(_player.level, rng)
@@ -1442,8 +1495,10 @@ func _complete_mission(from: Vector2) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	var id := Items.pick_random(_player.level, rng)
+	var drops: Array[Array] = Items.supply_drops("chest")
 	if id != "gold":
-		_drop_loot(from, [[id, 1]])
+		drops.append([id, 1])
+	_drop_loot(from, drops)
 	_player.add_experience(Missions.reward_xp(_player.level))
 	_hud.flash_challenge(tr("MISSION_DONE") % int(mission["gold"]))
 	_hud.set_objective("")
@@ -1556,6 +1611,15 @@ func spawn_tutorial_enemy(type_id: String, at: Vector2) -> Enemy:
 	enemy.drops_loot = false
 	enemy.alert()
 	return enemy
+
+
+## Pozione a terra di un passo del tutorial: salta fuori in at e non sparisce.
+func spawn_tutorial_supply(id: String, at: Vector2) -> void:
+	var loot := Loot.new()
+	loot.item_id = id
+	loot.player = _player
+	loot.launch(at, _world.free_position_near(at, 10.0))
+	_entities.add_child(loot)
 
 
 func _back_to_menu() -> void:

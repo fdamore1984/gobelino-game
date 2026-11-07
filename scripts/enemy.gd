@@ -33,6 +33,9 @@ extends Node2D
 ## dei danni del giocatore; vedi points_for), così combo, colpi potenti,
 ## parata perfetta, oggetti e livelli contano ancora. Colpito resta invulnerabile per
 ## HURT_INVULNERABLE_TIME secondi e lampeggia, come il giocatore.
+## I numeri dei danni (vedi DamagePopups) mostrano invece il danno vero del
+## colpo, meno l'armatura (vedi shown_damage), moltiplicato in DamagePopups:
+## decine all'inizio, centinaia e migliaia più avanti.
 ##
 ## I ghoul delle catacombe (tipi con "mutant") combattono come gli altri
 ## ma senza armi: due occhi piccoli e neri come tutti, escrescenze sul
@@ -315,11 +318,18 @@ const CONTACT_MARGIN := 6.0
 ## (prima dalla parte già scelta); bloccati per più di FIELD_AFTER_BLOCKED
 ## secondi seguono per FIELD_FOLLOW_TIME secondi il campo dei percorsi verso
 ## il giocatore (horde_field), che li porta attorno agli ostacoli; arrivati
-## sul rombo del giocatore o su uno vicino corrono di nuovo dritti.
+## sul rombo del giocatore o su uno vicino corrono di nuovo dritti. Ogni
+## PATH_CHECK_INTERVAL secondi ricontrollano anche se la strada dritta fino
+## al giocatore è libera (vedi _direct_path_clear): se non lo è (una parete,
+## un muro, un gradino troppo alto o un ostacolo solido in mezzo) seguono il
+## campo finché non torna libera, così non si piantano contro l'ostacolo.
 const SLIDE_BLOCKED_SHARE := 0.5
 const SLIDE_ANGLES := [0.6, 1.1, 1.57]
 const FIELD_AFTER_BLOCKED := 0.3
 const FIELD_FOLLOW_TIME := 2.5
+const PATH_CHECK_INTERVAL := 0.25
+## Passo dei punti controllati lungo la strada dritta (vedi _direct_path_clear).
+const PATH_CHECK_STEP := 24.0
 const BURST_SPLATS := 3
 
 var player: Player
@@ -413,6 +423,10 @@ var _hop_cooldown := 0.0
 var _blocked_time := 0.0
 var _slide_side := 1.0
 var _field_follow := 0.0
+## Strada dritta verso il giocatore libera, ricontrollata ogni
+## PATH_CHECK_INTERVAL secondi (vedi _direct_path_clear).
+var _direct_clear := true
+var _path_check := 0.0
 ## Zona da cui non si esce (il boss nella sua arena): centro e raggio in
 ## rombi; Vector2.INF se non c'è.
 var _home := Vector2.INF
@@ -663,6 +677,7 @@ func _physics_process(delta: float) -> void:
 	_magic_cooldown = maxf(_magic_cooldown - delta, 0.0)
 	_hop_cooldown = maxf(_hop_cooldown - delta, 0.0)
 	_field_follow = maxf(_field_follow - delta, 0.0)
+	_path_check -= delta
 	_blood.update(delta)
 	_wounds.update(delta)
 
@@ -1057,8 +1072,18 @@ func max_speed() -> float:
 ## Punti vita tolti da un colpo con quel danno (vedi in cima): l'armatura
 ## ne assorbe una parte, ma almeno un punto passa sempre.
 func points_for(amount: int) -> int:
-	var unit := EnemyTypes.scaled("hit_damage", POINT_DAMAGE * Player.BASE_DAMAGE, threat_level)
-	return clampi(roundi(amount * (1.0 - armor) / unit), 1, MAX_POINTS_PER_HIT)
+	return clampi(roundi(amount * (1.0 - armor) / _point_damage()), 1, MAX_POINTS_PER_HIT)
+
+
+## Danno che vale un punto vita a questo livello di minaccia (vedi in cima).
+func _point_damage() -> float:
+	return EnemyTypes.scaled("hit_damage", POINT_DAMAGE * Player.BASE_DAMAGE, threat_level)
+
+
+## Danno da mostrare per un colpo con quel danno: meno l'armatura (vedi
+## DamagePopups, che lo moltiplica).
+func shown_damage(amount: float) -> float:
+	return amount * (1.0 - armor)
 
 
 ## Colpo del giocatore con quel danno (vedi points_for); heavy: colpo
@@ -1067,7 +1092,7 @@ func points_for(amount: int) -> int:
 ## quanto svuota la resistenza ai colpi (vedi _take_poise; -1: 2 per i colpi
 ## potenti, 1 per gli altri).
 func take_damage(amount: int, direction: Vector2, heavy := false, max_push := INF, poise := -1.0) -> void:
-	take_points(points_for(amount), direction, heavy, false, max_push, poise)
+	take_points(points_for(amount), direction, heavy, false, max_push, poise, false, shown_damage(amount))
 
 
 ## Toglie punti vita. Durante l'invulnerabilità dopo un colpo non succede
@@ -1075,13 +1100,16 @@ func take_damage(amount: int, direction: Vector2, heavy := false, max_push := IN
 ## l'attacco speciale della Frenesia (i nemici sono fermi e i colpi vanno a raffica).
 ## Ogni colpo spinge via (vedi knock), fa reagire il corpo (vedi _react),
 ## schizza sangue nel verso del colpo, mostra i punti persi (vedi
-## DamagePopups; critical: il contrattacco) e può far barcollare (vedi
-## _stagger e _take_poise).
-func take_points(points: int, direction: Vector2, heavy := false, force := false, max_push := INF, poise := -1.0, critical := false) -> void:
+## DamagePopups; critical: il contrattacco; shown: il danno da mostrare,
+## vedi shown_damage; se manca si ricava dai punti) e può far barcollare
+## (vedi _stagger e _take_poise).
+func take_points(points: int, direction: Vector2, heavy := false, force := false, max_push := INF, poise := -1.0, critical := false, shown := -1.0) -> void:
 	if _state == State.DEAD or (_invulnerable > 0.0 and not force and not frozen):
 		return
 	health -= maxi(points, 1)
-	DamagePopups.spawn(global_position, ground_elevation + _air + _height + radius * 2.4, maxi(points, 1),
+	if shown < 0.0:
+		shown = maxi(points, 1) * _point_damage()
+	DamagePopups.spawn(global_position, ground_elevation + _air + _height + radius * 2.4, shown,
 			"critical" if critical else ("heavy" if heavy else "normal"))
 	_invulnerable = HURT_INVULNERABLE_TIME
 	_hit_flash = 0.12
@@ -1157,9 +1185,13 @@ func _rush(to_player: Vector2, distance: float, player_active: bool) -> Vector2:
 		if player.receive_hit(global_position, EnemyTypes.player_damage(false), false, true) != "dodged":
 			_burst(to_player)
 			return Vector2.ZERO
-	# Bloccato dal terreno da un po': segue il campo dei percorsi attorno
-	# agli ostacoli (vedi _slide_along_wall e _field_direction).
-	if _field_follow > 0.0:
+	# Strada dritta sbarrata, o bloccato dal terreno da un po': segue il
+	# campo dei percorsi attorno agli ostacoli (vedi _direct_path_clear,
+	# _slide_along_wall e _field_direction).
+	if _path_check <= 0.0:
+		_path_check = PATH_CHECK_INTERVAL * randf_range(0.8, 1.2)
+		_direct_clear = _direct_path_clear(player.global_position)
+	if _field_follow > 0.0 or not _direct_clear:
 		var along := _field_direction()
 		if along != Vector2.ZERO:
 			return along * _speed
@@ -1297,6 +1329,31 @@ func _field_direction() -> Vector2:
 	if best == cell:
 		return Vector2.ZERO
 	return (World.cell_center(best) - global_position).normalized()
+
+
+## La strada dritta fino a goal si fa a piedi: nessun rombo invalicabile,
+## nessun gradino da salire più alto di un salto e nessun ostacolo solido
+## che la sbarra, controllando un punto ogni PATH_CHECK_STEP pixel.
+func _direct_path_clear(goal: Vector2) -> bool:
+	var world := World.current
+	if world == null:
+		return true
+	var from := global_position
+	var climb := HOP_LEVELS * world.level_height + World.STEP_TOLERANCE
+	var height := world.elevation_at(from)
+	var steps := ceili(from.distance_to(goal) / PATH_CHECK_STEP)
+	for k in range(1, steps):
+		var point := from.lerp(goal, float(k) / steps)
+		if world.is_barrier(World.cell_at(point)):
+			return false
+		var next_height := world.elevation_at(point)
+		if next_height > height + climb:
+			return false
+		height = next_height
+		for obstacle: Dictionary in world.obstacles_close(point):
+			if obstacle["solid"] and point.distance_to(obstacle["position"]) < float(obstacle["collision"]) + radius * 0.5:
+				return false
+	return true
 
 
 ## Il punto, tenuto dentro la zona da cui non si esce (se c'è).

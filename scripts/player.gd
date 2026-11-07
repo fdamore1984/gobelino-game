@@ -8,8 +8,9 @@ extends Node2D
 ## che chiude la combo con un bonus (L2), parata tenendo premuto (L1),
 ## schivate concatenate con cambio di direzione (B), salti anche multipli (A),
 ## corsa tenendo premuto R2, palla di fuoco che insegue i nemici (X, costa
-## mana), scudo che assorbe un colpo (Y), pozioni di vita (croce sinistra),
-## di mana (croce destra) e di vigore (croce giù). Un tocco di L3 accende o
+## mana), scudo che assorbe un colpo (Y). Le pozioni (vita, mana, vigore)
+## non si portano dietro: le lasciano nemici e casse e si bevono da sole
+## appena raccolte (vedi Loot e use_supply). Un tocco di L3 accende o
 ## spegne la corsa, tenendolo premuto si accende o spegne la torcia (vedi
 ## _update_run_button). Il colpo potente si
 ## carica tenendo premuto, fino al doppio del danno. Equipaggiamento e libri
@@ -72,10 +73,10 @@ signal h_bomb_finished
 ## Un'azione è riuscita (per il tutorial giocabile, vedi TutorialRun):
 ## "jump", "attack", "heavy", "parry", "dodge", "missile" (la palla di
 ## fuoco), "slam", "h_bomb" (la runa),
-## "special", "shield", "lock", "drink_<scorta>".
+## "special", "shield", "lock", "supply_<pozione>" (pozione raccolta).
 signal action_done(kind: String)
 
-enum State { NORMAL, ATTACK, PARRY, DODGE, SLIDE, HURT, DEAD, SLAM, FALL, RECOIL, DRINK, SPECIAL, COUNTER }
+enum State { NORMAL, ATTACK, PARRY, DODGE, SLIDE, HURT, DEAD, SLAM, FALL, RECOIL, SPECIAL, COUNTER }
 
 const RADIUS := 22.0
 const START_HEALTH := 5
@@ -367,8 +368,7 @@ const START_JUMPS := 1
 ## da solo, solo con le taniche.
 const START_MANA := 60.0
 const MANA_UPGRADE := 20.0
-const MANA_POTION_RESTORE := 40.0
-const START_MANA_POTIONS := 1
+const MANA_POTION_RESTORE := 15.0
 ## Palla di fuoco: costo, attesa tra un lancio e l'altro, danni (crescono
 ## con il livello e con i potenziamenti della magia, +20% ciascuno).
 const SPELL_COST := 12.0
@@ -407,18 +407,12 @@ const TORCH_SELF_LIGHT := 0.5
 ## Contorno del goblin quando è dietro a un muro (vedi Silhouette).
 const COLOR_SILHOUETTE := Color(0.8, 1.0, 0.75, 0.75)
 
-## Ogni pozione cura questi punti vita.
-const POTION_HEAL := 3
-## Pozioni di vita (e di mana e di vigore) che si possono portare; ogni
-## potenziamento "potion_slots" ne aggiunge una di ciascun tipo.
-const MAX_POTIONS := 10
-## Potenziamenti delle pozioni: +1 punto vita curato, +5% di mana ridato.
+## Ogni pozione di vita raccolta cura questi punti vita.
+const POTION_HEAL := 1
+## Potenziamenti delle pozioni: +1 punto vita curato dalla pozione di vita,
+## +20% di mana ridato dalla pozione blu.
 const POTION_HEAL_UPGRADE := 1
-const MANA_RESTORE_UPGRADE := 0.05
-const START_POTIONS := 2
-## Pozioni verdi (vigore) di partenza; quanto vigore ridanno sta in
-## data/items.json ("restore_stamina", parte del vigore massimo).
-const START_STAMINA_POTIONS := 1
+const MANA_RESTORE_UPGRADE := 0.2
 ## Lo scudo assorbe un colpo; poi va ricaricato. Ogni potenziamento
 ## riduce la ricarica del 5%.
 const SHIELD_COOLDOWN := 30.0
@@ -483,12 +477,6 @@ const STAMINA_BLOCK := 30.0
 const STAMINA_RUN := 16.0
 ## Guardia rotta: si resta storditi per questo tempo.
 const GUARD_BREAK_TIME := 0.8
-## Bere una pozione richiede tempo: ci si muove piano e non si può fare
-## altro. L'effetto arriva subito, all'inizio del sorso; la fiaschetta
-## sale alla bocca in DRINK_EFFECT_TIME.
-const DRINK_TIME := 0.95
-const DRINK_EFFECT_TIME := 0.6
-const DRINK_SPEED_FACTOR := 0.3
 
 const HURT_TIME := 0.25
 const HURT_KNOCKBACK := 420.0
@@ -541,9 +529,6 @@ const COLOR_HEAL := Color(0.5, 1.0, 0.5)
 const COLOR_BUBBLE := Color(0.55, 0.85, 1.0)
 const COLOR_MANA := Color(0.45, 0.65, 1.0)
 const COLOR_FLAME := Color(1.0, 0.6, 0.2)
-const COLOR_HEALTH_FLASK := Color(0.9, 0.2, 0.25)
-const COLOR_MANA_FLASK := Color(0.3, 0.5, 1.0)
-const COLOR_STAMINA_FLASK := Color(0.3, 0.85, 0.3)
 
 var max_health := START_HEALTH
 ## Vita massima senza l'equipaggiamento (cresce con i potenziamenti).
@@ -551,9 +536,6 @@ var _base_max_health := START_HEALTH
 var mana := START_MANA
 var max_mana := START_MANA
 var _base_max_mana := START_MANA
-## Pozioni nella cintura: non hanno limite.
-var mana_potions := START_MANA_POTIONS
-var stamina_potions := START_STAMINA_POTIONS
 ## Rune del cataclisma (h_bomb) nella cintura (vedi h_bomb_capacity).
 var h_bombs := 0
 ## Esplosioni ancora visibili (vedi is_h_bomb_exploding).
@@ -577,7 +559,6 @@ var max_chained_dodges := START_CHAINED_DODGES
 var max_jumps := START_JUMPS
 ## Bonus alla velocità di corsa (0.02 = +2%).
 var run_speed_bonus := 0.0
-var potions := START_POTIONS
 var shield_cooldown_max := SHIELD_COOLDOWN
 ## Ricarica dello scudo rimasta, e se lo scudo è attivo in questo momento.
 var shield_cooldown := 0.0
@@ -615,11 +596,6 @@ var max_stamina := MAX_STAMINA
 var _stamina_delay := 0.0
 ## Si sta correndo (consuma vigore).
 var _running := false
-## Pozione che si sta bevendo ("potion", "mana_potion" o "stamina_potion").
-var _drinking := ""
-## Versione web: vigore finito, si aspetta di poter usare da soli una pozione verde
-## (vedi _auto_stamina_potion).
-var _stamina_out := false
 ## Corsa accesa (si alterna premendo "run").
 var _run_on := false
 ## Stordimento dopo una guardia rotta (si usa lo stato HURT, più lungo).
@@ -802,7 +778,6 @@ func _on_settings_changed() -> void:
 func _physics_process(delta: float) -> void:
 	if _touch_assist:
 		_touch_assist.update(self)
-	_auto_stamina_potion()
 	_state_time += delta
 	_dodge_cooldown = maxf(_dodge_cooldown - delta, 0.0)
 	_dodge_chain_grace = maxf(_dodge_chain_grace - delta, 0.0)
@@ -840,14 +815,8 @@ func _physics_process(delta: float) -> void:
 	var attack_input := _aim if _aim != Vector2.ZERO else input
 
 	if _state not in [State.DEAD, State.HURT, State.SPECIAL, State.COUNTER]:
-		if UiNav.game_pressed("potion"):
-			_start_drink("potion")
 		if UiNav.game_pressed("shield"):
 			_raise_shield()
-		if UiNav.game_pressed("mana_potion"):
-			_start_drink("mana_potion")
-		if UiNav.game_pressed("stamina_potion"):
-			_start_drink("stamina_potion")
 		if UiNav.game_pressed("spell"):
 			_cast_fireball(input)
 	if _state != State.DEAD:
@@ -871,12 +840,12 @@ func _physics_process(delta: float) -> void:
 	# La parata è istantanea: annulla subito attacchi (anche in carica),
 	# schivate, scivolate, attacchi a terra, rinculo e il bere.
 	elif UiNav.game_pressed("parry") and _state in [State.NORMAL, State.ATTACK, State.DODGE,
-			State.SLIDE, State.SLAM, State.RECOIL, State.DRINK]:
+			State.SLIDE, State.SLAM, State.RECOIL]:
 		_start_parry(input)
 	# Allo stesso modo schivata e salto annullano subito attacchi (anche in
 	# carica), attacchi a terra, parata, rinculo e il bere (se c'è vigore; in
 	# NORMAL, DODGE e SLIDE si gestiscono più sotto).
-	elif _state in [State.ATTACK, State.SLAM, State.PARRY, State.RECOIL, State.DRINK]:
+	elif _state in [State.ATTACK, State.SLAM, State.PARRY, State.RECOIL]:
 		if UiNav.game_pressed("dodge") and stamina > 0.0:
 			_interrupt_action()
 			_start_dodge(dodge_input)
@@ -1023,17 +992,6 @@ func _physics_process(delta: float) -> void:
 			_velocity = _velocity.move_toward(Vector2.ZERO, HURT_KNOCKBACK * 4.0 * delta)
 			if _state_time >= _hurt_time:
 				_hurt_time = HURT_TIME
-				_change_state(State.NORMAL)
-
-		State.DRINK:
-			# Si beve: ci si muove piano e non si fa altro finché non si finisce
-			# (parata, schivata e salto interrompono il sorso).
-			_running = false
-			if input != Vector2.ZERO:
-				_target_facing = input.normalized()
-			_velocity = _accelerate(_velocity, input * walk_speed() * DRINK_SPEED_FACTOR, delta)
-			if _state_time >= DRINK_TIME:
-				_drinking = ""
 				_change_state(State.NORMAL)
 
 		State.DEAD:
@@ -1333,12 +1291,6 @@ func receive_hit(from: Vector2, damage: int, projectile := false, horde := false
 	_charge = 0.0
 	GroundFx.bleed(global_position, altitude() + LEG_LENGTH + RADIUS * 0.5, -to_attacker, BLEED_DROPS)
 	_wound(to_attacker)
-	if health == 0 and _touch_assist and potions > 0:
-		# Modalità Touch: a vita zero una pozione si beve da sola.
-		potions -= 1
-		health = mini(potion_heal(), max_health)
-		health_changed.emit(health, max_health)
-		Sfx.play("potion", global_position)
 	if health == 0:
 		_die()
 	else:
@@ -1449,11 +1401,6 @@ func laugh() -> void:
 ## salta e interagisce insieme (A) serve a interagire (vedi Game).
 func _jump_pressed() -> bool:
 	return UiNav.game_pressed("jump") and not (can_interact and UiNav.game_pressed("interact"))
-
-
-## Per TouchAssist: fermi a terra senza fare altro (si può bere).
-func can_drink() -> bool:
-	return _state == State.NORMAL and not is_airborne()
 
 
 ## Per TouchAssist: si può saltare da soli (camminando o scendendo da un salto).
@@ -1590,7 +1537,7 @@ func _counter_strike() -> void:
 	facing = direction
 	_target_facing = direction
 	var damage := roundi(base_damage() * COUNTER_DAMAGE_FACTOR * (EMPOWER_DAMAGE_FACTOR if is_empowered() else 1.0) * (1.0 + inventory.bonus("damage")))
-	target.take_points(target.points_for(damage), direction, true, true, INF, INF, true)
+	target.take_points(target.points_for(damage), direction, true, true, INF, INF, true, target.shown_damage(damage))
 	HitSpark.spawn(get_parent(), target.global_position - direction * target.radius * 0.8, target.ground_elevation + target.radius * 0.9,
 			56.0, COLOR_COUNTER, direction.angle() + PI / 2.0 - 0.6 * _swing_sign, true)
 	Sfx.play("hit", global_position, 0.75)
@@ -1768,8 +1715,7 @@ func _face_lock() -> bool:
 func save_state() -> Dictionary:
 	return {
 		"level": level, "experience": experience, "xp_curve": XP_CURVE_VERSION, "health": health, "base_max_health": _base_max_health,
-		"mana": mana, "base_max_mana": _base_max_mana, "potions": potions,
-		"mana_potions": mana_potions, "stamina_potions": stamina_potions, "h_bombs": h_bombs, "spell_bonus": spell_bonus,
+		"mana": mana, "base_max_mana": _base_max_mana, "h_bombs": h_bombs, "spell_bonus": spell_bonus,
 		"max_combo_hits": max_combo_hits, "max_heavy_chain": max_heavy_chain,
 		"max_chained_dodges": max_chained_dodges, "max_jumps": max_jumps, "run_speed_bonus": run_speed_bonus,
 		"shield_cooldown_max": shield_cooldown_max, "torch_on": torch_on, "upgrades_taken": upgrades_taken,
@@ -1778,7 +1724,6 @@ func save_state() -> Dictionary:
 		# caricamento si ricalcolano.
 		"stats": {
 			"max_health": max_health, "max_mana": roundi(max_mana), "damage": base_damage(),
-			"potions": potions, "mana_potions": mana_potions,
 		},
 	}
 
@@ -1801,10 +1746,9 @@ func load_state(data: Dictionary) -> void:
 	experience = clampi(experience, 0, experience_needed() - 1)
 	_base_max_health = int(data.get("base_max_health", _base_max_health))
 	_base_max_mana = float(data.get("base_max_mana", _base_max_mana))
-	potions = int(data.get("potions", potions))
-	mana_potions = int(data.get("mana_potions", mana_potions))
-	# Salvataggi precedenti alle pozioni verdi: si parte con la scorta iniziale.
-	stamina_potions = int(data.get("stamina_potions", stamina_potions))
+	# Le pozioni nella cintura dei salvataggi precedenti ("potions",
+	# "mana_potions", "stamina_potions") non esistono più: ora si bevono
+	# appena raccolte, quindi si ignorano.
 	spell_bonus = float(data.get("spell_bonus", spell_bonus))
 	max_combo_hits = int(data.get("max_combo_hits", max_combo_hits))
 	max_heavy_chain = int(data.get("max_heavy_chain", max_heavy_chain))
@@ -1834,14 +1778,12 @@ func load_state(data: Dictionary) -> void:
 	var known: Dictionary = Items.DATA.data["items"]
 	var kept := {}
 	var saved_items: Array = data.get("items", [])
+	var refund := 0
 	for k in saved_items.size():
-		# Le pozioni di vita e di mana non stanno più nell'inventario: vanno nella cintura.
-		if saved_items[k] == "potion_health":
-			potions += 1
-		elif saved_items[k] == "potion_mana":
-			mana_potions += 1
-		elif saved_items[k] == "potion_stamina":
-			stamina_potions += 1
+		# Pozioni nell'inventario dei salvataggi vecchi (anche l'elisir): non
+		# si portano più dietro, diventano monete al prezzo di vendita.
+		if Items.is_supply(str(saved_items[k])):
+			refund += Items.supply_refund(str(saved_items[k]))
 		elif known.has(saved_items[k]):
 			kept[k] = inventory.items.size()
 			inventory.items.append(saved_items[k])
@@ -1850,7 +1792,7 @@ func load_state(data: Dictionary) -> void:
 	for slot: String in equipped:
 		if kept.has(int(equipped[slot])):
 			inventory.equipped[slot] = kept[int(equipped[slot])]
-	inventory.gold = int(data.get("gold", inventory.gold))
+	inventory.gold = int(data.get("gold", inventory.gold)) + refund
 	inventory.learned = (data.get("learned", {}) as Dictionary).duplicate()
 	_refresh_stats()
 	health = clampi(int(data.get("health", max_health)), 1, max_health)
@@ -2643,7 +2585,6 @@ func _interrupt_action() -> void:
 	_charge = 0.0
 	_carry_velocity = Vector2.ZERO
 	_walk_velocity = Vector2.ZERO
-	_drinking = ""
 	_running = false
 
 
@@ -2667,68 +2608,15 @@ func _chain_dodge(input: Vector2) -> void:
 	_change_state(State.DODGE)
 
 
-## Inizia a bere una pozione (solo fermi a terra, senza fare altro): la
-## pozione si consuma subito, l'effetto arriva dopo un attimo (vedi DRINK).
-func _start_drink(kind: String) -> void:
-	if _state != State.NORMAL or is_airborne():
-		return
-	if kind == "potion":
-		if potions == 0 or health >= max_health:
-			return
-		potions -= 1
-	elif kind == "stamina_potion":
-		if stamina_potions == 0 or stamina >= max_stamina:
-			return
-		stamina_potions -= 1
-	else:
-		if mana_potions == 0 or mana >= max_mana:
-			return
-		mana_potions -= 1
-	_drinking = kind
-	action_done.emit("drink_" + kind)
-	_end_combo()
-	_change_state(State.DRINK)
-	_apply_drink()
-
-
-func _apply_drink() -> void:
-	if _drinking == "potion":
-		health = mini(health + potion_heal(), max_health)
-		health_changed.emit(health, max_health)
-		Sfx.play("potion", global_position)
-	elif _drinking == "stamina_potion":
-		stamina = minf(stamina + stamina_potion_restore(), max_stamina)
-		Sfx.play("stamina_potion", global_position)
-	else:
-		mana = minf(mana + mana_potion_restore(), max_mana)
-		Sfx.play("mana_potion", global_position)
-
-
-## Solo nella versione web (con qualsiasi controllo): appena il vigore arriva a
-## zero si usa da soli una pozione verde, se ce n'è, con l'animazione
-## normale (vedi _start_drink: parte non appena si è fermi a terra senza
-## fare altro). Il vigore intanto torna da solo, quindi si ricorda che era
-## finito; se si riempie prima, non serve più.
-func _auto_stamina_potion() -> void:
-	if not Platform.is_web:
-		return
-	if stamina <= 0.0 and _state != State.DEAD:
-		_stamina_out = true
-	if stamina >= max_stamina or stamina_potions == 0:
-		_stamina_out = false
-	if _stamina_out and can_drink():
-		_stamina_out = false
-		_start_drink("stamina_potion")
-
-
 ## Velocità attuale sul terreno (i nemici la usano per capire se ci si ritira).
 func ground_velocity() -> Vector2:
 	return _velocity
 
 
-## Sta bevendo una pozione (i nemici ne approfittano).
+## Si sta curando (i nemici ne approfittano): le pozioni ora si bevono da
+## sole appena raccolte, quindi mai.
 func is_healing() -> bool:
-	return _state == State.DRINK
+	return false
 
 
 ## Consuma vigore per un'azione; senza vigore l'azione non parte.
@@ -2840,11 +2728,6 @@ func h_bomb_capacity() -> int:
 	return START_H_BOMB_CAPACITY + int(upgrades_taken.get("h_bomb", 0))
 
 
-## Pozioni di ciascun tipo che si possono portare.
-func potion_capacity() -> int:
-	return MAX_POTIONS + int(upgrades_taken.get("potion_slots", 0))
-
-
 func potion_heal() -> int:
 	return POTION_HEAL + POTION_HEAL_UPGRADE * int(upgrades_taken.get("potion_heal", 0))
 
@@ -2853,29 +2736,31 @@ func mana_potion_restore() -> float:
 	return MANA_POTION_RESTORE * (1.0 + MANA_RESTORE_UPGRADE * int(upgrades_taken.get("mana_restore", 0)))
 
 
-## Vigore ridato dalla pozione verde.
+## Vigore ridato da una pozione verde raccolta.
 func stamina_potion_restore() -> float:
 	return max_stamina * Items.stat("potion_stamina", "restore_stamina")
 
 
-## Si può prendere l'oggetto: le pozioni solo finché la cintura non è piena.
+## Si può prendere l'oggetto: le pozioni solo se servono (vita, mana o
+## vigore non pieni), le rune del cataclisma finché c'è posto.
 func can_pick_up(id: String) -> bool:
 	match id:
 		"potion_health":
-			return potions < potion_capacity()
+			return not is_dead() and health < max_health
 		"potion_mana":
-			return mana_potions < potion_capacity()
+			return mana < max_mana
 		"potion_stamina":
-			return stamina_potions < potion_capacity()
+			return stamina < max_stamina
 		"h_bomb":
 			return h_bombs < h_bomb_capacity()
 	return true
 
 
-## Raccoglie un oggetto: le monete vanno nel borsello, le pozioni di vita,
-## di mana e di vigore nella cintura (fino a potion_capacity, mai nell'inventario),
-## le rune del cataclisma anche (fino a h_bomb_capacity), il resto nell'inventario.
-## Restituisce false se la cintura è piena.
+## Raccoglie un oggetto: le monete vanno nel borsello, le sfere gialle
+## ("xp", vedi XpOrb) danno esperienza, le pozioni di vita, di mana e di
+## vigore si bevono subito (vedi use_supply), le rune del cataclisma vanno
+## nella cintura (fino a h_bomb_capacity), il resto nell'inventario.
+## Restituisce false se non si può prendere (vedi can_pick_up).
 func pickup(id: String, amount := 1) -> bool:
 	if not can_pick_up(id):
 		return false
@@ -2884,17 +2769,14 @@ func pickup(id: String, amount := 1) -> bool:
 			inventory.gold += amount
 			Sfx.play("coin", global_position)
 			return true
-		"potion_health":
-			potions = mini(potions + amount, potion_capacity())
-			Sfx.play("pickup", global_position)
+		"potion_health", "potion_mana", "potion_stamina":
+			for k in amount:
+				use_supply(id)
 			return true
-		"potion_mana":
-			mana_potions = mini(mana_potions + amount, potion_capacity())
-			Sfx.play("pickup", global_position)
-			return true
-		"potion_stamina":
-			stamina_potions = mini(stamina_potions + amount, potion_capacity())
-			Sfx.play("pickup", global_position)
+		"xp":
+			# Sfera gialla (vedi XpOrb): l'esperienza arriva solo raccogliendola.
+			XpOrb.chime(global_position)
+			add_experience(amount)
 			return true
 		"h_bomb":
 			h_bombs = mini(h_bombs + amount, h_bomb_capacity())
@@ -2905,8 +2787,27 @@ func pickup(id: String, amount := 1) -> bool:
 	return true
 
 
+## Beve subito una pozione raccolta: quella rossa cura (potion_heal), quella
+## blu ridà mana (mana_potion_restore), quella verde vigore
+## (stamina_potion_restore).
+func use_supply(id: String) -> void:
+	match id:
+		"potion_health":
+			health = mini(health + potion_heal(), max_health)
+			health_changed.emit(health, max_health)
+			HitSpark.spawn(get_parent(), global_position, altitude() + RADIUS, 26.0, COLOR_HEAL)
+			Sfx.play("potion", global_position)
+		"potion_mana":
+			mana = minf(mana + mana_potion_restore(), max_mana)
+			Sfx.play("mana_potion", global_position)
+		"potion_stamina":
+			stamina = minf(stamina + stamina_potion_restore(), max_stamina)
+			Sfx.play("stamina_potion", global_position)
+	action_done.emit("supply_" + id)
+
+
 ## Usa un oggetto dell'inventario: indossa o toglie l'equipaggiamento,
-## legge i libri (bonus permanente), beve le pozioni.
+## legge i libri (bonus permanente).
 func use_item(index: int) -> void:
 	var id := inventory.items[index]
 	match Items.category(id):
@@ -2914,16 +2815,6 @@ func use_item(index: int) -> void:
 			inventory.learn(id)
 			inventory.remove(index)
 			Sfx.play("level_up", global_position, 1.3)
-		"potion":
-			var heal := int(Items.stat(id, "heal"))
-			var restore := Items.stat(id, "restore_mana")
-			if (heal > 0 and health >= max_health) or (restore > 0.0 and mana >= max_mana):
-				return
-			health = mini(health + heal, max_health)
-			mana = minf(mana + restore, max_mana)
-			health_changed.emit(health, max_health)
-			inventory.remove(index)
-			Sfx.play("potion" if heal > 0 else "mana_potion", global_position)
 		_:
 			inventory.toggle_equip(index)
 			Sfx.play("block", global_position, 1.4, -8.0)
@@ -3261,31 +3152,13 @@ func _draw_h_bomb() -> void:
 	HBombBlast.draw_bomb(self, H_BOMB_HELD, H_BOMB_LENGTH, glow, facing.x < 0.0)
 
 
-## Da vivo la spada, la fiaschetta in uso e la lanterna (la faccia va
+## Da vivo la spada e la lanterna (la faccia va
 ## sopra, vedi _draw).
 func _draw_gear(_body: Color) -> void:
 	if _state != State.DEAD:
 		_draw_sword()
-		if _state == State.DRINK:
-			_draw_flask()
 		if torch_on and not holding_h_bomb():
 			_draw_torch()
-
-
-## Bevendo: la fiaschetta (rossa, blu o verde) sale alla bocca e si inclina.
-func _draw_flask() -> void:
-	var color := COLOR_MANA_FLASK
-	if _drinking == "potion":
-		color = COLOR_HEALTH_FLASK
-	elif _drinking == "stamina_potion":
-		color = COLOR_STAMINA_FLASK
-	var t := clampf(_state_time / DRINK_EFFECT_TIME, 0.0, 1.0)
-	var at := facing * RADIUS * lerpf(1.2, 0.7, t) + Vector2(0, lerpf(4.0, -8.0, t))
-	var neck := Vector2.from_angle(-PI / 2.0 + facing.x * 1.2 * t) * 10.0
-	draw_line(at, at + neck, Color(0.85, 0.8, 0.7), 4.0)
-	Shapes.disc(self, at, 7.5, Color(0, 0, 0, 0.6))
-	Shapes.disc(self, at, 6.0, color)
-	Shapes.disc(self, at + Vector2(-2, -2), 2.0, Color(1, 1, 1, 0.6))
 
 
 ## Spada: a riposo è tenuta di lato; nell'attacco si porta indietro durante

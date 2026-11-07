@@ -210,11 +210,6 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(222, 176)
 layout_mode = 2
 
-[node name="UpgradePotionSlots" type="Button" parent="HUD/LevelUp/Center/VBox/Upgrades"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(222, 176)
-layout_mode = 2
-
 [node name="UpgradeHBomb" type="Button" parent="HUD/LevelUp/Center/VBox/Upgrades"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(222, 176)

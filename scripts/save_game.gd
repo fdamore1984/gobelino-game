@@ -101,7 +101,6 @@ static func summary(index: int) -> Dictionary:
 		"max_health": int(stats.get("max_health", player.get("base_max_health", Player.START_HEALTH))),
 		"damage": int(stats.get("damage", Player.damage_at(level))),
 		"gold": int(player.get("gold", 0)),
-		"potions": int(stats.get("potions", player.get("potions", 0))),
 		"kills": int(data.get("kills", 0)),
 		"depth": int(dungeon.get("depth", 0)),
 		"metro": str(dungeon.get("kind", "cave")) == "metro",

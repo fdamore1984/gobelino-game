@@ -64,15 +64,11 @@ anche la pagina itch.io (`store/itch/`) mostrata sotto il gioco.
   (vedi sotto); la pausa resta comunque su Start del controller e sul pulsante
   Menu del touch.
 
-## Pozione del vigore automatica (tutta la versione web)
+## Pozioni
 
-Nel browser, con qualsiasi controllo (touch, tastiera e mouse o controller),
-quando il vigore arriva a zero il goblin beve da solo una pozione verde, se
-ne ha: `Player._auto_stamina_potion`, chiamato a ogni passo di fisica, usa
-la stessa azione del tasto (`Player._start_drink`, con l'animazione normale),
-che parte appena si è fermi a terra senza fare altro. Se nel frattempo il
-vigore si riempie da solo, la pozione non si beve. Nelle versioni per PC non
-succede.
+Su tutte le piattaforme (web e PC) le pozioni (vita, mana, vigore) si bevono
+da sole appena raccolte (`Player.use_supply`): non c'è più una cintura da cui
+berle né automazioni apposta per il browser.
 
 ## Modalità Touch (solo nel browser)
 
@@ -89,15 +85,11 @@ la Modalità Touch non esiste: niente controlli a schermo né automazioni.
   e colpo potente a terra, grigio senza mana o vigore), più i tasti colorati
   Runa e Frenesia, che compaiono solo quando si possono usare, e il tasto
   verde Interagisci, solo vicino a qualcosa con cui interagire (il
-  suggerimento sopra l'oggetto dice solo "Interagisci", senza tasto); in
-  basso al centro le pozioni di vita, mana e vigore con quante ne restano,
-  da toccare per berle (grigie quando non servono o sono finite). Nessun
-  altro tasto.
+  suggerimento sopra l'oggetto dice solo "Interagisci", senza tasto).
+  Nessun altro tasto: le pozioni si bevono da sole appena raccolte.
 - **Automazioni** (`scripts/touch_assist.gd`, chiamato da
   `Player._physics_process`; preme e rilascia le azioni dell'Input Map):
-  salto davanti ai dislivelli superabili con i salti rimasti; pozione di mana bevuta da sola
-  quando il mana finisce (a vita zero, in `Player.receive_hit`, si
-  consuma subito una pozione della vita); scudo alzato appena è carico; torcia accesa e
+  salto davanti ai dislivelli superabili con i salti rimasti; scudo alzato appena è carico; torcia accesa e
   spenta secondo il buio (`DayNight.darkness`).
 - **Combattimento**: Attacco tenuto premuto fa da solo combo normale →
   colpo potente → salto e slam, finché regge il vigore; da lontano

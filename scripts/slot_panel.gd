@@ -196,7 +196,7 @@ func _refresh() -> void:
 				texts.append_array([
 					tr("SLOT_PLACE_METRO" if info.get("metro", false) else "SLOT_PLACE_DEPTH") % depth if depth > 0 else tr("SLOT_PLACE_SURFACE"),
 					tr("SLOT_HEALTH_DAMAGE") % [info["max_health"], info["damage"]],
-					tr("SLOT_GOLD_POTIONS") % [info["gold"], info["potions"]],
+					tr("SLOT_GOLD") % info["gold"],
 					tr("SLOT_KILLS") % info["kills"],
 					tr("SLOT_PLAYTIME") % _play_time_text(info["play_time"]),
 					tr("SLOT_SAVED_AT") % info["time"],
