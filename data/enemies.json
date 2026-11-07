@@ -16,12 +16,12 @@
 		"slam": {"chance": 0.2, "range": 240, "radius": 85, "windup": 0.6, "air_time": 0.45, "height": 60, "damage_bonus": 0}, "spawn_weight": [40, 0]
 	},
 	"brute": {
-		"points": 6, "xp": 70, "damage": 3, "armor": 0.15, "stagger": "heavy",
+		"points": 6, "poise": 4, "xp": 70, "damage": 3, "armor": 0.15, "stagger": "heavy",
 		"guard_chance": 0.35, "guard_time": [0.5, 0.9], "max_strikes": 2,
 		"radius": 34, "speed": 56, "mass": 2.5, "aggro_range": 360, "orbit_distance": 200,
 		"windup": [0.97, 1.49], "lunge_speed": 286, "strike_reach": 85, "strike_arc": 180,
 		"color": [0.55, 0.2, 0.25],
-		"slam": {"chance": 0.35, "range": 260, "radius": 120, "windup": 0.75, "air_time": 0.55, "height": 70, "damage_bonus": 1}, "spawn_weight": [5, 4]
+		"slam": {"unblockable": true, "chance": 0.35, "range": 260, "radius": 120, "windup": 0.75, "air_time": 0.55, "height": 70, "damage_bonus": 1}, "spawn_weight": [5, 4]
 	},
 	"summoner": {
 		"points": 3, "xp": 50, "damage": 2,
@@ -44,7 +44,7 @@
 		"spawn_weight": [8, 3]
 	},
 	"whirler": {
-		"points": 6, "xp": 40, "damage": 2,
+		"points": 6, "unblockable": true, "xp": 40, "damage": 2,
 		"guard_chance": 0.3, "guard_time": [0.5, 0.9], "max_strikes": 2,
 		"radius": 23, "speed": 78, "mass": 1.2, "aggro_range": 380, "orbit_distance": 140,
 		"windup": [0.65, 0.98], "lunge_speed": 60, "strike_reach": 60, "strike_arc": 360,
@@ -52,12 +52,12 @@
 		"spawn_weight": [3, 3]
 	},
 	"golem": {
-		"points": 8, "xp": 110, "damage": 3, "armor": 0.25, "stagger": "heavy",
+		"points": 8, "poise": 6, "xp": 110, "damage": 3, "armor": 0.25, "stagger": "heavy",
 		"guard_chance": 0.4, "guard_time": [0.5, 0.9], "max_strikes": 2,
 		"radius": 40, "speed": 44, "mass": 4.0, "aggro_range": 340, "orbit_distance": 180,
 		"windup": [1.17, 1.69], "lunge_speed": 200, "strike_reach": 100, "strike_arc": 200,
 		"color": [0.5, 0.48, 0.55],
-		"slam": {"chance": 0.35, "range": 240, "radius": 140, "windup": 0.85, "air_time": 0.6, "height": 60, "damage_bonus": 1}, "spawn_weight": [0, 2]
+		"slam": {"unblockable": true, "chance": 0.35, "range": 240, "radius": 140, "windup": 0.85, "air_time": 0.6, "height": 60, "damage_bonus": 1}, "spawn_weight": [0, 2]
 	},
 	"caster": {
 		"points": 3, "xp": 40, "damage": 2,
@@ -123,14 +123,14 @@
 	},
 	"mutant_bloater": {
 		"mutant": true, "stagger": "heavy",
-		"points": 7, "xp": 90, "damage": 3, "armor": 0.2,
+		"points": 7, "poise": 5, "xp": 90, "damage": 3, "armor": 0.2,
 		"guard_chance": 0, "guard_time": [0.5, 0.9], "max_strikes": 2,
 		"radius": 38, "speed": 50, "mass": 3.5, "aggro_range": 360, "orbit_distance": 180,
 		"windup": [1.05, 1.5], "lunge_speed": 230, "strike_reach": 90, "strike_arc": 200,
-		"slam": {"chance": 0.4, "range": 250, "radius": 130, "windup": 0.8, "air_time": 0.55, "height": 60, "damage_bonus": 1},
+		"slam": {"unblockable": true, "chance": 0.4, "range": 250, "radius": 130, "windup": 0.8, "air_time": 0.55, "height": 60, "damage_bonus": 1},
 		"color": [0.66, 0.55, 0.52],
 		"spawn_weight": [0, 0], "metro_weight": [3, 2]
 	},
-	"abomination": {"mutant": true, "name": "BOSS_NAME_METRO", "points": 20, "armor": 0.15, "guard_chance": 0.3, "guard_time": [0.5, 0.9], "max_strikes": 3, "xp": 650, "damage": 3, "radius": 54, "speed": 66, "mass": 6.5, "aggro_range": 520, "orbit_distance": 150, "windup": [0.6, 0.95], "lunge_speed": 300, "strike_reach": 115, "strike_arc": 240, "slam": {"chance": 0.4, "range": 300, "radius": 150, "windup": 0.7, "air_time": 0.55, "height": 80, "damage_bonus": 1}, "color": [0.6, 0.5, 0.55], "spawn_weight": [0, 0], "boss": true, "magic": {"chance": 0.4, "min_range": 170, "range": 560, "windup": [0.85, 1.15], "cooldown": [3.0, 5.0], "retry": [1.0, 2.0], "bolts": 5, "spread": 30, "bolt_speed": 240, "bolt_radius": 14, "damage_bonus": 0, "color": [0.55, 1.0, 0.25]}, "summon": {"type": "walker", "count": 4, "max_minions": 8, "cooldown": [7.0, 11.0], "channel_time": 1.4, "minion_xp": 2}},
-	"guardian": {"points": 20, "armor": 0.15, "guard_chance": 0.5, "guard_time": [0.5, 0.9], "max_strikes": 3, "xp": 600, "damage": 3, "radius": 50, "speed": 63, "mass": 6.0, "aggro_range": 520, "orbit_distance": 150, "windup": [0.59, 0.98], "lunge_speed": 260, "strike_reach": 110, "strike_arc": 240, "color": [0.6, 0.2, 0.25], "slam": {"chance": 0.35, "range": 300, "radius": 140, "windup": 0.7, "air_time": 0.55, "height": 80, "damage_bonus": 1}, "spawn_weight": [0, 0], "boss": true, "magic": {"chance": 0.45, "min_range": 170, "range": 560, "windup": [0.85, 1.15], "cooldown": [3.0, 5.0], "retry": [1.0, 2.0], "bolts": 3, "spread": 20, "bolt_speed": 270, "bolt_radius": 13, "damage_bonus": 0, "color": [1.0, 0.5, 0.35]}, "summon": {"type": "scout", "count": 2, "max_minions": 3, "cooldown": [7.0, 11.0], "channel_time": 1.4, "minion_xp": 5}}
+	"abomination": {"mutant": true, "name": "BOSS_NAME_METRO", "points": 20, "poise": 12, "armor": 0.15, "guard_chance": 0.3, "guard_time": [0.5, 0.9], "max_strikes": 3, "xp": 650, "damage": 3, "radius": 54, "speed": 66, "mass": 6.5, "aggro_range": 520, "orbit_distance": 150, "windup": [0.6, 0.95], "lunge_speed": 300, "strike_reach": 115, "strike_arc": 240, "slam": {"unblockable": true, "chance": 0.4, "range": 300, "radius": 150, "windup": 0.7, "air_time": 0.55, "height": 80, "damage_bonus": 1}, "color": [0.6, 0.5, 0.55], "spawn_weight": [0, 0], "boss": true, "magic": {"chance": 0.4, "min_range": 170, "range": 560, "windup": [0.85, 1.15], "cooldown": [3.0, 5.0], "retry": [1.0, 2.0], "bolts": 5, "spread": 30, "bolt_speed": 240, "bolt_radius": 14, "damage_bonus": 0, "color": [0.55, 1.0, 0.25]}, "summon": {"type": "walker", "count": 4, "max_minions": 8, "cooldown": [7.0, 11.0], "channel_time": 1.4, "minion_xp": 2}},
+	"guardian": {"points": 20, "poise": 12, "armor": 0.15, "guard_chance": 0.5, "guard_time": [0.5, 0.9], "max_strikes": 3, "xp": 600, "damage": 3, "radius": 50, "speed": 63, "mass": 6.0, "aggro_range": 520, "orbit_distance": 150, "windup": [0.59, 0.98], "lunge_speed": 260, "strike_reach": 110, "strike_arc": 240, "color": [0.6, 0.2, 0.25], "slam": {"unblockable": true, "chance": 0.35, "range": 300, "radius": 140, "windup": 0.7, "air_time": 0.55, "height": 80, "damage_bonus": 1}, "spawn_weight": [0, 0], "boss": true, "magic": {"chance": 0.45, "min_range": 170, "range": 560, "windup": [0.85, 1.15], "cooldown": [3.0, 5.0], "retry": [1.0, 2.0], "bolts": 3, "spread": 20, "bolt_speed": 270, "bolt_radius": 13, "damage_bonus": 0, "color": [1.0, 0.5, 0.35]}, "summon": {"type": "scout", "count": 2, "max_minions": 3, "cooldown": [7.0, 11.0], "channel_time": 1.4, "minion_xp": 5}}
 }

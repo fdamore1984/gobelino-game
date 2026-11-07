@@ -24,7 +24,7 @@ const ROWS := [
 const MOVE_ACTIONS := ["move_up", "move_left", "move_down", "move_right"]
 ## Attacchi speciali con due tasti insieme: testo -> le due azioni.
 const CHORDS := {"CONTROLS_SPECIAL_FRENZY": ["parry", "attack"], "CONTROLS_SPECIAL_PLUNGE": ["heavy_attack", "focus"]}
-const SPECIALS := ["CONTROLS_SPECIAL_FRENZY", "CONTROLS_SPECIAL_MIXED", "CONTROLS_SPECIAL_CHARGED", "CONTROLS_SPECIAL_AIR", "CONTROLS_SPECIAL_PLUNGE", "CONTROLS_SPECIAL_DASH"]
+const SPECIALS := ["CONTROLS_SPECIAL_FRENZY", "CONTROLS_SPECIAL_COUNTER", "CONTROLS_SPECIAL_MIXED", "CONTROLS_SPECIAL_CHARGED", "CONTROLS_SPECIAL_AIR", "CONTROLS_SPECIAL_PLUNGE", "CONTROLS_SPECIAL_DASH"]
 const COLOR_TITLE := Color(0.85, 0.75, 0.4)
 const COLOR_HEADER := Color(1.0, 0.85, 0.4)
 const COLOR_TEXT := Color(1, 1, 1, 0.85)

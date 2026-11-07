@@ -408,3 +408,39 @@ TUTORIAL_PLAY_EXPLORE_TOUCH,"Out in the world you'll find chests, merchants, tot
 OPTIONS_LICENSES,Licenses,Licenze
 LICENSES_TITLE,Licenses,Licenze
 LICENSES_INTRO,"This game is made with Godot Engine (MIT license), which includes third-party components, and uses the Fredoka and Inter fonts (SIL Open Font License). Here are their copyright notices and licenses, in their original English text.","Questo gioco è fatto con Godot Engine (licenza MIT), che contiene componenti di terzi, e usa i font Fredoka e Inter (SIL Open Font License). Qui ci sono le loro note di copyright e le licenze, nel testo originale in inglese."
+OPTIONS_DIFFICULTY,Difficulty: %s,Difficoltà: %s
+DIFFICULTY_EASY,Easy,Facile
+DIFFICULTY_NORMAL,Normal,Normale
+DIFFICULTY_HARD,Hard,Difficile
+OPTIONS_VIBRATION,Vibration: %s,Vibrazione: %s
+OPTIONS_DAMAGE_NUMBERS,Damage numbers: %s,Numeri dei danni: %s
+OPTIONS_SHAKE,Camera shake: %s,Tremolio della telecamera: %s
+OPTIONS_BLOOD,Blood: %s,Sangue: %s
+OPTIONS_UI_SCALE,Interface size: %d%%,Interfaccia: %d%%
+OPTION_ON,On,Sì
+OPTION_OFF,Off,No
+OPTION_NORMAL,Normal,Normale
+OPTION_REDUCED,Reduced,Ridotto
+CONTROLS_SPECIAL_COUNTER,Attack within 1 s of a perfect parry: a golden critical counter on the stunned enemy,Attacca entro 1 s da una parata perfetta: un contrattacco critico dorato sul nemico stordito
+HORDE_WAVE,Wave %d of %d!,Ondata %d di %d!
+HORDE_CLEARED,Horde repelled! Your reward is on the ground,Orda respinta! La ricompensa è a terra
+NIGHT_FALLS,"Night falls: more enemies, more loot","Cala la notte: più nemici, più bottino"
+DAY_BREAKS,Day breaks,Spunta il giorno
+HUD_DEFEAT_LOSS,Defeated! You dropped %d gold: your bag is where you fell,Sconfitto! Hai perso %d oro: la sacca è dove sei caduto
+BAG_RECOVERED,You got back %d gold,Hai recuperato %d oro
+MAP_LEGEND_CLEARED,Cleared,Ripulito
+MAP_LEGEND_CHEST,Unopened chest,Forziere da aprire
+MAP_LEGEND_MISSION,Objective,Obiettivo
+MAP_LEGEND_BAG,Your bag,La tua sacca
+MISSION_TITLE,Mission,Missione
+MISSION_ACCEPT,Accept,Accetta
+MISSION_ACCEPTED,Mission accepted: it's marked on the map,Missione accettata: è segnata sulla mappa
+MISSION_BUSY,You already have a mission,Hai già una missione
+MISSION_CLEAR_TITLE,Clear the glade,Libera la radura
+MISSION_CLEAR_DESC,A band of goblins has taken over a glade: wipe them out.,Una banda di goblin ha occupato una radura: eliminali.
+MISSION_CRATE_TITLE,Recover the chest,Recupera il forziere
+MISSION_CRATE_DESC,A merchant's chest was lost far from here: find it and open it.,Il forziere di un mercante è andato perso lontano da qui: trovalo e aprilo.
+MISSION_REWARD,Reward: %d gold and an item,Ricompensa: %d oro e un oggetto
+MISSION_STATUS_CLEAR,Clear the glade: %d/%d,Libera la radura: %d/%d
+MISSION_STATUS_CRATE,Recover the chest marked on the map,Recupera il forziere segnato sulla mappa
+MISSION_DONE,Mission complete! +%d gold,Missione compiuta! +%d oro

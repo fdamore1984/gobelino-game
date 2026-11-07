@@ -111,13 +111,16 @@ func _ready() -> void:
 ## più uno schizzo largo, allungato anche lui, subito sotto chi è colpito e
 ## una nuvoletta rossa nel punto colpito (doppia con i colpi potenti).
 static func bleed(at: Vector2, altitude: float, direction: Vector2, amount: int, heavy := false) -> void:
-	if current == null:
+	# Opzione Sangue (vedi Settings.blood_factor): ridotto o niente.
+	var factor := Settings.blood_factor()
+	if current == null or factor <= 0.0:
 		return
+	amount = roundi(amount * factor)
 	# Il terreno su cui cadono le gocce è quello da cui partono: si calcola
 	# una volta sola, non per ogni goccia a ogni frame.
 	var ground := _ground(at)
 	var speeds := BLEED_SPEED_HEAVY if heavy else BLEED_SPEED
-	current._add_puff(at, altitude, direction, PUFF_PARTS_HEAVY if heavy else PUFF_PARTS, COLOR_BLOOD_PUFF, 9.0 if heavy else 7.0)
+	current._add_puff(at, altitude, direction, ceili((PUFF_PARTS_HEAVY if heavy else PUFF_PARTS) * factor), COLOR_BLOOD_PUFF, 9.0 if heavy else 7.0)
 	for i in mini(amount, MAX_DROPS - current._drops.size()):
 		var spread := direction.rotated(randf_range(-BLEED_CONE, BLEED_CONE)) * randf_range(speeds.x, speeds.y)
 		current._drops.append({
@@ -147,8 +150,9 @@ func _add_puff(at: Vector2, altitude: float, direction: Vector2, count: int, col
 ## Pozza di sangue sotto chi muore (giocatore e nemici), larga size: si
 ## allarga piano e poi resta (vedi POOL_GROW).
 static func pool(at: Vector2, size: float) -> void:
-	if current == null:
+	if current == null or Settings.blood_factor() <= 0.0:
 		return
+	size *= lerpf(0.6, 1.0, Settings.blood_factor())
 	current._pools.append({"position": at, "elevation": _ground(at), "size": size, "born": current._clock,
 			"angle": randf() * TAU, "variant": randi(), "color": BLOOD_COLOR.darkened(randf_range(0.1, 0.25))})
 	current._grow_until = maxf(current._grow_until, current._clock + POOL_GROW)

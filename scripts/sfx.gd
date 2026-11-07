@@ -273,6 +273,31 @@ func _build_sounds() -> void:
 	_streams["splat"] = _render_filtered(0.25, Vector2(0.5, 0.1), func(t: float, d: float) -> float:
 		var squelch := sin(TAU * lerpf(180.0, 60.0, t / d) * t) * 0.5 * exp(-t * 20.0)
 		return clampf(_noise() * exp(-t * 28.0) + squelch, -1.0, 1.0) * _env(t, d, 0.002))
+	# Carica di un attacco: ogni tipo ha il suo suono, si riconosce senza
+	# guardare (vedi Enemy._windup_sound).
+	# Carica di un tiro a distanza: la corda dell'arco che si tende o la
+	# magia che si accende, un luccichio che sale.
+	_streams["windup_ranged"] = _render(0.5, func(t: float, d: float) -> float:
+		var glide := sin(TAU * lerpf(500.0, 1200.0, t / d) * t) * (0.6 + 0.4 * sin(TAU * 24.0 * t))
+		var creak := signf(sin(TAU * (140.0 + 40.0 * sin(TAU * 20.0 * t)) * t)) * 0.08 * (1.0 - t / d)
+		return (glide * 0.18 + creak) * _env(t, d, 0.04))
+	# Carica dello sputo: un gorgoglio che sale.
+	_streams["windup_spit"] = _render_filtered(0.5, Vector2(0.2, 0.45), func(t: float, d: float) -> float:
+		var bubble := sin(TAU * (90.0 + 160.0 * t / d + 40.0 * sin(TAU * 13.0 * t)) * t)
+		return (bubble * 0.4 + _noise() * 0.25) * (0.5 + 0.5 * absf(sin(TAU * 9.0 * t))) * _env(t, d, 0.05))
+	# Carica del salto con colpo a terra: un ringhio basso che sale, col rombo sotto.
+	_streams["windup_slam"] = _render_filtered(0.7, Vector2(0.15, 0.3), func(t: float, d: float) -> float:
+		var growl := _saw(lerpf(55.0, 95.0, t / d) * t) * 0.45
+		var rumble := sin(TAU * 38.0 * t) * 0.35
+		return (growl + rumble + _noise() * 0.2) * (0.6 + 0.4 * sin(TAU * 7.0 * t)) * _env(t, d, 0.15))
+	# Carica del colpo che gira tutto attorno: un fruscio che accelera.
+	_streams["windup_spin"] = _render_filtered(0.6, Vector2(0.15, 0.6), func(t: float, d: float) -> float:
+		return _noise() * 0.5 * absf(sin(TAU * lerpf(3.0, 9.0, t / d) * t)) * _env(t, d, 0.1))
+	# Contrattacco: uno stridio di metallo e un accordo che squilla.
+	_streams["counter"] = _render(0.5, func(t: float, d: float) -> float:
+		var shing := (sin(TAU * 2400.0 * t) * 0.5 + sin(TAU * 3600.0 * t) * 0.3) * exp(-t * 14.0)
+		var chord := (sin(TAU * 660.0 * t) + sin(TAU * 990.0 * t) * 0.7 + sin(TAU * 1320.0 * t) * 0.5) * 0.18 * exp(-t * 4.0)
+		return clampf(shing + chord + _noise() * 0.3 * exp(-t * 40.0), -1.0, 1.0) * _env(t, d, 0.002))
 	# Interfaccia
 	_streams["ui_move"] = _render(0.04, func(t: float, d: float) -> float:
 		return sin(TAU * 900.0 * t) * 0.2 * _env(t, d, 0.002))

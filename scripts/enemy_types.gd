@@ -62,10 +62,11 @@ static func max_simultaneous_attacks() -> int:
 
 
 ## Punti vita tolti al giocatore da un colpo qualsiasi (fendente, slam,
-## proiettile), uguali per tutti i nemici e a ogni livello; di più per i boss.
+## proiettile), uguali per tutti i nemici e a ogni livello; di più per i
+## boss. Dipendono dalla difficoltà scelta (voce "difficulty" di
+## data/world.json, vedi Settings.difficulty_value).
 static func player_damage(boss: bool) -> int:
-	var data: Dictionary = WORLD_DATA.data["enemy_attacks"]
-	return int(data["boss_player_damage"] if boss else data["player_damage"])
+	return int(Settings.difficulty_value("boss_player_damage" if boss else "player_damage"))
 
 
 ## Sceglie un tipo a caso, pesato: salendo di livello compaiono più
