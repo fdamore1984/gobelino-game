@@ -36,6 +36,13 @@ const COLOR_CAVE := Color(0.95, 0.55, 0.2)
 ## Mausolei che portano alle catacombe.
 const COLOR_METRO := Color(0.5, 0.3, 0.65)
 const COLOR_EXIT := Color(1.0, 0.85, 0.45)
+## Segni aggiunti (vedi draw_mark e World.marks): luoghi ripuliti (spunta
+## verde), obiettivo della missione (bandierina), sacca dei soldi persi
+## morendo; casse da aprire col punto esclamativo.
+const COLOR_CHECK := Color(0.45, 1.0, 0.45)
+const COLOR_FLAG := Color(1.0, 0.3, 0.2)
+const COLOR_BAG := Color(0.62, 0.42, 0.22)
+const COLOR_BADGE := Color(1.0, 0.25, 0.15)
 ## Zone non ancora scoperte.
 const COLOR_UNKNOWN := Color(0.06, 0.07, 0.06)
 
@@ -138,6 +145,16 @@ func _draw() -> void:
 			if not _inside(at) or not world.is_explored(point["position"]):
 				continue
 			draw_point(self, world, point, at)
+	if world:
+		# Obiettivo e sacca si vedono anche fuori dalla minimappa, sul bordo
+		# nella loro direzione; i luoghi ripuliti solo dentro.
+		for mark: Dictionary in world.marks:
+			var at := _to_map(mark["position"])
+			if mark["type"] in ["mission", "bag"]:
+				at = _clamp_inside(at)
+			elif not _inside(at):
+				continue
+			draw_mark(self, mark, at)
 	var near := world.reveal_radius() if world else RANGE
 	for node in get_tree().get_nodes_in_group("loot"):
 		var at := _to_map((node as Node2D).global_position)
@@ -171,14 +188,28 @@ func _inside(at: Vector2) -> bool:
 	return Rect2(Vector2.ZERO, size).has_point(at)
 
 
+## Il punto, tenuto dentro la minimappa (con un margine) nella sua direzione.
+func _clamp_inside(at: Vector2) -> Vector2:
+	var middle := size / 2.0
+	var offset := at - middle
+	var limit := middle - Vector2(12, 12)
+	var factor := maxf(absf(offset.x) / limit.x, absf(offset.y) / limit.y)
+	return middle + offset / factor if factor > 1.0 else at
+
+
 ## Segno di un punto d'interesse (cassa, totem, mercante, caverna,
 ## mausoleo delle catacombe, scala, uscita) in at, con un bordo scuro; usato anche dalla mappa completa.
 static func draw_point(canvas: CanvasItem, world: World, point: Dictionary, at: Vector2) -> void:
 	match point["type"]:
 		"chest":
-			var opened: bool = world.is_chest_opened(point["position"])
-			canvas.draw_rect(Rect2(at - Vector2(5, 5), Vector2(10, 10)), COLOR_OUTLINE)
-			canvas.draw_rect(Rect2(at - Vector2(4, 4), Vector2(8, 8)), COLOR_OPENED if opened else COLOR_CHEST)
+			# Da aprire: grande, col punto esclamativo; aperta: piccola e grigia.
+			if world.is_chest_opened(point["position"]):
+				canvas.draw_rect(Rect2(at - Vector2(3.5, 3.5), Vector2(7, 7)), COLOR_OUTLINE)
+				canvas.draw_rect(Rect2(at - Vector2(2.5, 2.5), Vector2(5, 5)), COLOR_OPENED)
+			else:
+				canvas.draw_rect(Rect2(at - Vector2(5.5, 5.5), Vector2(11, 11)), COLOR_OUTLINE)
+				canvas.draw_rect(Rect2(at - Vector2(4.5, 4.5), Vector2(9, 9)), COLOR_CHEST)
+				draw_badge(canvas, at + Vector2(6, -6))
 		"totem":
 			var state := world.totem_state(point["position"])
 			var color := COLOR_TOTEM
@@ -217,3 +248,43 @@ static func draw_point(canvas: CanvasItem, world: World, point: Dictionary, at: 
 			# Una freccia in su, luce calda: si torna in superficie.
 			canvas.draw_colored_polygon(PackedVector2Array([at + Vector2(-8, 6), at + Vector2(8, 6), at + Vector2(0, -8)]), COLOR_OUTLINE)
 			canvas.draw_colored_polygon(PackedVector2Array([at + Vector2(-6, 4.5), at + Vector2(6, 4.5), at + Vector2(0, -5.5)]), COLOR_EXIT)
+	# Luoghi ripuliti: sotterranei completati e sfide già fatte.
+	var cleared: bool = (point["type"] in ["cave", "metro"] and world.is_cave_cleared(point["position"])) \
+			or (point["type"] == "totem" and world.totem_state(point["position"]) == "used")
+	if cleared:
+		draw_check(canvas, at + Vector2(7, -6), 0.8)
+
+
+## Segno aggiunto (vedi World.marks) in at: "cleared" (luogo ripulito),
+## "mission" (obiettivo della missione) o "bag" (sacca dei soldi persi).
+static func draw_mark(canvas: CanvasItem, mark: Dictionary, at: Vector2) -> void:
+	match mark["type"]:
+		"cleared":
+			draw_check(canvas, at, 1.1)
+		"mission":
+			# Bandierina sul palo.
+			canvas.draw_line(at + Vector2(-3, 8), at + Vector2(-3, -10), COLOR_OUTLINE, 4.0)
+			canvas.draw_line(at + Vector2(-3, 8), at + Vector2(-3, -10), Color.WHITE, 2.0)
+			canvas.draw_primitive(PackedVector2Array([at + Vector2(-3, -11), at + Vector2(10, -6), at + Vector2(-3, -1)]), PackedColorArray([COLOR_OUTLINE]), PackedVector2Array())
+			canvas.draw_primitive(PackedVector2Array([at + Vector2(-2, -9.5), at + Vector2(7.5, -6), at + Vector2(-2, -2.5)]), PackedColorArray([COLOR_FLAG]), PackedVector2Array())
+		"bag":
+			# Sacca legata con una moneta.
+			canvas.draw_circle(at + Vector2(0, 2), 7.5, COLOR_OUTLINE)
+			canvas.draw_circle(at + Vector2(0, 2), 6.0, COLOR_BAG)
+			canvas.draw_rect(Rect2(at + Vector2(-3, -7), Vector2(6, 4)), COLOR_BAG)
+			canvas.draw_circle(at + Vector2(0, 2.5), 2.6, COLOR_CHEST)
+
+
+## Segno di spunta verde col contorno scuro (scale: grandezza).
+static func draw_check(canvas: CanvasItem, at: Vector2, scale := 1.0) -> void:
+	var points := PackedVector2Array([at + Vector2(-5, 0) * scale, at + Vector2(-1.5, 3.5) * scale, at + Vector2(5.5, -4.5) * scale])
+	canvas.draw_polyline(points, COLOR_OUTLINE, 4.5 * scale)
+	canvas.draw_polyline(points, COLOR_CHECK, 2.2 * scale)
+
+
+## Pallino rosso col punto esclamativo (casse ancora da aprire).
+static func draw_badge(canvas: CanvasItem, at: Vector2) -> void:
+	canvas.draw_circle(at, 4.6, COLOR_OUTLINE)
+	canvas.draw_circle(at, 3.6, COLOR_BADGE)
+	canvas.draw_line(at + Vector2(0, -2.2), at + Vector2(0, 0.6), Color.WHITE, 1.4)
+	canvas.draw_circle(at + Vector2(0, 2.0), 0.8, Color.WHITE)

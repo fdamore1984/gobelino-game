@@ -105,6 +105,10 @@ func _draw() -> void:
 			var at := _to_map(point["position"], origin)
 			if Rect2(origin, Vector2(MAP_SIZE, MAP_SIZE)).has_point(at) and world.is_explored(point["position"]):
 				Minimap.draw_point(self, world, point, at)
+		for mark: Dictionary in world.marks:
+			var at := _to_map(mark["position"], origin)
+			if Rect2(origin, Vector2(MAP_SIZE, MAP_SIZE)).has_point(at):
+				Minimap.draw_mark(self, mark, at)
 		var center := _to_map(player.position, origin)
 		var facing := player.facing
 		draw_colored_polygon(PackedVector2Array([center + facing * 13.0, center - facing * 8.0 + facing.orthogonal() * 9.0,
@@ -112,7 +116,30 @@ func _draw() -> void:
 		draw_colored_polygon(PackedVector2Array([center + facing * 10.0, center - facing * 6.0 + facing.orthogonal() * 6.5,
 				center - facing * 6.0 - facing.orthogonal() * 6.5]), Color.WHITE)
 	draw_rect(Rect2(origin, Vector2(MAP_SIZE, MAP_SIZE)), Color(1, 1, 1, 0.5), false, 2.0)
-	draw_string(font, Vector2(0, origin.y + MAP_SIZE + 34), tr("MAP_HINT") % Keybinds.hint("map"), HORIZONTAL_ALIGNMENT_CENTER, size.x, 18, COLOR_HINT)
+	_draw_legend(font, origin.y + MAP_SIZE + 22)
+	draw_string(font, Vector2(0, origin.y + MAP_SIZE + 54), tr("MAP_HINT") % Keybinds.hint("map"), HORIZONTAL_ALIGNMENT_CENTER, size.x, 18, COLOR_HINT)
+
+
+## Legenda sotto la mappa: luogo ripulito, cassa da aprire, obiettivo, sacca.
+func _draw_legend(font: Font, y: float) -> void:
+	var entries := [["cleared", "MAP_LEGEND_CLEARED"], ["chest", "MAP_LEGEND_CHEST"], ["mission", "MAP_LEGEND_MISSION"], ["bag", "MAP_LEGEND_BAG"]]
+	var widths: Array[float] = []
+	var total := 0.0
+	for entry: Array in entries:
+		var width := 24.0 + font.get_string_size(tr(entry[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+		widths.append(width)
+		total += width + 28.0
+	var x := (size.x - total + 28.0) / 2.0
+	for k in entries.size():
+		var icon := Vector2(x + 8.0, y - 5.0)
+		if entries[k][0] == "chest":
+			draw_rect(Rect2(icon - Vector2(5.5, 5.5), Vector2(11, 11)), Minimap.COLOR_OUTLINE)
+			draw_rect(Rect2(icon - Vector2(4.5, 4.5), Vector2(9, 9)), Minimap.COLOR_CHEST)
+			Minimap.draw_badge(self, icon + Vector2(6, -6))
+		else:
+			Minimap.draw_mark(self, {"type": entries[k][0]}, icon)
+		draw_string(font, Vector2(x + 22.0, y), tr(entries[k][1]), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, COLOR_HINT)
+		x += widths[k] + 28.0
 
 
 func _to_map(point: Vector2, origin: Vector2) -> Vector2:

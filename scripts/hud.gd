@@ -64,6 +64,15 @@ var _interact := InteractPrompt.new()
 var _world_map := WorldMap.new()
 ## Menù di pausa: Game si collega ai suoi segnali (salva, esci).
 var pause_menu := PauseMenu.new()
+## Obiettivo della missione in corso, in alto al centro (vedi set_objective).
+var _objective := Label.new()
+## Missioni dei mercanti (per il negozio, vedi ShopPanel).
+var missions: Missions:
+	set(value):
+		missions = value
+		_shop_panel.missions = value
+## La missione è stata accettata nel negozio.
+signal mission_accepted
 @onready var _message: Label = %Message
 @onready var _level_up: Control = %LevelUp
 @onready var _level_up_title: Label = %LevelUpTitle
@@ -119,6 +128,20 @@ func _ready() -> void:
 	add_child(_loading)
 	add_child(_boss_bar)
 	move_child(_boss_bar, 0)
+	_objective.visible = false
+	_objective.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_objective.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_objective.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_objective.offset_left = -300
+	_objective.offset_right = 300
+	_objective.offset_top = 12
+	_objective.add_theme_font_size_override("font_size", 18)
+	_objective.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4))
+	_objective.add_theme_color_override("font_outline_color", UiStyle.INK)
+	_objective.add_theme_constant_override("outline_size", 6)
+	add_child(_objective)
+	move_child(_objective, 0)
+	_shop_panel.mission_accepted.connect(mission_accepted.emit)
 	add_child(_clock)
 	move_child(_clock, 0)
 	add_child(_vignette)
@@ -430,6 +453,16 @@ func flash_challenge(text: String) -> void:
 func show_message(text: String) -> void:
 	_message.text = text
 	_message.visible = true
+
+
+func hide_message() -> void:
+	_message.visible = false
+
+
+## Obiettivo della missione in corso in alto al centro ("" lo toglie).
+func set_objective(text: String) -> void:
+	_objective.text = text
+	_objective.visible = text != ""
 
 
 ## Materiale della vignetta (vedi Game._prewarm_start).

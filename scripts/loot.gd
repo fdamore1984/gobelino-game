@@ -5,6 +5,13 @@ extends Node2D
 ## "focus" (R2) gli oggetti a terra si vedono molto meglio: mentre il mondo
 ## si spegne (vedi LowHealthVignette) restano a colori, più grandi, sopra a
 ## tutto il resto e con un'aura bianca attorno.
+##
+## La sacca (bag) è il denaro perso morendo (vedi Game._drop_bag): una sacca
+## legata con una luce dorata che pulsa, che non prende luci (si vede anche
+## al buio) e che, raccolta, lo dice a Game (picked_up).
+
+## Raccolto dal giocatore (per la sacca: vedi Game._on_bag_picked).
+signal picked_up(item_id: String, amount: int)
 
 const PICKUP_RANGE := 38.0
 ## Appena uscito dalla cassa non si raccoglie subito, così si vede volare.
@@ -21,6 +28,8 @@ const FOCUS_Z := 50
 var item_id := "gold"
 var amount := 1
 var player: Player
+## È la sacca del denaro perso morendo.
+var bag := false
 
 var _from := Vector2.ZERO
 var _to := Vector2.ZERO
@@ -38,6 +47,8 @@ func launch(from: Vector2, to: Vector2) -> void:
 func _ready() -> void:
 	add_to_group("loot")
 	add_to_group(LowHealthVignette.FOCUS_GROUP)
+	if bag:
+		material = Enemy._unshaded_material()
 	if World.current:
 		_lift = World.current.elevation_at(_to)
 
@@ -52,6 +63,7 @@ func _physics_process(delta: float) -> void:
 			and absf(player.ground_elevation - _lift) < 40.0:
 		# Con la cintura piena le pozioni restano a terra.
 		if player.pickup(item_id, amount):
+			picked_up.emit(item_id, amount)
 			queue_free()
 	queue_redraw()
 
@@ -74,6 +86,9 @@ func focus_spot() -> Vector3:
 func _draw() -> void:
 	var center := _center()
 	Shapes.disc(self, Vector2(0, -_lift + 4.0), 9.0, Shapes.SHADOW)
+	if bag:
+		_draw_bag(center)
+		return
 	if LowHealthVignette.focus_held():
 		var pulse := 0.5 + 0.5 * sin(_age * 5.0)
 		Shapes.glow(self, center, SIZE * FOCUS_SCALE * FOCUS_AURA * (0.9 + 0.1 * pulse), COLOR_AURA)
@@ -81,3 +96,19 @@ func _draw() -> void:
 		return
 	Shapes.disc(self, center, SIZE * 0.6, Color(1, 1, 0.8, 0.18 + 0.1 * sin(_age * 6.0)))
 	ItemIcon.draw_item(self, center, SIZE, item_id)
+
+
+## Sacca del denaro perso: un fascio di luce dorata che pulsa (si vede da
+## lontano), la sacca di tela legata in cima e una moneta che spunta.
+func _draw_bag(center: Vector2) -> void:
+	var pulse := 0.5 + 0.5 * sin(_age * 4.0)
+	var base := Vector2(0, -_lift)
+	draw_primitive(PackedVector2Array([base + Vector2(-10, 0), base + Vector2(10, 0), base + Vector2(5, -120), base + Vector2(-5, -120)]),
+			PackedColorArray([Color(1.0, 0.85, 0.35, 0.35 + 0.15 * pulse), Color(1.0, 0.85, 0.35, 0.35 + 0.15 * pulse),
+			Color(1.0, 0.85, 0.35, 0.0), Color(1.0, 0.85, 0.35, 0.0)]), PackedVector2Array())
+	Shapes.glow(self, center, SIZE * (1.2 + 0.2 * pulse), Color(1.0, 0.8, 0.3, 0.45))
+	Shapes.ink_disc(self, center + Vector2(0, 3), 11.0, Minimap.COLOR_BAG)
+	draw_rect(Rect2(center + Vector2(-5, -12), Vector2(10, 6)), Shapes.INK)
+	draw_rect(Rect2(center + Vector2(-4, -11), Vector2(8, 4)), Minimap.COLOR_BAG.darkened(0.2))
+	draw_line(center + Vector2(-6, -6), center + Vector2(6, -6), Shapes.INK, 2.5)
+	Shapes.ink_disc(self, center + Vector2(4, 5), 4.0, Minimap.COLOR_CHEST, 1.5)

@@ -1408,6 +1408,21 @@ func _die() -> void:
 	died.emit()
 
 
+## Ripartenza dopo la sconfitta (vedi Game._respawn): in at, con tutta la
+## vita, invulnerabili per invulnerable secondi.
+func revive(at: Vector2, invulnerable: float) -> void:
+	lock_manual = false
+	_set_lock_target(null)
+	_interrupt_action()
+	_counter_window = 0.0
+	soot = 0.0
+	teleport(at)
+	health = max_health
+	health_changed.emit(health, max_health)
+	_start_invulnerability(invulnerable)
+	Sfx.play("potion", global_position)
+
+
 ## Un nemico ucciso: il corpo si sporca ancora un po' di sangue.
 func stain_with_blood() -> void:
 	_blood.add(BLOOD_PER_KILL)

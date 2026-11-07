@@ -244,6 +244,13 @@ var explored := {}
 ## Mappa in cui si è adesso: "surface" o il piano di un sotterraneo (la
 ## imposta Game).
 var map_key := "surface"
+## Luoghi ripuliti con le missioni (vedi Game._complete_mission): sulla
+## mappa hanno la spunta; si salvano.
+var cleared_spots: Array[Vector2] = []
+## Segni da mostrare su mappa e minimappa nel posto attuale (vedi
+## Minimap.draw_mark): {"type": "cleared", "mission" o "bag", "position"}.
+## Li aggiorna Game (vedi Game._update_marks), non si salvano.
+var marks: Array[Dictionary] = []
 var _map_data: Dictionary = DATA.data["map"]
 ## Ultimo punto attorno a cui si è scoperta la mappa e attesa per il prossimo.
 var _revealed_at := Vector2.INF
@@ -342,6 +349,7 @@ func save_state() -> Dictionary:
 		"chests": _opened_chests.keys().map(SaveGame.array), "totems": totems,
 		"stocks": stocks, "caves": cleared_caves.keys().map(SaveGame.array),
 		"explored": _explored_state(), "map_version": MAP_VERSION,
+		"spots": cleared_spots.map(SaveGame.array),
 	}
 
 
@@ -368,6 +376,9 @@ func load_state(data: Dictionary) -> void:
 		_merchant_stocks[SaveGame.vector(entry["at"])] = stock
 	for at: Array in data.get("caves", []):
 		cleared_caves[SaveGame.vector(at)] = true
+	# Salvataggi di prima delle missioni: nessun luogo ripulito.
+	for at: Array in data.get("spots", []):
+		cleared_spots.append(SaveGame.vector(at))
 	# I salvataggi di prima non hanno le zone scoperte: la mappa riparte vuota.
 	# Le zone scoperte salvate con una forma diversa del mondo e dei
 	# sotterranei (MAP_VERSION) non corrispondono più: la mappa riparte vuota.

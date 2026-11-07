@@ -341,6 +341,9 @@ var armor := 0.0
 var drops_loot := true
 ## Evocato da un altro nemico (per i salvataggi).
 var is_minion := false
+## Fa parte del gruppo di una missione (vedi Game e Missions): non si salva
+## e non sparisce allontanandosi.
+var in_mission := false
 
 var _type: Dictionary
 var _color := Color.WHITE
