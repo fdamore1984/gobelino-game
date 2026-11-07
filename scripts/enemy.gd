@@ -35,9 +35,9 @@ extends Node2D
 ## HURT_INVULNERABLE_TIME secondi e lampeggia, come il giocatore.
 ##
 ## I ghoul delle catacombe (tipi con "mutant") combattono come gli altri
-## ma senza armi: tre occhi rossi, bocca spalancata,
-## escrescenze sul corpo e artigli al posto delle mani; quelli che sputano
-## ("spit") lanciano bile velenosa dalla bocca invece di tirare frecce.
+## ma senza armi: due occhi piccoli e neri come tutti, escrescenze sul
+## corpo e artigli al posto delle mani; quelli che sputano ("spit")
+## lanciano bile velenosa invece di tirare frecce.
 ##
 ## I non morti delle orde (tipi con "horde", vedi Game) non girano attorno e
 ## non attaccano: corrono dritti verso il giocatore e, quando lo toccano, si
@@ -292,21 +292,17 @@ const SILHOUETTE_INTERVAL := 3
 ## sopra 1 lo illuminano di rosso invece di scurirlo.
 const COLOR_LOCKED := Color(1.7, 0.5, 0.45)
 ## Aspetto standard (vedi _apply_look): niente variazioni a caso, la taglia
-## e il colore sono quelli del tipo, la faccia è la stessa per tutti
-## (occhi grandi EYE_SIZE, ghigno che si spalanca attaccando) e così le
-## orecchie.
-const EYE_SIZE := 0.2
-## Non morti delle orde: carne grigioverde, occhi rossi, velocità variabile
+## e il colore sono quelli del tipo, la faccia è la stessa per tutti (due
+## occhi piccoli e neri, vedi GoblinLook.face) e così le orecchie.
+## Non morti delle orde: carne grigioverde, velocità variabile
 ## di questa parte (sempre sotto il tetto, vedi max_speed); si disfano
 ## toccando il giocatore entro CONTACT_MARGIN oltre i due raggi.
 const COLOR_ZOMBIE_SKIN := Color(0.52, 0.58, 0.46)
-const COLOR_ZOMBIE_EYES := Color(1.0, 0.2, 0.1)
 const COLOR_RAGS := Color(0.32, 0.27, 0.22)
 ## Ghoul: escrescenze, artigli e bile.
 const COLOR_GROWTH := Color(0.78, 0.55, 0.5)
-## Ghoul: tre occhi rossi ed escrescenze sempre nello stesso posto
-## (posizione rispetto al raggio e grandezza; il boss ne ha di più).
-const GHOUL_EYES := [Vector3(-0.3, -0.15, 0.1), Vector3(0.05, -0.3, 0.12), Vector3(0.32, -0.08, 0.09)]
+## Ghoul: escrescenze sempre nello stesso posto (posizione rispetto al
+## raggio e grandezza; il boss ne ha di più).
 const GHOUL_GROWTHS := [Vector3(-0.62, -0.45, 0.22), Vector3(0.6, -0.55, 0.18), Vector3(-0.2, -0.8, 0.16)]
 const BOSS_GROWTHS := [Vector3(0.75, -0.1, 0.2), Vector3(-0.78, 0.05, 0.17), Vector3(0.3, -0.85, 0.14)]
 const COLOR_CLAWS := Color(0.88, 0.85, 0.75)
@@ -457,7 +453,7 @@ var _trail_time := 0.0
 ## Mesh del corpo (vedi Shapes), preparata una volta per raggio.
 var _body_mesh: ArrayMesh
 ## Contorno a inchiostro sotto il corpo (stile fumetto, vedi Shapes.ink_mesh),
-## spesso quanto le linee nere di occhi e bocca (vedi ink_width).
+## proporzionato al raggio (vedi ink_width).
 var _ink_mesh: ArrayMesh
 var _shape_radius := -1.0
 
@@ -1917,8 +1913,8 @@ func _draw() -> void:
 	var behind := BodyParts.gear_behind(_facing)
 	if behind:
 		_draw_gear()
-	# Orecchie, corpo, occhi e bocca hanno tutti il contorno nero dello stesso
-	# spessore (vedi ink_width).
+	# Orecchie e corpo hanno il contorno nero dello stesso spessore (vedi
+	# ink_width).
 	GoblinLook.ears(self, radius, body.darkened(0.12), 1.0, 0.0, 0.0, ink_width())
 	draw_mesh(_ink_mesh, null, Transform2D.IDENTITY, Shapes.INK)
 	draw_mesh(_body_mesh, null, Transform2D.IDENTITY, body)
@@ -1927,11 +1923,8 @@ func _draw() -> void:
 	if not behind:
 		_draw_gear()
 	if not is_horde() and not is_mutant():
-		# Appena colpito fa la smorfia di dolore: occhi socchiusi e bocca aperta.
-		var attacking := _state in [State.WINDUP, State.STRIKE, State.SLAM]
-		var pained := in_pain()
-		GoblinLook.face(self, radius, _facing, EYE_SIZE, true, "open" if attacking or pained else "grin", 1.0,
-				{"squint": true} if pained else {}, ink_width())
+		# Appena colpito fa la smorfia di dolore: occhi socchiusi.
+		GoblinLook.face(self, radius, _facing, 1.0, {"squint": true} if in_pain() else {})
 	if is_mutant():
 		_draw_growths(body)
 	elif is_boss():
@@ -1981,34 +1974,21 @@ func _draw_gear() -> void:
 		_draw_sword()
 
 
-## Ghoul: tre occhi rossi (sempre nello stesso posto) e la bocca spalancata (la bile
-## gocciola a chi sputa, di più mentre carica), poi gli artigli.
+## Ghoul: due occhi piccoli e neri come tutti (niente bocca; la bile
+## gocciola sotto gli occhi a chi sputa, di più mentre carica), poi gli
+## artigli.
 func _draw_ghoul() -> void:
-	var across := _facing.orthogonal()
 	var eyes := _facing * radius * 0.45 + Vector2(0, -radius * 0.2)
-	var pained := in_pain()
-	for eye: Vector3 in GHOUL_EYES:
-		var at := eyes + across * radius * eye.x + Vector2(0, radius * eye.y)
-		if pained:
-			# Smorfia di dolore: gli occhi si strizzano in due fessure.
-			var size := radius * eye.z
-			var ink := ink_width() * 0.6
-			Shapes.oval(self, at, Vector2(size + ink, size * 0.3 + ink), Shapes.INK)
-			Shapes.oval(self, at, Vector2(size, size * 0.3), COLOR_ZOMBIE_EYES)
-		else:
-			Shapes.ink_disc(self, at, radius * eye.z, COLOR_ZOMBIE_EYES, ink_width() * 0.6)
-	var mouth := eyes + Vector2(0, radius * 0.35)
-	var open := 0.12 + (0.12 if pained or _state in [State.WINDUP, State.STRIKE, State.SUMMON] else 0.0)
-	draw_colored_polygon(PackedVector2Array([mouth - across * radius * 0.25, mouth + across * radius * 0.25, mouth + Vector2(0, radius * open)]), Color(0.12, 0.02, 0.03))
+	GoblinLook.dots(self, eyes, radius, _facing, 1.0, in_pain())
 	if _type.get("spit", false) or is_casting():
 		var charge := clampf(_state_time / _windup_time, 0.0, 1.0) if _state == State.WINDUP else 0.0
-		Shapes.disc(self, mouth + Vector2(0, radius * open), radius * (0.08 + 0.12 * charge), Color(COLOR_ACID, 0.7 + 0.3 * charge))
+		Shapes.disc(self, eyes + Vector2(0, radius * 0.45), radius * (0.08 + 0.12 * charge), Color(COLOR_ACID, 0.7 + 0.3 * charge))
 	_draw_claws()
 
 
 ## Artigli del ghoul: braccia lunghe con tre unghie ricurve. Come le spade,
 ## durante la carica si portano indietro e poi spazzano l'arco
-## dell'attacco; chi sputa le tiene basse e punta la bocca.
+## dell'attacco; chi sputa le tiene basse e punta il muso.
 func _draw_claws() -> void:
 	var angles := _sword_angles()
 	var angle := _facing.angle() + 0.5
@@ -2054,13 +2034,11 @@ func _draw_growths(body: Color) -> void:
 		Shapes.disc(self, at + Vector2(-size * 0.3, -size * 0.3), size * 0.35, growth.lightened(0.25))
 
 
-## Non morto delle orde: niente armi, due occhi rossi, braccia tese in
-## avanti con le mani ossute e stracci che pendono dal corpo.
+## Non morto delle orde: niente armi, due occhi piccoli e neri come tutti,
+## braccia tese in avanti con le mani ossute e stracci che pendono dal corpo.
 func _draw_undead() -> void:
 	var across := _facing.orthogonal()
-	var eyes := _facing * radius * 0.45 + Vector2(0, -radius * 0.15)
-	for side: float in [-1.0, 1.0]:
-		Shapes.disc(self, eyes + across * radius * 0.25 * side, maxf(radius * 0.1, 2.0), COLOR_ZOMBIE_EYES)
+	GoblinLook.dots(self, _facing * radius * 0.45 + Vector2(0, -radius * 0.15), radius, _facing)
 	var reach := _facing * radius * 0.95
 	for side: float in [-1.0, 1.0]:
 		var hand := reach + across * radius * 0.4 * side
@@ -2098,7 +2076,7 @@ func _body_transform() -> Transform2D:
 	return Transform2D(_hurt_tilt, Vector2(1.0 + squash, 1.0 - squash), 0.0, offset + bottom) * Transform2D(0.0, -bottom)
 
 
-## Smorfia di dolore: occhi socchiusi e bocca aperta subito dopo un colpo
+## Smorfia di dolore: occhi socchiusi (due trattini) subito dopo un colpo
 ## e mentre barcolla.
 func in_pain() -> bool:
 	return _state != State.DEAD and (_hurt_age < PAIN_FACE_TIME or _state == State.STAGGER)
@@ -2113,7 +2091,7 @@ func _prepare_meshes() -> void:
 
 
 ## Spessore delle linee nere del nemico: il contorno del corpo e delle
-## orecchie e quello di occhi e bocca sono uguali, proporzionati al raggio
+## orecchie sono uguali, proporzionati al raggio
 ## (Shapes.INK_WIDTH per un goblin grande come il giocatore).
 func ink_width() -> float:
 	return Shapes.INK_WIDTH * radius / Player.RADIUS
