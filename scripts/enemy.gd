@@ -128,10 +128,15 @@ const POISE_REFILL_TIME := 1.5
 const COLOR_POISE := Color(1.0, 0.82, 0.25)
 ## Nemici élite (vedi make_elite e la voce "elites" di data/world.json): più
 ## grossi, più resistenti, con più esperienza e bottino sicuro, avvolti da
-## un'aura che pulsa (ELITE_AURA_*), che il buio non spegne.
+## un'aura che pulsa (ELITE_AURA_*) e da un anello dorato a terra
+## (ELITE_RING_*, vedi _draw_elite_ring), che il buio non spegne e che si
+## vedono anche di giorno sul terreno chiaro.
 const COLOR_ELITE_AURA := Color(1.0, 0.75, 0.2)
-const ELITE_AURA_RADIUS := 1.7
-const ELITE_AURA_ALPHA := 0.4
+const ELITE_AURA_RADIUS := 1.8
+const ELITE_AURA_ALPHA := 0.55
+const ELITE_RING_RADIUS := 1.35
+const ELITE_RING_WIDTH := 3.0
+const ELITE_RING_GLOW_ALPHA := 0.45
 ## Attacchi che non si possono parare (voce "unblockable" del tipo o del suo
 ## "slam" in data/enemies.json): mentre li carica, sopra la testa c'è un
 ## triangolo rosso col punto esclamativo (vedi _draw_unblockable_icon).
@@ -897,8 +902,9 @@ func _physics_process(delta: float) -> void:
 	elif _silhouette.visible:
 		_silhouette.visible = false
 	_redraw_danger()
-	if _state in [State.SUMMON, State.SLAM] or _telegraph_shown:
-		_telegraph_shown = _state in [State.SUMMON, State.SLAM]
+	var elite_ring := is_elite and _state != State.DEAD and _on_screen()
+	if _state in [State.SUMMON, State.SLAM] or elite_ring or _telegraph_shown:
+		_telegraph_shown = _state in [State.SUMMON, State.SLAM] or elite_ring
 		_telegraph.queue_redraw()
 
 
@@ -1853,6 +1859,8 @@ func _on_screen() -> bool:
 ## più una zona a terra: si riconosce dal corpo che si accende e dalla spada
 ## (o dal bastone) portata indietro.
 func _draw_telegraph() -> void:
+	if is_elite and _state != State.DEAD:
+		_draw_elite_ring()
 	if _state == State.SLAM and not _slam_landed:
 		var slam: Dictionary = _type["slam"]
 		var total := float(slam["windup"]) + _slam_air_time(slam)
@@ -2118,7 +2126,7 @@ func _draw_danger_back() -> void:
 		return
 	if is_elite:
 		# Aura dell'élite: un bagliore dorato che pulsa piano.
-		var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.004 + _update_slot)
+		var pulse := _elite_pulse()
 		_danger_back.draw_set_transform(_body_offset())
 		Shapes.glow(_danger_back, Vector2.ZERO, radius * ELITE_AURA_RADIUS * (0.92 + 0.12 * pulse), Color(COLOR_ELITE_AURA, ELITE_AURA_ALPHA * (0.7 + 0.3 * pulse)))
 	if _state == State.WINDUP and not _is_ranged():
@@ -2135,6 +2143,21 @@ func _draw_danger_back() -> void:
 		var offset := Vector2(point.x, point.y) - global_position
 		_danger_back.draw_set_transform(offset + Vector2(0, -ground_elevation - point.z - leg), 0.0, Vector2.ONE * (0.75 + 0.25 * fade))
 		_danger_back.draw_mesh(_body_mesh, null, Transform2D.IDENTITY, Color(COLOR_DANGER, TRAIL_ALPHA * fade * fade))
+
+
+## Battito dell'aura e dell'anello dell'élite (da 0 a 1).
+func _elite_pulse() -> float:
+	return 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.004 + _update_slot)
+
+
+## Anello dorato a terra sotto l'élite, con un bagliore, che pulsa con l'aura.
+func _draw_elite_ring() -> void:
+	var pulse := _elite_pulse()
+	var ring := radius * ELITE_RING_RADIUS * (0.95 + 0.1 * pulse)
+	Shapes.glow(_telegraph, Vector2.ZERO, ring * 1.3, Color(COLOR_ELITE_AURA, ELITE_RING_GLOW_ALPHA * (0.7 + 0.3 * pulse)), GroundFx.GROUND_SQUASH)
+	_telegraph.draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, GroundFx.GROUND_SQUASH))
+	_telegraph.draw_arc(Vector2.ZERO, ring, 0.0, TAU, 48, Color(COLOR_ELITE_AURA, 0.65 + 0.35 * pulse), ELITE_RING_WIDTH, true)
+	_telegraph.draw_set_transform(Vector2.ZERO)
 
 
 ## Davanti al corpo: l'arco rosso lasciato dalla spada che fende, l'icona

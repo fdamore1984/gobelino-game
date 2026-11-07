@@ -115,12 +115,28 @@ var _power_ups_panel := PanelContainer.new()
 var _power_ups_preset := -1
 ## Tempo rimasto del messaggio di fine sfida: intanto gli altri testi della sfida aspettano.
 var _challenge_flash := 0.0
+## Posizione degli avvisi della sfida scritta nella scena, fra il pannello di
+## stato e l'orologio; se l'interfaccia grande lascia lì meno di
+## CHALLENGE_MIN_WIDTH, scendono sopra la barra delle azioni, CHALLENGE_LOW_TOP
+## sopra il fondo dello schermo (vedi _layout_challenge).
+var _challenge_offsets := Vector4.ZERO
+const CHALLENGE_MIN_WIDTH := 300.0
+const CHALLENGE_LOW_TOP := 210.0
+const CHALLENGE_LOW_MARGIN := 60.0
+## Obiettivo della missione: fra il pannello di stato e l'orologio, e se non ci
+## sta va a capo.
+const OBJECTIVE_LEFT := 410.0
+const OBJECTIVE_RIGHT := 345.0
 
 
 func _ready() -> void:
 	_deck_hint.text = tr("DECK_HINT")
 	_message.visible = false
 	_challenge.visible = false
+	_challenge_offsets = Vector4(_challenge.offset_left, _challenge.offset_top, _challenge.offset_right, _challenge.offset_bottom)
+	_layout_challenge()
+	get_viewport().size_changed.connect(_layout_challenge)
+	Settings.changed.connect(_layout_challenge)
 	add_child(_inventory_panel)
 	add_child(_world_map)
 	add_child(_shop_panel)
@@ -131,9 +147,10 @@ func _ready() -> void:
 	_objective.visible = false
 	_objective.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_objective.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_objective.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	_objective.offset_left = -300
-	_objective.offset_right = 300
+	_objective.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_objective.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	_objective.offset_left = OBJECTIVE_LEFT
+	_objective.offset_right = -OBJECTIVE_RIGHT
 	_objective.offset_top = 12
 	_objective.add_theme_font_size_override("font_size", 18)
 	_objective.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4))
@@ -448,6 +465,25 @@ func flash_challenge(text: String) -> void:
 	_challenge.text = text
 	_challenge.visible = true
 	_challenge_flash = CHALLENGE_FLASH_TIME
+
+
+## Avvisi della sfida al loro posto in alto o, se lì non c'è spazio
+## (interfaccia grande o schermo stretto), in basso sopra la barra delle
+## azioni, larghi quasi quanto lo schermo e lontani dal personaggio.
+func _layout_challenge() -> void:
+	var screen := get_viewport().get_visible_rect().size
+	var width := screen.x
+	if width - _challenge_offsets.x + _challenge_offsets.z >= CHALLENGE_MIN_WIDTH:
+		_challenge.offset_left = _challenge_offsets.x
+		_challenge.offset_top = _challenge_offsets.y
+		_challenge.offset_right = _challenge_offsets.z
+		_challenge.offset_bottom = _challenge_offsets.w
+	else:
+		var height := _challenge_offsets.w - _challenge_offsets.y
+		_challenge.offset_left = CHALLENGE_LOW_MARGIN
+		_challenge.offset_right = -CHALLENGE_LOW_MARGIN
+		_challenge.offset_top = screen.y - CHALLENGE_LOW_TOP
+		_challenge.offset_bottom = screen.y - CHALLENGE_LOW_TOP + height
 
 
 func show_message(text: String) -> void:
