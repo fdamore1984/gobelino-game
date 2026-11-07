@@ -633,7 +633,7 @@ func _capture_horde(language: String) -> void:
 	var origin := _player.position
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
-	for k in 120:
+	for k in 35:
 		var at := origin + Vector2(rng.randf_range(160, 760), rng.randf_range(-260, 320))
 		_enemy("zombie", at, Enemy.State.CHASE, 0.0)._walk_phase = rng.randf() * TAU
 	await _frames(20)

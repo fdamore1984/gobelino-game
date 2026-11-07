@@ -235,7 +235,7 @@ const COLOR_CLAWS := Color(0.88, 0.85, 0.75)
 const COLOR_ACID := Color(0.55, 1.0, 0.25)
 const ZOMBIE_SPEED_SPREAD := 0.15
 const CONTACT_MARGIN := 6.0
-const BURST_SPLATS := 5
+const BURST_SPLATS := 3
 
 var player: Player
 var type_id := "warrior"
@@ -831,7 +831,7 @@ func take_points(points: int, direction: Vector2, heavy := false, force := false
 		_fall_side = 1.0 if direction.x >= 0.0 else -1.0
 		_trail.clear()
 		_silhouette.visible = false
-		# Gli zombie che si spappolano non lasciano la pozza (solo gli schizzi).
+		# I non morti che si disfano non lasciano la pozza (solo gli schizzi).
 		if not force or not is_horde():
 			GroundFx.pool(global_position, radius * DEATH_POOL)
 		_change_state(State.DEAD)
